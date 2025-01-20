@@ -7,17 +7,22 @@ import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * This is a simple User Defined Sink example which logs the input message
  */
 
-@Slf4j
+
 public class SimpleSink extends Sinker {
+    private static final Logger log = LoggerFactory.getLogger(SimpleSink.class);
+
 
     public static void main(String[] args) throws Exception {
         Server server = new Server(new SimpleSink());
+
 
         // Start the server
         server.start();
