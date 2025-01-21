@@ -18,9 +18,7 @@ spec:
       sink:
         udsink:
           container:
-            image: simple-sink-logger:latest  # Updated image tag
-            imagePullPolicy: Never
-
+            image: my-sink:latest
   edges:
     - from: in
       to: p1

@@ -1,4 +1,5 @@
-package org.example;
+package io.numaproj.numaflow.examples.sink.simple;
+
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.Response;
@@ -7,21 +8,12 @@ import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
 import lombok.extern.slf4j.Slf4j;
 
-
-/**
- * This is a simple User Defined Sink example which logs the input message
- */
-
 @Slf4j
 public class SimpleSink extends Sinker {
 
     public static void main(String[] args) throws Exception {
         Server server = new Server(new SimpleSink());
-
-        // Start the server
         server.start();
-
-        // wait for the server to shut down
         server.awaitTermination();
     }
 
@@ -36,7 +28,6 @@ public class SimpleSink extends Sinker {
                 Thread.currentThread().interrupt();
                 continue;
             }
-            // null means the iterator is closed, so we break the loop
             if (datum == null) {
                 break;
             }
@@ -45,9 +36,7 @@ public class SimpleSink extends Sinker {
                 log.info("Received message: {}, headers - {}", msg, datum.getHeaders());
                 responseListBuilder.addResponse(Response.responseOK(datum.getId()));
             } catch (Exception e) {
-                responseListBuilder.addResponse(Response.responseFailure(
-                        datum.getId(),
-                        e.getMessage()));
+                responseListBuilder.addResponse(Response.responseFailure(datum.getId(), e.getMessage()));
             }
         }
         return responseListBuilder.build();
