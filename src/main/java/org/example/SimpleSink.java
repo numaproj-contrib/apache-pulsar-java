@@ -1,4 +1,5 @@
 package org.example;
+
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.Response;
