@@ -7,23 +7,33 @@ import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
-
-/**
- * This is a simple User Defined Sink example which logs the input message
- */
+import javax.annotation.PostConstruct;
 
 @Slf4j
+@Component
 public class SimpleSink extends Sinker {
 
-    public static void main(String[] args) throws Exception {
-        Server server = new Server(new SimpleSink());
+    private Server server;
+
+    @PostConstruct // starts server automatically when the spring context initializes
+    public void startServer() throws Exception {
+        server = new Server(new SimpleSink());
 
         // Start the server
         server.start();
 
-        // wait for the server to shut down
-        server.awaitTermination();
+        // Wait for the server to shut down in a separate thread
+        Thread awaitThread = new Thread(() -> {
+            try {
+                server.awaitTermination();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        awaitThread.setDaemon(false);
+        awaitThread.start();
     }
 
     @Override
