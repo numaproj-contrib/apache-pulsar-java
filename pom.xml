@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
+    <groupId>io.numaproj.pulsar</groupId>
     <artifactId>apache-pulsar-java</artifactId>
     <version>1.0-SNAPSHOT</version>
 
@@ -80,7 +80,7 @@
                                 <image>amazoncorretto:21</image>
                             </from>
                             <container>
-                                <mainClass>org.example.MyApplication</mainClass>
+                                <mainClass>io.numaproj.pulsar.MyApplication</mainClass>
 
                             </container>
                             <to>
