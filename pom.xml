@@ -9,8 +9,8 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -28,19 +28,20 @@
             <artifactId>numaflow-java</artifactId>
             <version>0.9.0</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>org.projectlombok</groupId>-->
-<!--            <artifactId>lombok</artifactId>-->
-<!--            <version>1.18.36</version>-->
-<!--            <scope>compile</scope>-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>org.slf4j</groupId>-->
-<!--            <artifactId>slf4j-simple</artifactId>-->
-<!--            <version>2.0.7</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.7</version>
+        </dependency>
 
     </dependencies>
+
 
     <dependencyManagement>
         <dependencies>
@@ -54,38 +55,44 @@
         </dependencies>
     </dependencyManagement>
 
+
     <build>
+
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>3.4.2</version>
             </plugin>
-<!--            <plugin>-->
-<!--                <groupId>com.google.cloud.tools</groupId>-->
-<!--                <artifactId>jib-maven-plugin</artifactId>-->
-<!--                <version>3.3.0</version>-->
-<!--                    <execution>-->
-<!--                        <id>image-build</id>-->
-<!--                        <phase>package</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>dockerBuild</goal>-->
-<!--                        </goals> d-->
-<!--                        <configuration>-->
-<!--                            <from>-->
-<!--                                <image>amazoncorretto:11</image>-->
-<!--                            </from>-->
-<!--                            <container>-->
-<!--                                <mainClass>org.example.SimpleSink</mainClass>-->
-<!--                            </container>-->
-<!--                            <to>-->
-<!--                                <image>my-sink:v0.0.2</image>-->
-<!--                            </to>-->
-<!--                        </configuration>-->
-<!--                    </execution>-->
-<!--            </plugin>-->
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>image-build</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>dockerBuild</goal>
+                        </goals>
+                        <configuration>
+                            <from>
+                                <image>amazoncorretto:21</image>
+                            </from>
+                            <container>
+                                <mainClass>org.example.MyApplication</mainClass>
+
+                            </container>
+                            <to>
+                                <image>
+                                    my-sink:v0.0.2
+                                </image>
+                            </to>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
-
 
 </project>
