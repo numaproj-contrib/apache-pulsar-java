@@ -5,7 +5,8 @@ target/
 
 ### IntelliJ IDEA ###
 .idea/*
-*.iml 
+*.iml
+
 
 ### Eclipse ###
 .apt_generated
@@ -28,6 +29,7 @@ build/
 
 ### VS Code ###
 .vscode/
+.qodo
 
 ### Mac OS ###
 .DS_Store

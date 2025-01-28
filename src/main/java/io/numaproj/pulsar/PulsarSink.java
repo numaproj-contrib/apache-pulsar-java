@@ -1,4 +1,4 @@
-package org.example;
+package io.numaproj.pulsar;
 
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
@@ -7,23 +7,24 @@ import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
-
-/**
- * This is a simple User Defined Sink example which logs the input message
- */
+import javax.annotation.PostConstruct;
 
 @Slf4j
-public class SimpleSink extends Sinker {
+@Component
+public class PulsarSink extends Sinker {
 
-    public static void main(String[] args) throws Exception {
-        Server server = new Server(new SimpleSink());
+    private Server server;
 
-        // Start the server
+    @PostConstruct // starts server automatically when the spring context initializes
+    public void startServer() throws Exception {
+        server = new Server(new PulsarSink());
+
         server.start();
-
-        // wait for the server to shut down
         server.awaitTermination();
+
+
     }
 
     @Override
