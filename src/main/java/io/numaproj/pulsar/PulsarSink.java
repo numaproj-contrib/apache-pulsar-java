@@ -13,27 +13,18 @@ import javax.annotation.PostConstruct;
 
 @Slf4j
 @Component
-public class SimpleSink extends Sinker {
+public class PulsarSink extends Sinker {
 
     private Server server;
 
     @PostConstruct // starts server automatically when the spring context initializes
     public void startServer() throws Exception {
-        server = new Server(new SimpleSink());
+        server = new Server(new PulsarSink());
 
-        // Start the server
         server.start();
+        server.awaitTermination();
 
-        // Wait for the server to shut down in a separate thread
-        Thread awaitThread = new Thread(() -> {
-            try {
-                server.awaitTermination();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
-        awaitThread.setDaemon(false);
-        awaitThread.start();
+
     }
 
     @Override
