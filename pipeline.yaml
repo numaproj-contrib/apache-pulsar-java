@@ -1,7 +1,7 @@
 apiVersion: numaflow.numaproj.io/v1alpha1
 kind: Pipeline
 metadata:
-  name: udsink-pipeline
+  name: simple-pipeline
 spec:
   vertices:
     - name: in
@@ -18,7 +18,7 @@ spec:
       sink:
         udsink:
           container:
-            image: my-sink:v0.0.2
+            image: my-sink:v0.0.3
             imagePullPolicy: Never
 
   edges:

@@ -1,0 +1,9 @@
+server:
+  port: 9191
+
+spring:
+  pulsar:
+    client:
+      service-url: pulsar://host.docker.internal:6650
+    producer:
+      topic-name: demo-topic

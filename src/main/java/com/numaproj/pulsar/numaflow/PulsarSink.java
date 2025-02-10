@@ -1,5 +1,6 @@
-package io.numaproj.pulsar;
+package com.numaproj.pulsar.numaflow;
 
+import com.numaproj.pulsar.producer.EventPublisher;
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.Response;
@@ -7,6 +8,7 @@ import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -15,16 +17,16 @@ import javax.annotation.PostConstruct;
 @Component
 public class PulsarSink extends Sinker {
 
+    @Autowired
+    private EventPublisher publisher;
+
     private Server server;
 
     @PostConstruct // starts server automatically when the spring context initializes
     public void startServer() throws Exception {
-        server = new Server(new PulsarSink());
-
+        server = new Server(this);
         server.start();
         server.awaitTermination();
-
-
     }
 
     @Override
@@ -44,12 +46,14 @@ public class PulsarSink extends Sinker {
             }
             try {
                 String msg = new String(datum.getValue());
-                log.info("Received message: {}, headers - {}", msg, datum.getHeaders());
+                publisher.publishPlainMessage(msg);
+                log.info("Processed message ID: {}", datum.getId());
                 responseListBuilder.addResponse(Response.responseOK(datum.getId()));
             } catch (Exception e) {
-                responseListBuilder.addResponse(Response.responseFailure(
-                        datum.getId(),
-                        e.getMessage()));
+                log.error("Error processing message with ID {}: {}", datum.getId(), e.getMessage(), e);
+                responseListBuilder.addResponse(
+                        Response.responseFailure(datum.getId(), e.getMessage())
+                );
             }
         }
         return responseListBuilder.build();
