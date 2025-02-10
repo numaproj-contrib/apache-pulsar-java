@@ -14,17 +14,17 @@ import javax.annotation.PostConstruct;
 public class EventPublisher {
 
 
-    @Value("${spring.pulsar.producer.topic-name1}")
-    private String topicName1;
+    @Value("${spring.pulsar.producer.topic-name}")
+    private String topicName;
 
     @PostConstruct
     public void init() {
         if (pulsarTemplate == null) {
             log.error("PulsarTemplate is not instantiated!");
         } else {
-            log.info("PulsarTemplate is successfully ≈.");
+            log.info("PulsarTemplate is successfully instantiated.");
         }
-        log.info("Loaded topic name: {}", topicName1);
+        log.info("Loaded topic name: {}", topicName);
     }
 
     @Autowired
@@ -32,7 +32,7 @@ public class EventPublisher {
 
 
     public void publishPlainMessage(String message) throws PulsarClientException {
-        pulsarTemplate.send(topicName1, message);
+        pulsarTemplate.send(topicName, message);
         log.info("EventPublisher::publishPlainMessage publish the event {}", message);
     }
 
