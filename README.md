@@ -10,6 +10,7 @@ Apache Pulsar user-defined source and sink implemented using Java.
 #### Numaflow:
 *     mvn clean install
 *     kubectl apply -f pipeline.yaml
+*     kubectl apply -f pulsar-config-map.yaml 
 *     kubectl -n numaflow-system port-forward deployment/numaflow-server 8443:8443
 
 This builds the UDsink image, and the pipeline file uses it. Go to https://localhost:8443/ to use Numaflow UI
