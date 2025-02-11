@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-config
+data:
+  service-url: "pulsar://host.docker.internal:6650"
+  topic-name: "test-topic"

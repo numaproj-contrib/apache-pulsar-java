@@ -4,6 +4,6 @@ server:
 spring:
   pulsar:
     client:
-      service-url: pulsar://host.docker.internal:6650
+      service-url: ${PULSAR_SERVICE_URL:pulsar://host.docker.internal:6650}
     producer:
-      topic-name: demo-topic
+      topic-name: ${PULSAR_TOPIC_NAME:demo-topic}
