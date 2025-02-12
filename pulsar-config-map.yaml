@@ -1,7 +1,22 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pulsar-config
+  name: pulsar-producer-config
 data:
-  service-url: "pulsar://host.docker.internal:6650"
-  topic-name: "test-topic"
+  application.yml: |
+    spring:
+      pulsar:
+        client:
+          service-url: "pulsar://host.docker.internal:6650"
+        producer:
+          topic-name: "test-topic"
+          producerConfig:
+            producerName: "test-producer"
+            sendTimeoutMs: 2000
+      application:
+        name: pulsar-producer-app
+      cloud:
+        kubernetes:
+          config:
+            enabled: true
+            name: pulsar-producer-config

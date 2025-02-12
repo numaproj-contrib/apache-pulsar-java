@@ -2,8 +2,10 @@ server:
   port: 9191
 
 spring:
-  pulsar:
-    client:
-      service-url: ${PULSAR_SERVICE_URL:pulsar://host.docker.internal:6650}
-    producer:
-      topic-name: ${PULSAR_TOPIC_NAME:demo-topic}
+  application:
+      name: spring-pulsar
+  cloud:
+    kubernetes:
+      config:
+        enabled: true
+        name: pulsar-producer-config
