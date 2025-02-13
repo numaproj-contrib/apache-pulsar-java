@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pulsar-producer-config
+  name: pulsar-config
 data:
   application.yml: |
     spring:
