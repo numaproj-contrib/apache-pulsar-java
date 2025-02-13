@@ -6,27 +6,28 @@ import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import com.numaproj.pulsar.config.PulsarClientProperties;
+import com.numaproj.pulsar.config.PulsarProducerProperties;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.Map;
 
 @Component
 @Slf4j
 public class EventPublisher {
 
-    @Value("${spring.pulsar.client.service-url}")
-    private String serviceUrl;
-
+    private final PulsarClientProperties pulsarClientProperties;
     private final PulsarProducerProperties pulsarProducerProperties;
 
     private PulsarClient pulsarClient;
     private Producer<String> producer;
 
     @Autowired
-    public EventPublisher(PulsarProducerProperties pulsarProducerProperties) {
+    public EventPublisher(PulsarClientProperties pulsarClientProperties,
+            PulsarProducerProperties pulsarProducerProperties) {
+        this.pulsarClientProperties = pulsarClientProperties;
         this.pulsarProducerProperties = pulsarProducerProperties;
     }
 
@@ -34,7 +35,7 @@ public class EventPublisher {
     public void init() {
         try {
             pulsarClient = PulsarClient.builder()
-                    .serviceUrl(serviceUrl)
+                    .loadConf(pulsarClientProperties.getClientConfig())
                     .build();
 
             producer = pulsarClient.newProducer(Schema.STRING)
@@ -42,11 +43,6 @@ public class EventPublisher {
                     .create();
 
             log.info("PulsarClient and Producer are successfully instantiated.");
-      
-            log.info("Producer configuration loaded:");
-            for (Map.Entry<String, Object> entry : pulsarProducerProperties.getProducerConfig().entrySet()) {
-                log.info("Key: {}, Value: {}", entry.getKey(), entry.getValue());
-            }
         } catch (PulsarClientException e) {
             log.error("Failed to create PulsarClient or Producer", e);
         }

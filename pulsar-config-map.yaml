@@ -6,10 +6,11 @@ data:
   application.yml: |
     spring:
       pulsar:
-        client:
-          service-url: "pulsar://host.docker.internal:6650"
+        client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
+          clientConfig:
+            serviceUrl: "pulsar://host.docker.internal:6650"
         producer:
-          producerConfig:
+          producerConfig: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer
             topicName: "test-config-topic" 
             producerName: "test-producer"
             sendTimeoutMs: 2000
