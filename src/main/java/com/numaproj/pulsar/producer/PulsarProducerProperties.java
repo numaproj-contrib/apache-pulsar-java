@@ -13,7 +13,5 @@ import java.util.Map;
 @Configuration
 @ConfigurationProperties(prefix = "spring.pulsar.producer")
 public class PulsarProducerProperties {
-
-    private String topicName;
     private Map<String, Object> producerConfig = new HashMap<>(); // Default to an empty map
 }

@@ -38,14 +38,11 @@ public class EventPublisher {
                     .build();
 
             producer = pulsarClient.newProducer(Schema.STRING)
-                    .topic(pulsarProducerProperties.getTopicName())
                     .loadConf(pulsarProducerProperties.getProducerConfig())
                     .create();
 
             log.info("PulsarClient and Producer are successfully instantiated.");
-            log.info("Loaded topic name: {}", pulsarProducerProperties.getTopicName());
-
-            // Log the key-value pairs in the producerConfig map
+      
             log.info("Producer configuration loaded:");
             for (Map.Entry<String, Object> entry : pulsarProducerProperties.getProducerConfig().entrySet()) {
                 log.info("Key: {}, Value: {}", entry.getKey(), entry.getValue());

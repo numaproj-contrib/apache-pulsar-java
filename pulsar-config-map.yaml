@@ -9,7 +9,7 @@ data:
         client:
           service-url: "pulsar://host.docker.internal:6650"
         producer:
-          topic-name: "test-topic"
           producerConfig:
+            topicName: "test-config-topic" 
             producerName: "test-producer"
             sendTimeoutMs: 2000
