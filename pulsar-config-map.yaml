@@ -13,10 +13,3 @@ data:
           producerConfig:
             producerName: "test-producer"
             sendTimeoutMs: 2000
-      application:
-        name: pulsar-producer-app
-      cloud:
-        kubernetes:
-          config:
-            enabled: true
-            name: pulsar-producer-config

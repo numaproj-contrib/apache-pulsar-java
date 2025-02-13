@@ -4,8 +4,3 @@ server:
 spring:
   application:
       name: spring-pulsar
-  cloud:
-    kubernetes:
-      config:
-        enabled: true
-        name: pulsar-producer-config
