@@ -26,4 +26,3 @@ curl \
 -d '{"name": "admin", "password": "apachepulsar", "description": "test", "email": "username@test.org"}'
 ````
 
-

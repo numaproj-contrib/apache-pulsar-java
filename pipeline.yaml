@@ -15,23 +15,22 @@ spec:
         builtin:
           name: cat
     - name: out
+      volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
+        - name: pulsar-config-volume
+          configMap:
+            name: pulsar-config 
+            items:
+              - key: application.yml
+                path: application.yml
       sink:
         udsink:
           container:
             image: my-sink:v0.0.3
+            args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
             imagePullPolicy: Never
-            env:
-              - name: PULSAR_SERVICE_URL
-                valueFrom:
-                  configMapKeyRef:
-                    name: pulsar-config
-                    key: service-url
-              - name: PULSAR_TOPIC_NAME
-                valueFrom:
-                  configMapKeyRef:
-                    name: pulsar-config
-                    key: topic-name
-
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
   edges:
     - from: in
       to: p1

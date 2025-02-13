@@ -3,5 +3,14 @@ kind: ConfigMap
 metadata:
   name: pulsar-config
 data:
-  service-url: "pulsar://host.docker.internal:6650"
-  topic-name: "test-topic"
+  application.yml: |
+    spring:
+      pulsar:
+        client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
+          clientConfig:
+            serviceUrl: "pulsar://host.docker.internal:6650"
+        producer:
+          producerConfig: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer
+            topicName: "test-config-topic" 
+            producerName: "test-producer"
+            sendTimeoutMs: 2000
