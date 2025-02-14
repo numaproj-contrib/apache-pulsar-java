@@ -21,7 +21,7 @@ import com.numaproj.pulsar.config.PulsarProducerProperties;
  * application context.
  */
 @Configuration
-public class PulsarBeanConfig {
+public class PulsarConfig {
 
     @Autowired
     private PulsarClientProperties pulsarClientProperties;
@@ -50,10 +50,6 @@ public class PulsarBeanConfig {
                     .loadConf(pulsarProducerProperties.getProducerConfig())
                     .create();
         }
-
-        @Bean
-        public EventPublisher eventPublisher(@Autowired Producer<String> pulsarProducer) {
-            return new EventPublisher(pulsarProducer);
-        }
+    
     }
 }
