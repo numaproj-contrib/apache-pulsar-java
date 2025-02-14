@@ -1,0 +1,41 @@
+package com.numaproj.pulsar.producer;
+
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.Producer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import com.numaproj.pulsar.config.PulsarClientProperties;
+import com.numaproj.pulsar.config.PulsarProducerProperties;
+
+
+/***
+ *
+ * For each @Configuration annotated class it finds, Spring will create an instance of that configuration class
+ * and then call the methods marked with @Bean to get the instances of beans.
+ * The objects returned by these methods are then registered within the Spring application context.
+ */
+
+@Configuration
+//TO DO: make this a conditional
+public class PulsarBeanConfig {
+    @Bean
+    public PulsarClient pulsarClient(PulsarClientProperties pulsarClientProperties) throws Exception {
+        return PulsarClient.builder()
+                .loadConf(pulsarClientProperties.getClientConfig())
+                .build();
+    }
+
+    @Bean
+    public Producer<String> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties) throws Exception {
+        return pulsarClient.newProducer(Schema.STRING)
+                .loadConf(pulsarProducerProperties.getProducerConfig())
+                .create();
+    }
+
+    @Bean
+    public EventPublisher eventPublisher(Producer<String> producer) {
+        return new EventPublisher(producer);
+    }
+}
