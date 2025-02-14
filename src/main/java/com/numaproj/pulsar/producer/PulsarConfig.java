@@ -29,8 +29,8 @@ public class PulsarConfig {
     }
 
     @Bean
-    public Producer<String> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties) throws Exception {
-        return pulsarClient.newProducer(Schema.STRING)
+    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties) throws Exception {
+        return pulsarClient.newProducer(Schema.BYTES)
                 .loadConf(pulsarProducerProperties.getProducerConfig())
                 .create();
     }

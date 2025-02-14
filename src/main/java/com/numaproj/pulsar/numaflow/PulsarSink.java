@@ -21,13 +21,11 @@ import javax.annotation.PostConstruct;
 @Component
 public class PulsarSink extends Sinker {
 
-
     @Autowired
-    private Producer<String> producer;
+    private Producer<byte[]> producer;
 
     @Autowired
     private PulsarClient pulsarClient;
-
 
     private Server server;
 
@@ -54,9 +52,9 @@ public class PulsarSink extends Sinker {
                 break;
             }
             try {
-                String msg = new String(datum.getValue());
+                byte[] msg = datum.getValue();
                 producer.send(msg);
-                log.info("Processed message ID: {}", datum.getId());
+                log.info("Processed message ID: {}, Content: {}", datum.getId(), new String(msg));
                 responseListBuilder.addResponse(Response.responseOK(datum.getId()));
             } catch (Exception e) {
                 log.error("Error processing message with ID {}: {}", datum.getId(), e.getMessage(), e);
@@ -66,6 +64,7 @@ public class PulsarSink extends Sinker {
         }
         return responseListBuilder.build();
     }
+
     @PreDestroy
     public void cleanup() {
         try {
