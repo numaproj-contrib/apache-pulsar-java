@@ -1,4 +1,4 @@
-package com.numaproj.pulsar.numaflow;
+package io.numaproj.pulsar.numaflow;
 
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;

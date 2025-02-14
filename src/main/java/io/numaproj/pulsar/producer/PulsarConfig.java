@@ -1,4 +1,4 @@
-package com.numaproj.pulsar.producer;
+package io.numaproj.pulsar.producer;
 
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -7,8 +7,8 @@ import org.apache.pulsar.client.api.Producer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.numaproj.pulsar.config.PulsarClientProperties;
-import com.numaproj.pulsar.config.PulsarProducerProperties;
+import io.numaproj.pulsar.config.PulsarClientProperties;
+import io.numaproj.pulsar.config.PulsarProducerProperties;
 
 /***
  *
