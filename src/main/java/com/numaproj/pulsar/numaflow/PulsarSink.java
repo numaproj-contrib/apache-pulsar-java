@@ -1,13 +1,17 @@
 package com.numaproj.pulsar.numaflow;
 
-import com.numaproj.pulsar.producer.EventPublisher;
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.Response;
 import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
+import javax.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +22,10 @@ import javax.annotation.PostConstruct;
 public class PulsarSink extends Sinker {
 
     @Autowired
-    private EventPublisher publisher;
+    private Producer<byte[]> producer;
+
+    @Autowired
+    private PulsarClient pulsarClient;
 
     private Server server;
 
@@ -45,17 +52,33 @@ public class PulsarSink extends Sinker {
                 break;
             }
             try {
-                String msg = new String(datum.getValue());
-                publisher.publishPlainMessage(msg);
-                log.info("Processed message ID: {}", datum.getId());
+                byte[] msg = datum.getValue();
+                producer.send(msg);
+                log.info("Processed message ID: {}, Content: {}", datum.getId(), new String(msg));
                 responseListBuilder.addResponse(Response.responseOK(datum.getId()));
             } catch (Exception e) {
                 log.error("Error processing message with ID {}: {}", datum.getId(), e.getMessage(), e);
                 responseListBuilder.addResponse(
-                        Response.responseFailure(datum.getId(), e.getMessage())
-                );
+                        Response.responseFailure(datum.getId(), e.getMessage()));
             }
         }
         return responseListBuilder.build();
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        try {
+            if (producer != null) {
+                producer.close();
+                log.info("Producer closed.");
+            }
+
+            if (pulsarClient != null) {
+                pulsarClient.close();
+                log.info("PulsarClient closed.");
+            }
+        } catch (PulsarClientException e) {
+            log.error("Error while closing PulsarClient or Producer", e);
+        }
     }
 }
