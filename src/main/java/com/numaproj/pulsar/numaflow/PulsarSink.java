@@ -6,9 +6,12 @@ import io.numaproj.numaflow.sinker.Response;
 import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
+import javax.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +24,10 @@ public class PulsarSink extends Sinker {
 
     @Autowired
     private Producer<String> producer;
+
+    @Autowired
+    private PulsarClient pulsarClient;
+
 
     private Server server;
 
@@ -54,10 +61,25 @@ public class PulsarSink extends Sinker {
             } catch (Exception e) {
                 log.error("Error processing message with ID {}: {}", datum.getId(), e.getMessage(), e);
                 responseListBuilder.addResponse(
-                        Response.responseFailure(datum.getId(), e.getMessage())
-                );
+                        Response.responseFailure(datum.getId(), e.getMessage()));
             }
         }
         return responseListBuilder.build();
+    }
+    @PreDestroy
+    public void cleanup() {
+        try {
+            if (producer != null) {
+                producer.close();
+                log.info("Producer closed.");
+            }
+
+            if (pulsarClient != null) {
+                pulsarClient.close();
+                log.info("PulsarClient closed.");
+            }
+        } catch (PulsarClientException e) {
+            log.error("Error while closing PulsarClient or Producer", e);
+        }
     }
 }

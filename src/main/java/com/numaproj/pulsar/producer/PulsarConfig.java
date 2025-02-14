@@ -4,8 +4,6 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.Producer;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,33 +21,18 @@ import com.numaproj.pulsar.config.PulsarProducerProperties;
 @Configuration
 public class PulsarConfig {
 
-    @Autowired
-    private PulsarClientProperties pulsarClientProperties;
-
     @Bean
-    public PulsarClient pulsarClient() throws PulsarClientException {
+    public PulsarClient pulsarClient(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
         return PulsarClient.builder()
                 .loadConf(pulsarClientProperties.getClientConfig())
                 .build();
     }
 
-    // TO DO: Extend the conditional logic when implementing sink
-    @Configuration
-    @ConditionalOnProperty(name = "spring.pulsar.producer.enable", havingValue = "true", matchIfMissing = true)
-    static class ProducerConfig {
-
-        @Autowired
-        private PulsarProducerProperties pulsarProducerProperties;
-
-        @Autowired
-        private PulsarClient pulsarClient;
-
-        @Bean
-        public Producer<String> pulsarProducer() throws PulsarClientException {
-            return pulsarClient.newProducer(Schema.STRING)
-                    .loadConf(pulsarProducerProperties.getProducerConfig())
-                    .create();
-        }
-    
+    @Bean
+    public Producer<String> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties) throws Exception {
+        return pulsarClient.newProducer(Schema.STRING)
+                .loadConf(pulsarProducerProperties.getProducerConfig())
+                .create();
     }
+
 }
