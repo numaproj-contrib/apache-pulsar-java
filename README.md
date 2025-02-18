@@ -26,3 +26,4 @@ curl \
 -d '{"name": "admin", "password": "apachepulsar", "description": "test", "email": "username@test.org"}'
 ````
 
+In Pulsar Manager, once logged in, create an environment with the service URL http://pulsar:8080/ and Bookie url http://pulsar:8080/.<img width="809" alt="image" src="https://github.com/user-attachments/assets/293665d3-4528-4325-bbf7-0cbd7bc04928" />
