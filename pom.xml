@@ -67,7 +67,7 @@
                                 <image>amazoncorretto:17</image>
                             </from>
                             <container>
-                                <mainClass>com.numaproj.pulsar.PulsarApplication</mainClass>
+                                <mainClass>io.numaproj.pulsar.PulsarApplication</mainClass>
 
                             </container>
                             <to>
