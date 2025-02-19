@@ -12,6 +12,7 @@ public class PulsarProducerPropertiesTest {
         return new PulsarProducerProperties();
     }
 
+    // Test to check that the producerConfig map is initialized as an empty map by default when a new instance of PulsarClientProperties is created.
     @Test  
     public void ProducerConfig_DefaultInitialization_EmptyMap() {
         PulsarProducerProperties properties = MakePulsarProducerProperties();
@@ -21,6 +22,7 @@ public class PulsarProducerPropertiesTest {
         assertTrue(result.isEmpty());
     }
     
+    // Test to verify that the producerConfig map can be modified through the setter method.
     @Test  
     public void ProducerConfig_Modifiable_AfterInitialization() {
         PulsarProducerProperties properties = MakePulsarProducerProperties();
