@@ -5,7 +5,6 @@ import org.apache.pulsar.client.api.ProducerBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.junit.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import io.numaproj.pulsar.config.PulsarClientProperties;
 import io.numaproj.pulsar.config.PulsarProducerProperties;
@@ -13,7 +12,6 @@ import io.numaproj.pulsar.config.PulsarProducerProperties;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
@@ -24,10 +22,10 @@ public class PulsarConfigTest {
     // Successfully create PulsarClient bean with valid configuration properties
     // in-valid key-value pairs are skipped, and do not throw an error
     @Test
-    public void test_create_pulsar_client_with_valid_config() throws Exception {
+    public void pulsarClient_validConfig() throws Exception {
         PulsarClientProperties properties = mock(PulsarClientProperties.class);
         Map<String, Object> config = new HashMap<>();
-        config.put("serviceUrl", "pulsar://localhost:6650");
+        config.put("serviceUrl", "pulsar://test:1234"); // URL must include the protocol (pulsar:// or pulsar+ssl://) in order to be valid
         when(properties.getClientConfig()).thenReturn(config);
 
         PulsarConfig pulsarConfig = new PulsarConfig();
@@ -39,7 +37,7 @@ public class PulsarConfigTest {
 
     // Successfully create Producer bean with valid configuration properties
     @Test
-    public void test_create_pulsar_producer_with_valid_config() throws Exception {
+    public void pulsarProducer_validConfig() throws Exception {
 
         // Create Client for producer 
         PulsarClientProperties clientProperties = mock(PulsarClientProperties.class);
