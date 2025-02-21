@@ -6,9 +6,7 @@ import io.numaproj.numaflow.sinker.Response;
 import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
-import javax.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -16,6 +14,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
@@ -39,29 +41,43 @@ public class PulsarSink extends Sinker {
     @Override
     public ResponseList processMessages(DatumIterator datumIterator) {
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>(); 
         while (true) {
-            Datum datum = null;
+            Datum datum;
             try {
                 datum = datumIterator.next();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 continue;
             }
-            // null means the iterator is closed, so we break the loop
+            // null means the iterator is closed, so we break
             if (datum == null) {
                 break;
             }
-            try {
-                byte[] msg = datum.getValue();
-                producer.send(msg);
-                log.info("Processed message ID: {}, Content: {}", datum.getId(), new String(msg));
-                responseListBuilder.addResponse(Response.responseOK(datum.getId()));
-            } catch (Exception e) {
-                log.error("Error processing message with ID {}: {}", datum.getId(), e.getMessage(), e);
-                responseListBuilder.addResponse(
-                        Response.responseFailure(datum.getId(), e.getMessage()));
-            }
+
+            final byte[] msg = datum.getValue();
+            final String msgId = datum.getId();
+
+            // Won't wait for broker to confirm receipt of msg before continuing
+            // sendSync returns CompletableFuture which will complete when broker ack
+            CompletableFuture<Void> future = producer.sendAsync(msg) 
+                    .thenAccept(messageId -> {
+                        log.info("Processed message ID: {}, Content: {}", msgId, new String(msg));
+                        responseListBuilder.addResponse(Response.responseOK(msgId));
+                    })
+                    .exceptionally(ex -> {
+                        log.error("Error processing message ID {}: {}",  msgId, ex.getMessage(), ex);
+                        responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
+                        return null;
+                    });
+
+            futures.add(future);
         }
+
+        // Wait for all sends to complete
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
         return responseListBuilder.build();
     }
 
@@ -72,13 +88,12 @@ public class PulsarSink extends Sinker {
                 producer.close();
                 log.info("Producer closed.");
             }
-
             if (pulsarClient != null) {
                 pulsarClient.close();
                 log.info("PulsarClient closed.");
             }
         } catch (PulsarClientException e) {
-            log.error("Error while closing PulsarClient or Producer", e);
+            log.error("Error while closing PulsarClient or Producer.", e);
         }
     }
 }

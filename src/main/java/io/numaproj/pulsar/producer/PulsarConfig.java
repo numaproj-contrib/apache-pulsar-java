@@ -35,5 +35,4 @@ public class PulsarConfig {
                 .loadConf(pulsarProducerProperties.getProducerConfig())
                 .create();
     }
-
 }
