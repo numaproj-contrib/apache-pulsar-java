@@ -93,7 +93,7 @@ public class PulsarConfigTest {
                 exception.getMessage().contains(expectedMessage));
     }
 
-    // Test which ensures an error is thrown if pulsar producer isn't created withvtopicName
+    // Test which ensures an error is thrown if pulsar producer isn't created with topicName
     @Test
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
         PulsarProducerProperties producerProperties = mock(PulsarProducerProperties.class);

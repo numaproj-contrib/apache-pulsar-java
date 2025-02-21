@@ -72,7 +72,7 @@
                             </container>
                             <to>
                                 <image>
-                                    my-sink:v0.0.3
+                                    apache-pulsar-java:v0.1.0
                                 </image>
                             </to>
                         </configuration>
