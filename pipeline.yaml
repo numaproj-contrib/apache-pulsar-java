@@ -25,7 +25,7 @@ spec:
       sink:
         udsink:
           container:
-            image: my-sink:v0.0.3
+            image: apache-pulsar-java:v0.1.0
             args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
             imagePullPolicy: Never
             volumeMounts:
