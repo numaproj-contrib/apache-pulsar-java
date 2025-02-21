@@ -19,9 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PulsarConfigTest {
-    // Successfully create PulsarClient bean with valid configuration properties
-    // note: in-valid key-value pairs are skipped, do not throw an error, and
-    // therefore do not need test
+    // Test to create PulsarClient bean with valid configuration properties
     @Test
     public void pulsarClient_validConfig() throws Exception {
         PulsarClientProperties properties = mock(PulsarClientProperties.class);
@@ -39,7 +37,7 @@ public class PulsarConfigTest {
         verify(properties).getClientConfig();
     }
 
-    // Successfully create Producer bean with valid configuration properties
+    // Test to successfully create Producer bean with valid configuration properties
     @Test
     public void pulsarProducer_validConfig() throws Exception {
 
@@ -77,7 +75,7 @@ public class PulsarConfigTest {
         verify(producerProperties).getProducerConfig();
     }
 
-    // Ensures an error is thrown if pulsar client isn't created with service url
+    // Test to ensure an error is thrown if pulsar client isn't created with service url
     @Test
     public void pulsarClient_missingServiceUrl_throwsException() {
         PulsarClientProperties properties = new PulsarClientProperties();
@@ -95,7 +93,7 @@ public class PulsarConfigTest {
                 exception.getMessage().contains(expectedMessage));
     }
 
-    // Ensures an error is thrown if pulsar producer isn't created withvtopicName
+    // Test which ensures an error is thrown if pulsar producer isn't created withvtopicName
     @Test
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
         PulsarProducerProperties producerProperties = mock(PulsarProducerProperties.class);
