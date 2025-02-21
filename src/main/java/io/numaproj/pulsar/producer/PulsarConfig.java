@@ -22,9 +22,9 @@ import io.numaproj.pulsar.config.PulsarProducerProperties;
 public class PulsarConfig {
 
     @Bean
-    public PulsarClient pulsarClient(PulsarClientProperties pulsarProducerProperties) throws PulsarClientException {
+    public PulsarClient pulsarClient(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
         return PulsarClient.builder()
-                .loadConf(pulsarProducerProperties.getClientConfig())
+                .loadConf(pulsarClientProperties.getClientConfig())
                 .build();
     }
 
