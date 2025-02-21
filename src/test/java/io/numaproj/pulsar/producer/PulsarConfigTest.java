@@ -20,7 +20,8 @@ import java.util.Map;
 
 public class PulsarConfigTest {
     // Successfully create PulsarClient bean with valid configuration properties
-    // note: in-valid key-value pairs are skipped, do not throw an error, and therefore do not need test
+    // note: in-valid key-value pairs are skipped, do not throw an error, and
+    // therefore do not need test
     @Test
     public void pulsarClient_validConfig() throws Exception {
         PulsarClientProperties properties = mock(PulsarClientProperties.class);
@@ -44,15 +45,16 @@ public class PulsarConfigTest {
 
         PulsarClientProperties clientProperties = mock(PulsarClientProperties.class);
 
-        // Use spy to use the real implementation of PulsarConfig, but allows overriding and tracking methods
+        // Use spy to use the real implementation of PulsarConfig, but allows overriding
+        // and tracking methods
         PulsarConfig pulsarConfig = spy(new PulsarConfig());
         PulsarClient mockClient = mock(PulsarClient.class);
 
-        //Configures the pulsarConfig spy to return the ‘mockClient’ when the method pulsarClient is called with any instance of PulsarClientProperties.
+        // Configures the pulsarConfig spy to return the ‘mockClient’ when the method
+        // pulsarClient is called with any instance of PulsarClientProperties.
         doReturn(mockClient).when(pulsarConfig).pulsarClient(any(PulsarClientProperties.class));
 
         PulsarProducerProperties producerProperties = mock(PulsarProducerProperties.class);
-
         Map<String, Object> producerConfig = new HashMap<>();
         producerConfig.put("topicName", "test-topic");
         when(producerProperties.getProducerConfig()).thenReturn(producerConfig);
@@ -88,13 +90,12 @@ public class PulsarConfigTest {
             pulsarConfig.pulsarClient(properties);
         });
 
-        // Verify that the exception message contains the required text.
         String expectedMessage = "service URL or service URL provider needs to be specified";
         assertTrue("Exception message should contain the expected error text",
                 exception.getMessage().contains(expectedMessage));
     }
 
-    //Ensures an error is thrown if pulsar producer isn't created withvtopicName
+    // Ensures an error is thrown if pulsar producer isn't created withvtopicName
     @Test
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
         PulsarProducerProperties producerProperties = mock(PulsarProducerProperties.class);
@@ -108,7 +109,6 @@ public class PulsarConfigTest {
         when(producerBuilder.create()) // mocking that anytime the producer is created, it throws an exception
                 .thenThrow(new IllegalArgumentException("Topic name must be set on the producer builder"));
 
-        // Verify the exception is thrown with correct message
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> pulsarConfig.pulsarProducer(pulsarClient, producerProperties));
