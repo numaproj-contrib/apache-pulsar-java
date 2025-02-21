@@ -4,7 +4,6 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.Producer;
-import org.springframework.boot.autoconfigure.pulsar.PulsarProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,9 +22,9 @@ import io.numaproj.pulsar.config.PulsarProducerProperties;
 public class PulsarConfig {
 
     @Bean
-    public PulsarClient pulsarClient(PulsarClientProperties properties) throws PulsarClientException {
+    public PulsarClient pulsarClient(PulsarClientProperties pulsarProducerProperties) throws PulsarClientException {
         return PulsarClient.builder()
-                .loadConf(properties.getClientConfig())
+                .loadConf(pulsarProducerProperties.getClientConfig())
                 .build();
     }
 
