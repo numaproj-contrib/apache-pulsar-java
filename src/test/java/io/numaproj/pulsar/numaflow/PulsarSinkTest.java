@@ -3,6 +3,8 @@ package io.numaproj.pulsar.numaflow;
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.ResponseList;
+
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -11,6 +13,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
+import java.util.concurrent.CompletableFuture;
 
 public class PulsarSinkTest {
 
@@ -32,9 +36,12 @@ public class PulsarSinkTest {
         when(mockDatum.getId()).thenReturn("msg-1");
         when(mockIterator.next()).thenReturn(mockDatum, (Datum) null);
 
+        CompletableFuture<MessageId> future = CompletableFuture.completedFuture(mock(MessageId.class));
+        when(mockProducer.sendAsync(testMessage)).thenReturn(future);
+
         ResponseList response = pulsarSink.processMessages(mockIterator);
 
-        verify(mockProducer).send(testMessage);
+        verify(mockProducer).sendAsync(testMessage);
         assertEquals(1, response.getResponses().size());
         assertTrue(response.getResponses().get(0).getSuccess());
         assertEquals("msg-1", response.getResponses().get(0).getId());
@@ -55,7 +62,7 @@ public class PulsarSinkTest {
 
         ResponseList response = pulsarSink.processMessages(mockIterator);
 
-        verify(mockProducer, never()).send(any());
+        verify(mockProducer, never()).sendAsync(any());
         assertTrue(response.getResponses().isEmpty());
         assertTrue(Thread.currentThread().isInterrupted());
     }
@@ -79,20 +86,19 @@ public class PulsarSinkTest {
 
         when(mockIterator.next()).thenReturn(mockDatum, (Datum) null);
 
-        String exceptionMessage = "Sending failed due to network error";
-        doThrow(new PulsarClientException(exceptionMessage))
-            .when(mockProducer).send(testMessage);
+        CompletableFuture<MessageId> future = new CompletableFuture<>();
+        future.completeExceptionally(new PulsarClientException("Network error"));
+        when(mockProducer.sendAsync(testMessage)).thenReturn(future);
 
         ResponseList response = pulsarSink.processMessages(mockIterator);
 
-        verify(mockProducer).send(testMessage);
-
+        verify(mockProducer).sendAsync(testMessage);
+        
         assertEquals(1, response.getResponses().size());
         assertFalse(response.getResponses().get(0).getSuccess());
         assertEquals("msg-1", response.getResponses().get(0).getId());
-        assertEquals(exceptionMessage, response.getResponses().get(0).getErr());
+        assertTrue(response.getResponses().get(0).getErr().contains("Network error"));
     }
-
     
 
     // Ensure proper resource cleanup on shutdown
