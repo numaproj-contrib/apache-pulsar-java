@@ -86,8 +86,9 @@ public class PulsarSinkTest {
 
         when(mockIterator.next()).thenReturn(mockDatum, (Datum) null);
 
+        String exceptionMessage = "Sending failed due to network error";
         CompletableFuture<MessageId> future = new CompletableFuture<>();
-        future.completeExceptionally(new PulsarClientException("Network error"));
+        future.completeExceptionally(new PulsarClientException(exceptionMessage));
         when(mockProducer.sendAsync(testMessage)).thenReturn(future);
 
         ResponseList response = pulsarSink.processMessages(mockIterator);
@@ -97,7 +98,7 @@ public class PulsarSinkTest {
         assertEquals(1, response.getResponses().size());
         assertFalse(response.getResponses().get(0).getSuccess());
         assertEquals("msg-1", response.getResponses().get(0).getId());
-        assertTrue(response.getResponses().get(0).getErr().contains("Network error"));
+        assertTrue(response.getResponses().get(0).getErr().contains(exceptionMessage));
     }
     
 
