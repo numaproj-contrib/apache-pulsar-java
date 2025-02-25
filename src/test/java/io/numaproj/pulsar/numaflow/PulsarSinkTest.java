@@ -19,7 +19,8 @@ import java.util.concurrent.CompletableFuture;
 public class PulsarSinkTest {
 
     // Helper interface to represent Producer<byte[]> without type issues
-    private interface ByteProducer extends Producer<byte[]> { }
+    private interface ByteProducer extends Producer<byte[]> {
+    }
 
     // Successfully process and send messages to Pulsar from DatumIterator
     @Test
@@ -47,7 +48,8 @@ public class PulsarSinkTest {
         assertEquals("msg-1", response.getResponses().get(0).getId());
     }
 
-    // Failed to process messages because the thread waiting for the next datum is interrupted; no new messages
+    // Failed to process messages because the thread waiting for the next datum is
+    // interrupted; no new messages
     @Test
     public void processMessages_responseFailure_datumInterupted() throws Exception {
         PulsarSink pulsarSink = new PulsarSink();
@@ -57,8 +59,8 @@ public class PulsarSinkTest {
         ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
 
         when(mockIterator.next())
-            .thenThrow(new InterruptedException())
-            .thenReturn(null);
+                .thenThrow(new InterruptedException())
+                .thenReturn(null);
 
         ResponseList response = pulsarSink.processMessages(mockIterator);
 
@@ -67,9 +69,8 @@ public class PulsarSinkTest {
         assertTrue(Thread.currentThread().isInterrupted());
     }
 
-
-
-    // Verifies when sending a message fails, the processMessages method calls responseListBuilder.addResponse with a failure response
+    // Verifies when sending a message fails, the processMessages method calls
+    // responseListBuilder.addResponse with a failure response
     @Test
     public void processMessages_responseFailure_addResponse() throws Exception {
         PulsarSink pulsarSink = new PulsarSink();
@@ -94,13 +95,12 @@ public class PulsarSinkTest {
         ResponseList response = pulsarSink.processMessages(mockIterator);
 
         verify(mockProducer).sendAsync(testMessage);
-        
+
         assertEquals(1, response.getResponses().size());
         assertFalse(response.getResponses().get(0).getSuccess());
         assertEquals("msg-1", response.getResponses().get(0).getId());
         assertTrue(response.getResponses().get(0).getErr().contains(exceptionMessage));
     }
-    
 
     // Ensure proper resource cleanup on shutdown
     @Test
@@ -117,6 +117,54 @@ public class PulsarSinkTest {
 
         verify(mockProducer).close();
         verify(mockPulsarClient).close();
+    }
+
+    // Part of the stream succeeds, part fails
+    @Test
+    public void processMessages_responsePartialSuccess() throws Exception {
+        // Arrange
+        PulsarSink pulsarSink = new PulsarSink();
+        ByteProducer mockProducer = mock(ByteProducer.class);
+        DatumIterator mockIterator = mock(DatumIterator.class);
+        Datum mockDatum1 = mock(Datum.class);
+        Datum mockDatum2 = mock(Datum.class);
+
+        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
+
+        byte[] testMessage1 = "message part 1".getBytes();
+        byte[] testMessage2 = "message part 2".getBytes();
+
+        when(mockDatum1.getValue()).thenReturn(testMessage1);
+        when(mockDatum1.getId()).thenReturn("msg-1");
+        when(mockDatum2.getValue()).thenReturn(testMessage2);
+        when(mockDatum2.getId()).thenReturn("msg-2");
+
+        when(mockIterator.next()).thenReturn(mockDatum1, mockDatum2, (Datum) null);
+
+        // First message completes successfully
+        CompletableFuture<MessageId> successFuture = CompletableFuture.completedFuture(mock(MessageId.class));
+
+        // Second message fails
+        String exceptionMessage = "Sending failed due to network error";
+        CompletableFuture<MessageId> failureFuture = new CompletableFuture<>();
+        failureFuture.completeExceptionally(new PulsarClientException(exceptionMessage));
+
+        when(mockProducer.sendAsync(testMessage1)).thenReturn(successFuture);
+        when(mockProducer.sendAsync(testMessage2)).thenReturn(failureFuture);
+
+        // Act
+        ResponseList response = pulsarSink.processMessages(mockIterator);
+
+        // Assert
+        verify(mockProducer).sendAsync(testMessage1);
+        verify(mockProducer).sendAsync(testMessage2);
+
+        assertEquals(2, response.getResponses().size());
+        assertTrue(response.getResponses().get(0).getSuccess());
+        assertEquals("msg-1", response.getResponses().get(0).getId());
+        assertFalse(response.getResponses().get(1).getSuccess());
+        assertEquals("msg-2", response.getResponses().get(1).getId());
+        assertTrue(response.getResponses().get(1).getErr().contains(exceptionMessage));
     }
 
 }
