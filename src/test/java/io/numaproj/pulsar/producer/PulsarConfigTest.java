@@ -27,32 +27,51 @@ import static org.mockito.Mockito.*;
 import java.util.HashMap;
 import java.util.Map;
 
-
 @SpringBootTest(classes = PulsarConfig.class)
 public class PulsarConfigTest {
 
+    // Common objects used by most tests
     private PulsarConfig pulsarConfig;
-    private PulsarConfig spiedConfig;
-    private PulsarClientProperties mockClientProperties;
-    private PulsarProducerProperties mockProducerProperties;
-    private PulsarClient mockClient;
-    private ProducerBuilder<byte[]> mockProducerBuilder;
-    private Producer<byte[]> mockProducer;
     private Environment mockEnvironment;
 
+    // Objects used only by specific test groups
+    private PulsarConfig spiedConfig;
+    private PulsarClient mockClient;
+    private PulsarClientProperties mockClientProperties;
+    private PulsarProducerProperties mockProducerProperties;
+    private ProducerBuilder<byte[]> mockProducerBuilder;
+    private Producer<byte[]> mockProducer;
+
     @Before
-    public void setUp() throws Exception {
-        // Use a real PulsarConfig but mock out Pulsar dependencies
+    public void setUp() {
+        // Initialize only the base objects needed by all tests
         pulsarConfig = new PulsarConfig();
+        mockEnvironment = mock(Environment.class);
+        ReflectionTestUtils.setField(pulsarConfig, "env", mockEnvironment);
+        
+        // Initialize client properties used by client tests
         mockClientProperties = mock(PulsarClientProperties.class);
+    }
+
+    @After
+    public void tearDown() {
+        // Cleanup references
+        pulsarConfig = null;
+        spiedConfig = null;
+        mockClientProperties = null;
+        mockProducerProperties = null;
+        mockClient = null;
+        mockProducerBuilder = null;
+        mockProducer = null;
+        mockEnvironment = null;
+    }
+
+    // Helper method to set up producer-specific test dependencies
+    private void setUpProducerTest() throws Exception {
+        // Only initialize these when needed for producer tests
         mockProducerProperties = mock(PulsarProducerProperties.class);
         mockClient = mock(PulsarClient.class);
-        mockEnvironment = mock(Environment.class);
-
-        // Inject the mock Environment into the PulsarConfig instance
-        ReflectionTestUtils.setField(pulsarConfig, "env", mockEnvironment);
-
-        // Create a spy of PulsarConfig to avoid real client creation in tests
+        
         spiedConfig = spy(pulsarConfig);
         doReturn(mockClient).when(spiedConfig).pulsarClient(any(PulsarClientProperties.class));
 
@@ -67,19 +86,6 @@ public class PulsarConfigTest {
         when(mockClient.newProducer(Schema.BYTES)).thenReturn(mockProducerBuilder);
         when(mockProducerBuilder.create()).thenReturn(mockProducer);
         when(mockProducerBuilder.loadConf(anyMap())).thenReturn(mockProducerBuilder);
-    }
-
-    @After
-    public void tearDown() {
-        // Cleanup references
-        pulsarConfig = null;
-        spiedConfig = null;
-        mockClientProperties = null;
-        mockProducerProperties = null;
-        mockClient = null;
-        mockProducerBuilder = null;
-        mockProducer = null;
-        mockEnvironment = null;
     }
 
     // Test to create PulsarClient bean with valid configuration properties
@@ -99,6 +105,8 @@ public class PulsarConfigTest {
     // Test to successfully create Producer bean with valid configuration properties
     @Test
     public void pulsarProducer_validConfig() throws Exception {
+        setUpProducerTest();
+        
         Map<String, Object> producerConfig = new HashMap<>();
         producerConfig.put("topicName", "test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
@@ -113,7 +121,7 @@ public class PulsarConfigTest {
         verify(mockProducerProperties).getProducerConfig();
     }
 
-     // Test to ensure an error is thrown if pulsar client isn't created with service url
+    // Test to ensure an error is thrown if pulsar client isn't created with service url
     @Test
     public void pulsarClient_missingServiceUrl_throwsException() {
         // Missing the service URL in config so will cause an error
@@ -132,6 +140,8 @@ public class PulsarConfigTest {
     // Test which ensures an error is thrown if pulsar producer isn't created with topicName
     @Test
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
+        setUpProducerTest();
+        
         when(mockProducerProperties.getProducerConfig()).thenReturn(new HashMap<>());
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn("test-pod-name");
 
@@ -153,6 +163,8 @@ public class PulsarConfigTest {
      */
     @Test
     public void testProducerNameFromEnvVarNoUserConfig() throws Exception {
+        setUpProducerTest();
+        
         final String envPodName = "NUMAFLOW_POD_VALUE";
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
 
@@ -175,6 +187,8 @@ public class PulsarConfigTest {
      */
     @Test
     public void testUserDefinedProducerNameOverridden() throws Exception {
+        setUpProducerTest();
+        
         final String envPodName = "my-env-pod";
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
 
@@ -197,6 +211,8 @@ public class PulsarConfigTest {
      */
     @Test
     public void testNoEnvVariableFoundFallbackName() throws Exception {
+        setUpProducerTest();
+        
         // Return null to simulate environment variable not set
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(null);
 
