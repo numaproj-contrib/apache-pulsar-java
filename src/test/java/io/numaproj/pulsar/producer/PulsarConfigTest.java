@@ -118,11 +118,10 @@ public class PulsarConfigTest {
     // Test to ensure an error is thrown if pulsar client isn't created with service url
     @Test
     public void pulsarClient_missingServiceUrl_throwsException() {
-        // Missing the service URL in config so will cause an error
-        Map<String, Object> clientConfig = new HashMap<>();
+        Map<String, Object> clientConfig = new HashMap<>(); // no service URL added to cause error
         when(mockClientProperties.getClientConfig()).thenReturn(clientConfig);
 
-      IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             pulsarConfig.pulsarClient(mockClientProperties);
         });
 
