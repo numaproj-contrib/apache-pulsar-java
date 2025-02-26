@@ -42,19 +42,15 @@ public class PulsarConfig {
     public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties)
             throws Exception {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
-
-        if (podName == null || podName.isBlank()) {
-            podName = "pod-" + UUID.randomUUID();
-            log.warn("NUMAFLOW_POD environment variable not found. Generating fallback Producer name: {}", podName);
-        }
+        String producerName = "producerName";
 
         // Always override the user-specified producerName with the pod name
         Map<String, Object> producerConfig = pulsarProducerProperties.getProducerConfig();
-        if (producerConfig.containsKey("producerName")) {
+        if (producerConfig.containsKey(producerName)) {
             log.warn("User configured a 'producerName' in the config, but this can cause errors if multiple pods spin "
                     + "up with the same name. Overriding with '{}'", podName);
         }
-        producerConfig.put("producerName", podName);
+        producerConfig.put(producerName, podName);
         log.info("The podname is {}", podName);
 
         return pulsarClient.newProducer(Schema.BYTES)
