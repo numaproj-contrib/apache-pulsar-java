@@ -7,7 +7,6 @@ import org.apache.pulsar.client.api.Schema;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.function.ThrowingRunnable;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
@@ -123,8 +122,9 @@ public class PulsarConfigTest {
         Map<String, Object> clientConfig = new HashMap<>();
         when(mockClientProperties.getClientConfig()).thenReturn(clientConfig);
 
-        ThrowingRunnable r = () -> pulsarConfig.pulsarClient(mockClientProperties);
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, r);
+      IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            pulsarConfig.pulsarClient(mockClientProperties);
+        });
 
         String expectedMessage = "service URL or service URL provider needs to be specified";
         assertTrue("Exception message should contain the expected error text",
@@ -139,14 +139,14 @@ public class PulsarConfigTest {
         when(mockProducerProperties.getProducerConfig()).thenReturn(new HashMap<>());
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn("test-pod-name");
 
-        // Simulate exception thrown on producer creation
-        when(mockProducerBuilder.create())
-                .thenThrow(new IllegalArgumentException("Topic name must be set on the producer builder"));
-
-        ThrowingRunnable r = () -> spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, r);
-
         String expectedErrorSubstring = "Topic name must be set on the producer builder";
+        when(mockProducerBuilder.create())
+                .thenThrow(new IllegalArgumentException(expectedErrorSubstring));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> pulsarConfig.pulsarProducer(mockClient, mockProducerProperties));
+
         assertTrue(exception.getMessage().contains(expectedErrorSubstring));
     }
 
