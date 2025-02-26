@@ -8,8 +8,10 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.pulsar.client.api.Producer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 import io.numaproj.pulsar.config.PulsarClientProperties;
 import io.numaproj.pulsar.config.PulsarProducerProperties;
@@ -26,6 +28,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Configuration
 public class PulsarConfig {
+    @Autowired
+    private Environment env;
 
     @Bean
     public PulsarClient pulsarClient(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
@@ -37,7 +41,7 @@ public class PulsarConfig {
     @Bean
     public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties)
             throws Exception {
-        String podName = System.getenv("NUMAFLOW_POD");
+        String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
 
         if (podName == null || podName.isBlank()) {
             podName = "pod-" + UUID.randomUUID();

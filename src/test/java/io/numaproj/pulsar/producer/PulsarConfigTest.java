@@ -4,7 +4,14 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.ProducerBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.function.ThrowingRunnable;
+import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import io.numaproj.pulsar.config.PulsarClientProperties;
 import io.numaproj.pulsar.config.PulsarProducerProperties;
@@ -12,81 +19,110 @@ import io.numaproj.pulsar.config.PulsarProducerProperties;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.util.HashMap;
 import java.util.Map;
 
+
+@SpringBootTest(classes = PulsarConfig.class)
 public class PulsarConfigTest {
+
+    private PulsarConfig pulsarConfig;
+    private PulsarConfig spiedConfig;
+    private PulsarClientProperties mockClientProperties;
+    private PulsarProducerProperties mockProducerProperties;
+    private PulsarClient mockClient;
+    private ProducerBuilder<byte[]> mockProducerBuilder;
+    private Producer<byte[]> mockProducer;
+    private Environment mockEnvironment;
+
+    @Before
+    public void setUp() throws Exception {
+        // Use a real PulsarConfig but mock out Pulsar dependencies
+        pulsarConfig = new PulsarConfig();
+        mockClientProperties = mock(PulsarClientProperties.class);
+        mockProducerProperties = mock(PulsarProducerProperties.class);
+        mockClient = mock(PulsarClient.class);
+        mockEnvironment = mock(Environment.class);
+
+        // Inject the mock Environment into the PulsarConfig instance
+        ReflectionTestUtils.setField(pulsarConfig, "env", mockEnvironment);
+
+        // Create a spy of PulsarConfig to avoid real client creation in tests
+        spiedConfig = spy(pulsarConfig);
+        doReturn(mockClient).when(spiedConfig).pulsarClient(any(PulsarClientProperties.class));
+
+        // ProducerBuilder
+        @SuppressWarnings("unchecked")
+        ProducerBuilder<byte[]> builder = mock(ProducerBuilder.class);
+        mockProducerBuilder = builder;
+
+        // Producer
+        mockProducer = mock(Producer.class);
+
+        when(mockClient.newProducer(Schema.BYTES)).thenReturn(mockProducerBuilder);
+        when(mockProducerBuilder.create()).thenReturn(mockProducer);
+        when(mockProducerBuilder.loadConf(anyMap())).thenReturn(mockProducerBuilder);
+    }
+
+    @After
+    public void tearDown() {
+        // Cleanup references
+        pulsarConfig = null;
+        spiedConfig = null;
+        mockClientProperties = null;
+        mockProducerProperties = null;
+        mockClient = null;
+        mockProducerBuilder = null;
+        mockProducer = null;
+        mockEnvironment = null;
+    }
+
     // Test to create PulsarClient bean with valid configuration properties
     @Test
     public void pulsarClient_validConfig() throws Exception {
-        PulsarClientProperties properties = mock(PulsarClientProperties.class);
         Map<String, Object> config = new HashMap<>();
-
         // URL must include the protocol (pulsar:// or pulsar+ssl://)
         config.put("serviceUrl", "pulsar://test:1234");
+        when(mockClientProperties.getClientConfig()).thenReturn(config);
 
-        when(properties.getClientConfig()).thenReturn(config);
-
-        PulsarConfig pulsarConfig = new PulsarConfig();
-        PulsarClient client = pulsarConfig.pulsarClient(properties);
+        PulsarClient client = pulsarConfig.pulsarClient(mockClientProperties);
 
         assertNotNull(client);
-        verify(properties).getClientConfig();
+        verify(mockClientProperties).getClientConfig();
     }
 
     // Test to successfully create Producer bean with valid configuration properties
     @Test
     public void pulsarProducer_validConfig() throws Exception {
-
-        PulsarClientProperties clientProperties = mock(PulsarClientProperties.class);
-
-        // Use spy to use the real implementation of PulsarConfig, but allows overriding
-        // and tracking methods
-        PulsarConfig pulsarConfig = spy(new PulsarConfig());
-        PulsarClient mockClient = mock(PulsarClient.class);
-
-        // Configures the pulsarConfig spy to return the ‘mockClient’ when the method
-        // pulsarClient is called with any instance of PulsarClientProperties.
-        doReturn(mockClient).when(pulsarConfig).pulsarClient(any(PulsarClientProperties.class));
-
-        PulsarProducerProperties producerProperties = mock(PulsarProducerProperties.class);
         Map<String, Object> producerConfig = new HashMap<>();
         producerConfig.put("topicName", "test-topic");
-        when(producerProperties.getProducerConfig()).thenReturn(producerConfig);
+        when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
 
-        // Surpress warnings about unchecked type cast from ProducerBuilder to ProducerBuilder<byte[]>
-        @SuppressWarnings("unchecked")
-        ProducerBuilder<byte[]> mockProducerBuilder = (ProducerBuilder<byte[]>) mock(ProducerBuilder.class);
-        Producer<byte[]> mockProducer = mock(Producer.class);
-
-        when(mockClient.newProducer(Schema.BYTES)).thenReturn(mockProducerBuilder);
-        when(mockProducerBuilder.loadConf(anyMap())).thenReturn(mockProducerBuilder);
-        when(mockProducerBuilder.create()).thenReturn(mockProducer);
-
-        PulsarClient client = pulsarConfig.pulsarClient(clientProperties); // Will return the mock client
-        Producer<byte[]> producer = pulsarConfig.pulsarProducer(client, producerProperties);
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
 
         assertNotNull("Producer should be created", producer);
-        verify(mockProducerBuilder).loadConf(argThat(map -> "test-topic".equals(map.get("topicName"))));
+
+        verify(mockProducerBuilder).loadConf(argThat(map -> 
+            "test-topic".equals(map.get("topicName"))));
         verify(mockProducerBuilder).create();
-        verify(producerProperties).getProducerConfig();
+        verify(mockProducerProperties).getProducerConfig();
     }
 
-    // Test to ensure an error is thrown if pulsar client isn't created with service url
+     // Test to ensure an error is thrown if pulsar client isn't created with service url
     @Test
     public void pulsarClient_missingServiceUrl_throwsException() {
-        PulsarClientProperties properties = new PulsarClientProperties();
-        Map<String, Object> clientConfig = new HashMap<>(); // no service URL added to cause error
-        properties.setClientConfig(clientConfig);
+        // Missing the service URL in config so will cause an error
+        Map<String, Object> clientConfig = new HashMap<>();
+        when(mockClientProperties.getClientConfig()).thenReturn(clientConfig);
 
-        PulsarConfig pulsarConfig = new PulsarConfig();
-
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            pulsarConfig.pulsarClient(properties);
-        });
+        // We expect an exception from pulsarClient(...) call
+        ThrowingRunnable r = () -> pulsarConfig.pulsarClient(mockClientProperties);
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, r);
 
         String expectedMessage = "service URL or service URL provider needs to be specified";
         assertTrue("Exception message should contain the expected error text",
@@ -96,21 +132,86 @@ public class PulsarConfigTest {
     // Test which ensures an error is thrown if pulsar producer isn't created with topicName
     @Test
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
-        PulsarProducerProperties producerProperties = mock(PulsarProducerProperties.class);
-        PulsarClient pulsarClient = mock(PulsarClient.class);
-        @SuppressWarnings("unchecked")
-        ProducerBuilder<byte[]> producerBuilder = mock(ProducerBuilder.class);
-        PulsarConfig pulsarConfig = new PulsarConfig();
+        when(mockProducerProperties.getProducerConfig()).thenReturn(new HashMap<>());
+        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn("test-pod-name");
 
-        when(pulsarClient.newProducer(Schema.BYTES)).thenReturn(producerBuilder);
-        when(producerBuilder.loadConf(any())).thenReturn(producerBuilder);
-        when(producerBuilder.create()) // mocking that anytime the producer is created, it throws an exception
+        // Simulate exception thrown on producer creation
+        when(mockProducerBuilder.create())
                 .thenThrow(new IllegalArgumentException("Topic name must be set on the producer builder"));
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> pulsarConfig.pulsarProducer(pulsarClient, producerProperties));
+        ThrowingRunnable r = () -> spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, r);
 
-        assertTrue(exception.getMessage().contains("Topic name must be set on the producer builder"));
+        String expectedErrorSubstring = "Topic name must be set on the producer builder";
+        assertTrue(exception.getMessage().contains(expectedErrorSubstring));
+    }
+
+    /**
+     * Environment variable is set, and user does NOT specify producerName in
+     * config:
+     * we should use the environment-provided name.
+     */
+    @Test
+    public void testProducerNameFromEnvVarNoUserConfig() throws Exception {
+        final String envPodName = "NUMAFLOW_POD_VALUE";
+        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
+
+        Map<String, Object> emptyConfig = new HashMap<>();
+        emptyConfig.put("topicName", "test-topic");
+        when(mockProducerProperties.getProducerConfig()).thenReturn(emptyConfig);
+
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+
+        assertNotNull(producer);
+        // Check that the "producerName" is set to envPodName
+        ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(mockProducerBuilder).loadConf(configCaptor.capture());
+        assertEquals(envPodName, configCaptor.getValue().get("producerName"));
+    }
+
+    /**
+     * Environment variable is set, but user explicitly sets producerName:
+     * we warn and override with the environment-provided name anyway.
+     */
+    @Test
+    public void testUserDefinedProducerNameOverridden() throws Exception {
+        final String envPodName = "my-env-pod";
+        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
+
+        Map<String, Object> userConfig = new HashMap<>();
+        userConfig.put("producerName", "userProvidedName");
+        userConfig.put("topicName", "test-topic");
+        when(mockProducerProperties.getProducerConfig()).thenReturn(userConfig);
+
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+
+        assertNotNull(producer);
+        ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(mockProducerBuilder).loadConf(configCaptor.capture());
+        assertEquals(envPodName, configCaptor.getValue().get("producerName"));
+    }
+
+    /**
+     * If NUMAFLOW_POD environment variable is not set or blank, we generate a
+     * fallback name.
+     */
+    @Test
+    public void testNoEnvVariableFoundFallbackName() throws Exception {
+        // Return null to simulate environment variable not set
+        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(null);
+
+        Map<String, Object> emptyConfig = new HashMap<>();
+        emptyConfig.put("topicName", "test-topic");
+        when(mockProducerProperties.getProducerConfig()).thenReturn(emptyConfig);
+
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+
+        assertNotNull(producer);
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(mockProducerBuilder).loadConf(captor.capture());
+        String actualProducerName = (String) captor.getValue().get("producerName");
+        // Expect "pod-" + random UUID
+        assertTrue(actualProducerName.startsWith("pod-"));
+        assertNotEquals("pod-", actualProducerName);
     }
 }
