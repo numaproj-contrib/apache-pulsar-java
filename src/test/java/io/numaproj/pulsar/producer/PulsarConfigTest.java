@@ -44,18 +44,15 @@ public class PulsarConfigTest {
 
     @Before
     public void setUp() {
-        // Initialize only the base objects needed by all tests
         pulsarConfig = new PulsarConfig();
         mockEnvironment = mock(Environment.class);
         ReflectionTestUtils.setField(pulsarConfig, "env", mockEnvironment);
         
-        // Initialize client properties used by client tests
         mockClientProperties = mock(PulsarClientProperties.class);
     }
 
     @After
     public void tearDown() {
-        // Cleanup references
         pulsarConfig = null;
         spiedConfig = null;
         mockClientProperties = null;
@@ -75,12 +72,10 @@ public class PulsarConfigTest {
         spiedConfig = spy(pulsarConfig);
         doReturn(mockClient).when(spiedConfig).pulsarClient(any(PulsarClientProperties.class));
 
-        // ProducerBuilder
         @SuppressWarnings("unchecked")
         ProducerBuilder<byte[]> builder = mock(ProducerBuilder.class);
         mockProducerBuilder = builder;
 
-        // Producer
         mockProducer = mock(Producer.class);
 
         when(mockClient.newProducer(Schema.BYTES)).thenReturn(mockProducerBuilder);
@@ -128,7 +123,6 @@ public class PulsarConfigTest {
         Map<String, Object> clientConfig = new HashMap<>();
         when(mockClientProperties.getClientConfig()).thenReturn(clientConfig);
 
-        // We expect an exception from pulsarClient(...) call
         ThrowingRunnable r = () -> pulsarConfig.pulsarClient(mockClientProperties);
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, r);
 
@@ -199,7 +193,6 @@ public class PulsarConfigTest {
     }
 
     // Test for if NUMAFLOW_POD environment variable is not set 
-
     @Test
     public void pulsarProducer_NoEnvVariableFoundFallbackName() throws Exception {
         setUpProducerTest();
@@ -217,7 +210,6 @@ public class PulsarConfigTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(mockProducerBuilder).loadConf(captor.capture());
         String actualProducerName = (String) captor.getValue().get("producerName");
-        // Expect "pod-" + random UUID
         assertTrue(actualProducerName.startsWith("pod-"));
         assertNotEquals("pod-", actualProducerName);
     }
