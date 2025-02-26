@@ -156,13 +156,9 @@ public class PulsarConfigTest {
         assertTrue(exception.getMessage().contains(expectedErrorSubstring));
     }
 
-    /**
-     * Environment variable is set, and user does NOT specify producerName in
-     * config:
-     * we should use the environment-provided name.
-     */
+    // Test for environment variable is set, and user does NOT specify producerName 
     @Test
-    public void testProducerNameFromEnvVarNoUserConfig() throws Exception {
+    public void pulsarProducer_ProducerNameFromEnvVarNoUserConfig() throws Exception {
         setUpProducerTest();
         
         final String envPodName = "NUMAFLOW_POD_VALUE";
@@ -181,12 +177,9 @@ public class PulsarConfigTest {
         assertEquals(envPodName, configCaptor.getValue().get("producerName"));
     }
 
-    /**
-     * Environment variable is set, but user explicitly sets producerName:
-     * we warn and override with the environment-provided name anyway.
-     */
+    // Test for environment variable is set, but user explicitly sets producerName:
     @Test
-    public void testUserDefinedProducerNameOverridden() throws Exception {
+    public void pulsarProducer_ProducerNameOverridden() throws Exception {
         setUpProducerTest();
         
         final String envPodName = "my-env-pod";
@@ -205,12 +198,10 @@ public class PulsarConfigTest {
         assertEquals(envPodName, configCaptor.getValue().get("producerName"));
     }
 
-    /**
-     * If NUMAFLOW_POD environment variable is not set or blank, we generate a
-     * fallback name.
-     */
+    // Test for if NUMAFLOW_POD environment variable is not set 
+
     @Test
-    public void testNoEnvVariableFoundFallbackName() throws Exception {
+    public void pulsarProducer_NoEnvVariableFoundFallbackName() throws Exception {
         setUpProducerTest();
         
         // Return null to simulate environment variable not set
