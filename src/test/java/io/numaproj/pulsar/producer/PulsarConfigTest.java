@@ -136,7 +136,6 @@ public class PulsarConfigTest {
         setUpProducerTest();
         
         when(mockProducerProperties.getProducerConfig()).thenReturn(new HashMap<>());
-        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn("test-pod-name");
 
         String expectedErrorSubstring = "Topic name must be set on the producer builder";
         when(mockProducerBuilder.create())
