@@ -22,7 +22,7 @@ Use the example [ConfigMap](manifests/byte-arr-producer-config.yaml) to configur
 In the ConfigMap:
 
 * `clientConfig` allows you to configure the client. See all avalaible configurations [here:](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client) 
-    *    serviceUrl must be specified as it is a required field 
+    * serviceUrl must be specified as it is a required field 
 
 * `producerConfig` allows you to configure the client. See all avalaible configurations [here:](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer) 
     * `topicName` is the Pulsar topic name to write data to, and is a required field and therefore must be in the ConfigMap
