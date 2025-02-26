@@ -37,6 +37,3 @@ the previous step. Please make sure that the args list under the sink vertex mat
 
 #### Observe the messages
 Wait for the pipeline to be up and running. You can observe the messages in the `test-config-topic` topic. 
-If you have multiple pods running for a vertex, you should see multiple producers for a given topic name with the name of each respective pod. 
-
-You can use the [pulsar-admin CLI](https://pulsar.apache.org/docs/4.0.x/get-started-pulsar-admin/) to check the messages in the topic. 
