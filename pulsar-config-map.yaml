@@ -12,8 +12,8 @@ data:
             serviceUrl: "pulsar://host.docker.internal:6650"
         producer:
           enabled: false
-          producerConfig: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer
-            topicName: "test-config-topic" 
-            sendTimeoutMs: 2000
         consumer: 
           enabled: true
+
+
+
