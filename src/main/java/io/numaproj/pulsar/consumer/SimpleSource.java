@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * This component is conditionally loaded only when consumer properties are
  * enabled.
- * For example, when 'spring.pulsar.consumer.enabled' is set to true.
+ * For example, when 'spring.pulsar.consumer.enabled' is set to truÅe.
  */
 @Slf4j
 @Component

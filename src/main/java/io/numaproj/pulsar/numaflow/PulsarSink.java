@@ -11,6 +11,7 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -21,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true")
 public class PulsarSink extends Sinker {
 
     @Autowired
@@ -42,7 +44,7 @@ public class PulsarSink extends Sinker {
     public ResponseList processMessages(DatumIterator datumIterator) {
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
 
-        List<CompletableFuture<Void>> futures = new ArrayList<>(); 
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         while (true) {
             Datum datum;
             try {
@@ -61,13 +63,13 @@ public class PulsarSink extends Sinker {
 
             // Won't wait for broker to confirm receipt of msg before continuing
             // sendSync returns CompletableFuture which will complete when broker ack
-            CompletableFuture<Void> future = producer.sendAsync(msg) 
+            CompletableFuture<Void> future = producer.sendAsync(msg)
                     .thenAccept(messageId -> {
                         log.info("Processed message ID: {}, Content: {}", msgId, new String(msg));
                         responseListBuilder.addResponse(Response.responseOK(msgId));
                     })
                     .exceptionally(ex -> {
-                        log.error("Error processing message ID {}: {}",  msgId, ex.getMessage(), ex);
+                        log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
                         responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
                         return null;
                     });
