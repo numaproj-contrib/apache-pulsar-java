@@ -28,7 +28,7 @@ import java.util.List;
 @Slf4j
 @Component
 @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
-public class SimpleSource extends Sourcer {
+public class PulsarSource extends Sourcer {
 
     // Mapping of readIndex to Pulsar messages that haven't yet been acknowledged
     private final Map<Long, org.apache.pulsar.client.api.Message<byte[]>> messages = new ConcurrentHashMap<>();
@@ -72,7 +72,8 @@ public class SimpleSource extends Sourcer {
 
             try {
                 // Correctly cast the timeout to int as the receive method expects an int.
-                org.apache.pulsar.client.api.Message<byte[]> pMsg = pulsarConsumer.receive((int) request.getTimeout().toMillis(), TimeUnit.MILLISECONDS);
+                org.apache.pulsar.client.api.Message<byte[]> pMsg = pulsarConsumer
+                        .receive((int) request.getTimeout().toMillis(), TimeUnit.MILLISECONDS);
                 if (pMsg == null) {
                     // no message received within timeout
                     return;
