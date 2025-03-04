@@ -5,16 +5,6 @@ metadata:
 spec:
   vertices:
     - name: in
-      source:
-        generator:
-          rpu: 1
-          duration: 1s
-          msgSize: 10
-    - name: p1
-      udf:
-        builtin:
-          name: cat
-    - name: out
       volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
         - name: pulsar-config-volume
           configMap:
@@ -22,8 +12,8 @@ spec:
             items:
               - key: application.yml
                 path: application.yml
-      sink:
-        udsink:
+      source:
+        udsource: 
           container:
             image: apache-pulsar-java:v0.2.0
             args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
@@ -31,6 +21,17 @@ spec:
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf
+    - name: p1
+      scale:
+        min: 1
+      udf:
+        builtin:
+          name: cat # A built-in UDF which simply cats the message
+    - name: out
+      scale:
+        min: 1
+      sink:
+        log: {}
   edges:
     - from: in
       to: p1
