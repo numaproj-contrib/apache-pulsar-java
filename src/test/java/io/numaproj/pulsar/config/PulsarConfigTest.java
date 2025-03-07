@@ -1,4 +1,4 @@
-package io.numaproj.pulsar.producer;
+package io.numaproj.pulsar.config;
 
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.ProducerBuilder;
@@ -13,6 +13,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.numaproj.pulsar.config.PulsarClientProperties;
+import io.numaproj.pulsar.config.PulsarConfig;
 import io.numaproj.pulsar.config.PulsarProducerProperties;
 
 import static org.junit.Assert.*;

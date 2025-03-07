@@ -1,4 +1,4 @@
-package io.numaproj.pulsar.producer;
+package io.numaproj.pulsar.config;
 
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -6,9 +6,7 @@ import org.apache.pulsar.client.api.Schema;
 
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.pulsar.client.api.BatchReceivePolicy;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Producer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,8 +15,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
-import io.numaproj.pulsar.config.PulsarClientProperties;
-import io.numaproj.pulsar.config.PulsarProducerProperties;
 import lombok.extern.slf4j.Slf4j;
 
 /***

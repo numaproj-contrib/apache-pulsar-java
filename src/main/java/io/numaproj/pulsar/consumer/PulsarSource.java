@@ -1,6 +1,5 @@
 package io.numaproj.pulsar.consumer;
 
-import com.google.common.primitives.Longs;
 import io.numaproj.numaflow.sourcer.AckRequest;
 import io.numaproj.numaflow.sourcer.Message;
 import io.numaproj.numaflow.sourcer.Offset;
@@ -11,10 +10,8 @@ import io.numaproj.numaflow.sourcer.Sourcer;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.Consumer;
-import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.api.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -34,7 +31,6 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class PulsarSource extends Sourcer {
 
-    // Mapping of readIndex to Pulsar messages that haven't yet been acknowledged
     private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messages = new ConcurrentHashMap<>();
     private Server server;
 
@@ -44,15 +40,14 @@ public class PulsarSource extends Sourcer {
     @Autowired
     private Consumer<byte[]> pulsarConsumer;
 
-    @PostConstruct // starts server automatically when the Spring context initializes
+    @PostConstruct
     public void startServer() throws Exception {
-        // Start the gRPC server for reading messages.
         server = new Server(this);
         server.start();
         server.awaitTermination();
     }
 
-       @Override
+    @Override
     public void read(ReadRequest request, OutputObserver observer) {
         long startTime = System.currentTimeMillis();
 
@@ -62,7 +57,6 @@ public class PulsarSource extends Sourcer {
         }
 
         for (int i = 0; i < request.getCount(); i++) {
-            // Stop reading if timeout exceeds the allowed duration.
             if (System.currentTimeMillis() - startTime > request.getTimeout().toMillis()) {
                 return;
             }
@@ -71,28 +65,20 @@ public class PulsarSource extends Sourcer {
                 org.apache.pulsar.client.api.Message<byte[]> pMsg = pulsarConsumer
                         .receive((int) request.getTimeout().toMillis(), TimeUnit.MILLISECONDS);
                 if (pMsg == null) {
-                    // No message received within timeout
                     return;
                 }
 
-                // Log the consumed message (converting byte[] to String for clarity)
                 log.info("Consumed Pulsar message: {}", new String(pMsg.getValue()));
 
-                // Convert the Pulsar MessageId to a byte array using its String representation.
                 byte[] offsetBytes = pMsg.getMessageId().toString().getBytes(StandardCharsets.UTF_8);
                 Offset offset = new Offset(offsetBytes);
 
-                // Create a header map with Pulsar message id detail.
                 Map<String, String> headers = new HashMap<>();
                 headers.put("pulsarMessageId", pMsg.getMessageId().toString());
 
-                // Create a new message wrapping the received Pulsar message value.
                 Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
 
-                // Send the message to the observer.
                 observer.send(message);
-
-                // Track the Pulsar message using its MessageId as the key.
                 messages.put(pMsg.getMessageId().toString(), pMsg);
             } catch (PulsarClientException e) {
                 log.error("Failed to receive message from Pulsar", e);
@@ -100,7 +86,6 @@ public class PulsarSource extends Sourcer {
             }
         }
     }
-
 
     @Override
     public void ack(AckRequest request) {
