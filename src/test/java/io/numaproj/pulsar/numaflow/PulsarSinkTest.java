@@ -3,6 +3,7 @@ package io.numaproj.pulsar.numaflow;
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.ResponseList;
+import io.numaproj.pulsar.producer.PulsarSink;
 
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
