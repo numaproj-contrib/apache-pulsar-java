@@ -7,11 +7,13 @@ import io.numaproj.numaflow.sourcer.OutputObserver;
 import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
+
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 
 import java.nio.charset.StandardCharsets;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,6 +35,7 @@ import java.util.List;
 public class PulsarSource extends Sourcer {
 
     private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messages = new ConcurrentHashMap<>();
+
     private Server server;
 
     @Autowired
@@ -42,6 +46,7 @@ public class PulsarSource extends Sourcer {
 
     @PostConstruct
     public void startServer() throws Exception {
+
         server = new Server(this);
         server.start();
         server.awaitTermination();
@@ -51,7 +56,7 @@ public class PulsarSource extends Sourcer {
     public void read(ReadRequest request, OutputObserver observer) {
         long startTime = System.currentTimeMillis();
 
-        // Minimal check: if outstanding messages haven't been acknowledged, do nothing.
+        // minimal check: if outstanding messages haven't been acknowledged, do nothing.
         if (!messages.isEmpty()) {
             return;
         }
@@ -80,6 +85,7 @@ public class PulsarSource extends Sourcer {
 
                 observer.send(message);
                 messages.put(pMsg.getMessageId().toString(), pMsg);
+
             } catch (PulsarClientException e) {
                 log.error("Failed to receive message from Pulsar", e);
                 return;
@@ -112,7 +118,7 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public long getPending() {
-        // Number of messages not yet acknowledged.
+        // number of messages not acknowledged yet
         return messages.size();
     }
 
