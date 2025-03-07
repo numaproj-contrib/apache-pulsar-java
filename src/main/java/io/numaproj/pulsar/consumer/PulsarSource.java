@@ -8,8 +8,10 @@ import io.numaproj.numaflow.sourcer.OutputObserver;
 import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
@@ -39,24 +41,18 @@ public class PulsarSource extends Sourcer {
     @Autowired
     private PulsarClient pulsarClient;
 
-    // Consumer for Pulsar messages on hardcoded topic "my-topic"
+    @Autowired
     private Consumer<byte[]> pulsarConsumer;
 
     @PostConstruct // starts server automatically when the Spring context initializes
     public void startServer() throws Exception {
-        // Create and start Pulsar consumer using the autowired PulsarClient.
-        pulsarConsumer = pulsarClient.newConsumer(Schema.BYTES)
-                .topic("demo-t")
-                .subscriptionName("my-topic-subscription")
-                .subscribe();
-
         // Start the gRPC server for reading messages.
         server = new Server(this);
         server.start();
         server.awaitTermination();
     }
 
-    @Override
+       @Override
     public void read(ReadRequest request, OutputObserver observer) {
         long startTime = System.currentTimeMillis();
 
@@ -105,6 +101,7 @@ public class PulsarSource extends Sourcer {
         }
     }
 
+
     @Override
     public void ack(AckRequest request) {
         // Iterate over provided offsets and acknowledge the corresponding Pulsar
@@ -136,6 +133,22 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public List<Integer> getPartitions() {
-        return Sourcer.defaultPartitions(); // Fallback mechnism, a single partition based on your pod replica index
+        return Sourcer.defaultPartitions(); // Fallback mechanism: a single partition based on your pod replica index.
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        try {
+            if (pulsarConsumer != null) {
+                pulsarConsumer.close();
+                log.info("Consumer closed.");
+            }
+            if (pulsarClient != null) {
+                pulsarClient.close();
+                log.info("PulsarClient closed.");
+            }
+        } catch (PulsarClientException e) {
+            log.error("Error while closing PulsarClient or Producer.", e);
+        }
     }
 }
