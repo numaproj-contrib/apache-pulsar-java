@@ -7,14 +7,11 @@ import io.numaproj.numaflow.sourcer.OutputObserver;
 import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.client.api.BatchReceivePolicy;
+
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.api.Schema;
-import org.apache.pulsar.client.api.SubscriptionType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -37,7 +34,6 @@ public class PulsarSource extends Sourcer {
 
     private Server server;
 
-    // Inject the managed consumer factory.
     @Autowired
     private PulsarConsumerManager pulsarConsumerManager;
 
@@ -50,7 +46,7 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
-        // if there are messages not acknowledged, return
+        // If there are messages not acknowledged, return
         if (!messagesToAck.isEmpty()) {
             return;
         }
