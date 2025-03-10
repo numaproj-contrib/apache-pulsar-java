@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PulsarSource extends Sourcer {
 
     // Map tracking received messages (keyed by Pulsar message ID string)
-    private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messages = new ConcurrentHashMap<>();
+    private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = new ConcurrentHashMap<>();
 
     private Server server;
 
@@ -50,13 +50,18 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
+        // if there are messages not acknowledged, return
+        if (!messagesToAck.isEmpty()) {
+            return;
+        }
+
         Consumer<byte[]> consumer = null;
+
         try {
             // Obtain a consumer with the desired settings.
             consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
             Messages<byte[]> batchMessages = null;
             try {
-                // Attempt to receive a batch.
                 batchMessages = consumer.batchReceive();
             } catch (PulsarClientException.AlreadyClosedException ace) {
                 // If the consumer is closed, remove it and try to obtain a new one.
@@ -86,7 +91,7 @@ public class PulsarSource extends Sourcer {
                 Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
                 observer.send(message);
 
-                messages.put(msgId, pMsg);
+                messagesToAck.put(msgId, pMsg);
             }
         } catch (PulsarClientException e) {
             log.error("Failed to get consumer or receive messages from Pulsar", e);
@@ -97,7 +102,7 @@ public class PulsarSource extends Sourcer {
     public void ack(AckRequest request) {
         request.getOffsets().forEach(offset -> {
             String messageIdKey = new String(offset.getValue(), StandardCharsets.UTF_8);
-            org.apache.pulsar.client.api.Message<byte[]> pMsg = messages.get(messageIdKey);
+            org.apache.pulsar.client.api.Message<byte[]> pMsg = messagesToAck.get(messageIdKey);
             if (pMsg != null) {
                 try {
                     Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
@@ -107,14 +112,14 @@ public class PulsarSource extends Sourcer {
                 } catch (PulsarClientException e) {
                     log.error("Failed to acknowledge Pulsar message", e);
                 }
-                messages.remove(messageIdKey);
+                messagesToAck.remove(messageIdKey);
             }
         });
     }
 
     @Override
     public long getPending() {
-        return messages.size();
+        return messagesToAck.size();
     }
 
     @Override
