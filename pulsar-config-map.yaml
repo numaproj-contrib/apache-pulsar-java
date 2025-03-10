@@ -15,7 +15,7 @@ data:
         consumer: 
           enabled: true
           consumerConfig: 
-            topicNames: "test-topic"
+            topicNames: "marchten"
             subscriptionName: "sub"
 
 
