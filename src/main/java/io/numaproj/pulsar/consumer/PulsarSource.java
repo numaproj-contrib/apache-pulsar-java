@@ -45,6 +45,14 @@ public class PulsarSource extends Sourcer {
     // Map tracking the consumer instance that received each message. In the new
     // design, each message
     // should have been received by the current consumer instance.
+
+    /**
+     * this map stores a relationship between a message ID (as a string) and the
+     * specific consumer instance that received it.
+     * during ack, this mapping allows the code to look up the correct
+     * consumer instance to call the acknowledge() method, ensuring the proper
+     * handling of each message.
+     */
     private final Map<String, Consumer<byte[]>> consumerByMessage = new ConcurrentHashMap<>();
 
     private Server server;
@@ -86,7 +94,8 @@ public class PulsarSource extends Sourcer {
             // Process each message in the trimmed batch.
             for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
                 String msgId = pMsg.getMessageId().toString();
-                log.info("Consumed Pulsar message: {}", new String(pMsg.getValue(), StandardCharsets.UTF_8));
+                log.info("Consumed Pulsar message [id: {}]: {}", pMsg.getMessageId(),
+                        new String(pMsg.getValue(), StandardCharsets.UTF_8));
 
                 byte[] offsetBytes = msgId.getBytes(StandardCharsets.UTF_8);
                 Offset offset = new Offset(offsetBytes);

@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import io.numaproj.pulsar.config.PulsarConsumerProperties;
+
 import javax.annotation.PreDestroy;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 @Component
 @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class ManagedConsumerFactory {
+    @Autowired
+    private PulsarConsumerProperties pulsarConsumerProperties;
 
     @Autowired
     private PulsarClient pulsarClient;
@@ -66,9 +70,7 @@ public class ManagedConsumerFactory {
                 .build();
 
         currentConsumer = pulsarClient.newConsumer(Schema.BYTES)
-                .topic("testy") // TO DO: TURN TOPIC INTO SPRING BEAN if needed
-                .subscriptionName("sub")
-                .subscriptionType(SubscriptionType.Shared)
+                .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
                 .subscribe();
 
