@@ -7,17 +7,21 @@ import io.numaproj.numaflow.sourcer.OutputObserver;
 import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
+
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class PulsarSource extends Sourcer {
-
     // Map tracking received messages (keyed by Pulsar message ID string)
     private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = new ConcurrentHashMap<>();
 
@@ -36,6 +39,7 @@ public class PulsarSource extends Sourcer {
 
     @Autowired
     private PulsarConsumerManager pulsarConsumerManager;
+
 
     @PostConstruct
     public void startServer() throws Exception {
@@ -50,7 +54,7 @@ public class PulsarSource extends Sourcer {
         if (!messagesToAck.isEmpty()) {
             return;
         }
-
+      
         Consumer<byte[]> consumer = null;
 
         try {
@@ -85,10 +89,11 @@ public class PulsarSource extends Sourcer {
                 headers.put("pulsarMessageId", msgId);
 
                 Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
-                observer.send(message);
 
+                observer.send(message);
+                messages.put(pMsg.getMessageId().toString(), pMsg);
+              
                 messagesToAck.put(msgId, pMsg);
-            }
         } catch (PulsarClientException e) {
             log.error("Failed to get consumer or receive messages from Pulsar", e);
         }
@@ -120,6 +125,22 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public List<Integer> getPartitions() {
-        return Sourcer.defaultPartitions();
+        return Sourcer.defaultPartitions(); // Fallback mechanism: a single partition based on your pod replica index.
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        try {
+            if (pulsarConsumer != null) {
+                pulsarConsumer.close();
+                log.info("Consumer closed.");
+            }
+            if (pulsarClient != null) {
+                pulsarClient.close();
+                log.info("PulsarClient closed.");
+            }
+        } catch (PulsarClientException e) {
+            log.error("Error while closing PulsarClient or Producer.", e);
+        }
     }
 }
