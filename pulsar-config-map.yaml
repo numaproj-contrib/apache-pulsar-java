@@ -15,9 +15,8 @@ data:
         consumer: 
           enabled: true
           consumerConfig: 
-            topicNames: ["marchten"]
+            topicNames: "test-topic"
             subscriptionName: "sub"
-            subscriptionType: "Shared"
 
 
 

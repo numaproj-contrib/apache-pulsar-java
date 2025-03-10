@@ -72,6 +72,7 @@ public class ManagedConsumerFactory {
         currentConsumer = pulsarClient.newConsumer(Schema.BYTES)
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
+                .subscriptionType(SubscriptionType.Shared) // Needs to be shared to support multiple pods 
                 .subscribe();
 
         currentKey = newKey;
@@ -80,15 +81,14 @@ public class ManagedConsumerFactory {
     }
 
     /**
-     * Optionally, if you ever need to explicitly remove the current consumer (for
-     * example, if needed within error handling),
-     * this method will close it and clear the current state.
-     *
+     * Removes the current consumer (for example, if needed within error handling).     *
      * @param count         maximum number of messages (batch size and receiver
      *                      queue size)
      * @param timeoutMillis the timeout in milliseconds used when creating the
      *                      consumer
      */
+
+     // synchronized so that only one thread cane execuet these messages at one time 
     public synchronized void removeConsumer(long count, long timeoutMillis) {
         ConsumerKey keyToRemove = new ConsumerKey(count, timeoutMillis);
         if (currentConsumer != null && keyToRemove.equals(currentKey)) {
