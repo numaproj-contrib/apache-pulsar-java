@@ -3,6 +3,8 @@ kind: Pipeline
 metadata:
   name: simple-pipeline
 spec:
+  limits: 
+    readBatchSize: 10
   vertices:
     - name: in
       volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
