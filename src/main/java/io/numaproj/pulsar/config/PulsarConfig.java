@@ -1,4 +1,4 @@
-package io.numaproj.pulsar.producer;
+package io.numaproj.pulsar.config;
 
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -7,6 +7,7 @@ import org.apache.pulsar.client.api.Schema;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Producer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,8 +15,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
-import io.numaproj.pulsar.config.PulsarClientProperties;
-import io.numaproj.pulsar.config.PulsarProducerProperties;
 import lombok.extern.slf4j.Slf4j;
 
 /***
@@ -58,5 +57,14 @@ public class PulsarConfig {
         return pulsarClient.newProducer(Schema.BYTES)
                 .loadConf(producerConfig)
                 .create();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true", matchIfMissing = false)
+    public Consumer<byte[]> pulsarConsumer(PulsarClient pulsarClient) throws PulsarClientException {
+        return pulsarClient.newConsumer(Schema.BYTES)
+                .topic("testy")
+                .subscriptionName("sub")
+                .subscribe();
     }
 }
