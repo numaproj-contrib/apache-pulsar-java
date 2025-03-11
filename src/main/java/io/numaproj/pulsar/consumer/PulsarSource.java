@@ -19,9 +19,9 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PulsarSource extends Sourcer {
 
     // Map tracking received messages (keyed by Pulsar message ID string)
-    private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = new ConcurrentHashMap<>();
+    private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = new HashMap<>();
 
     private Server server;
 
@@ -86,8 +86,25 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void ack(AckRequest request) {
+        // Convert offsets to message ID strings for comparison
+        Map<String, Offset> requestOffsetMap = new HashMap<>(); // key: msgId, value: offset object
         request.getOffsets().forEach(offset -> {
+            // Offset value is a byte array so convert byte arr to string
             String messageIdKey = new String(offset.getValue(), StandardCharsets.UTF_8);
+            requestOffsetMap.put(messageIdKey, offset);
+        });
+
+        // Verify that the keys in messagesToAck match the message IDs from the request
+        if (!messagesToAck.keySet().equals(requestOffsetMap.keySet())) {
+            log.error("Mismatch in acknowledgment: internal pending IDs {} do not match requested ack IDs {}",
+                    messagesToAck.keySet(), requestOffsetMap.keySet());
+            // Return early without processing the ack to prevent any inconsistent state
+            return;
+        }
+
+        // If the check passed, process each ack request
+        for (Map.Entry<String, Offset> entry : requestOffsetMap.entrySet()) {
+            String messageIdKey = entry.getKey();
             org.apache.pulsar.client.api.Message<byte[]> pMsg = messagesToAck.get(messageIdKey);
             if (pMsg != null) {
                 try {
@@ -99,8 +116,10 @@ public class PulsarSource extends Sourcer {
                     log.error("Failed to acknowledge Pulsar message", e);
                 }
                 messagesToAck.remove(messageIdKey);
+            } else {
+                log.warn("Requested message ID {} not found in the pending acks", messageIdKey);
             }
-        });
+        }
     }
 
     @Override
