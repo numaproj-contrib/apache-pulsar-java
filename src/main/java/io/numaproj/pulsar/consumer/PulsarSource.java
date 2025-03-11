@@ -19,7 +19,6 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,6 +47,7 @@ public class PulsarSource extends Sourcer {
     public void read(ReadRequest request, OutputObserver observer) {
         // If there are messages not acknowledged, return
         if (!messagesToAck.isEmpty()) {
+            log.trace("messagesToAck not empty: {}", messagesToAck);
             return;
         }
 
@@ -56,19 +56,11 @@ public class PulsarSource extends Sourcer {
         try {
             // Obtain a consumer with the desired settings.
             consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
-            Messages<byte[]> batchMessages = null;
-            try {
-                batchMessages = consumer.batchReceive();
-            } catch (PulsarClientException.AlreadyClosedException ace) {
-                // If the consumer is closed, remove it and try to obtain a new one.
-                log.warn("Cached consumer was closed. Removing and recreating consumer.");
-                pulsarConsumerManager.removeConsumer();
-                consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(),
-                        request.getTimeout().toMillis());
-                batchMessages = consumer.batchReceive();
-            }
+
+            Messages<byte[]> batchMessages = consumer.batchReceive();
 
             if (batchMessages == null || batchMessages.size() == 0) {
+                log.trace("Received 0 messages, return early.");
                 return;
             }
 
@@ -81,16 +73,14 @@ public class PulsarSource extends Sourcer {
                 byte[] offsetBytes = msgId.getBytes(StandardCharsets.UTF_8);
                 Offset offset = new Offset(offsetBytes);
 
-                HashMap<String, String> headers = new HashMap<>();
-                headers.put("pulsarMessageId", msgId);
-
-                Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
+                Message message = new Message(pMsg.getValue(), offset, Instant.now());
                 observer.send(message);
 
                 messagesToAck.put(msgId, pMsg);
             }
         } catch (PulsarClientException e) {
             log.error("Failed to get consumer or receive messages from Pulsar", e);
+            throw new RuntimeException("Failed to get consumer or receive messages from Pulsar", e);
         }
     }
 
@@ -115,6 +105,8 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public long getPending() {
+        // TO DO: Currently this is received but not acked. Should be num messages in
+        // backlog
         return messagesToAck.size();
     }
 

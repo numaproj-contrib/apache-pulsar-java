@@ -36,7 +36,7 @@ public class PulsarConsumerManager {
     private Consumer<byte[]> currentConsumer;
 
     // Returns the current consumer if it exists. If not, creates a new one.
-    public synchronized Consumer<byte[]> getOrCreateConsumer(long count, long timeoutMillis)
+    public Consumer<byte[]> getOrCreateConsumer(long count, long timeoutMillis)
             throws PulsarClientException {
         if (currentConsumer != null) {
             return currentConsumer;
@@ -44,7 +44,8 @@ public class PulsarConsumerManager {
 
         BatchReceivePolicy batchPolicy = BatchReceivePolicy.builder()
                 .maxNumMessages((int) count)
-                .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS)
+                .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS) // We do not expect user to specify a number larger
+                                                                     // than 2^63 - 1 which will cause an overflow
                 .build();
 
         currentConsumer = pulsarClient.newConsumer(Schema.BYTES)
@@ -53,24 +54,12 @@ public class PulsarConsumerManager {
                 .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
                 .subscribe();
 
-        log.info("Created new consumer with batch size: {} and timeoutMillis: {}", count, timeoutMillis);
+        log.info("Created new consumer with batch receive policy of: {} and timeoutMillis: {}", count, timeoutMillis);
         return currentConsumer;
     }
 
-    public synchronized void removeConsumer() {
-        if (currentConsumer != null) {
-            try {
-                currentConsumer.close();
-                log.info("Removed consumer.");
-            } catch (PulsarClientException e) {
-                log.error("Error closing consumer", e);
-            }
-            currentConsumer = null;
-        }
-    }
-
     @PreDestroy
-    public synchronized void cleanup() {
+    public void cleanup() {
         if (currentConsumer != null) {
             try {
                 currentConsumer.close();

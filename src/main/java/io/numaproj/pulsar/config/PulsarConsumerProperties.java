@@ -2,6 +2,8 @@ package io.numaproj.pulsar.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,6 +18,7 @@ import java.util.Map;
 @Setter
 @Configuration
 @ConfigurationProperties(prefix = "spring.pulsar.consumer")
+@Slf4j
 public class PulsarConsumerProperties {
     private Map<String, Object> consumerConfig = new HashMap<>(); // Default to an empty map
 
@@ -28,7 +31,6 @@ public class PulsarConsumerProperties {
             topicNames.add(topicName);
             consumerConfig.put("topicNames", topicNames);
         }
-
-        System.out.println("Consumer Config: " + consumerConfig);
+        log.info("Consumer Config: " + consumerConfig);
     }
 }
