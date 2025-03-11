@@ -12,9 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import io.numaproj.pulsar.config.PulsarClientProperties;
-import io.numaproj.pulsar.config.PulsarConfig;
-import io.numaproj.pulsar.config.PulsarProducerProperties;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,7 +44,7 @@ public class PulsarConfigTest {
         pulsarConfig = new PulsarConfig();
         mockEnvironment = mock(Environment.class);
         ReflectionTestUtils.setField(pulsarConfig, "env", mockEnvironment);
-        
+
         mockClientProperties = mock(PulsarClientProperties.class);
     }
 
@@ -68,7 +65,7 @@ public class PulsarConfigTest {
         // Only initialize these when needed for producer tests
         mockProducerProperties = mock(PulsarProducerProperties.class);
         mockClient = mock(PulsarClient.class);
-        
+
         spiedConfig = spy(pulsarConfig);
         doReturn(mockClient).when(spiedConfig).pulsarClient(any(PulsarClientProperties.class));
 
@@ -101,7 +98,7 @@ public class PulsarConfigTest {
     @Test
     public void pulsarProducer_validConfig() throws Exception {
         setUpProducerTest();
-        
+
         Map<String, Object> producerConfig = new HashMap<>();
         producerConfig.put("topicName", "test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
@@ -110,13 +107,13 @@ public class PulsarConfigTest {
 
         assertNotNull("Producer should be created", producer);
 
-        verify(mockProducerBuilder).loadConf(argThat(map -> 
-            "test-topic".equals(map.get("topicName"))));
+        verify(mockProducerBuilder).loadConf(argThat(map -> "test-topic".equals(map.get("topicName"))));
         verify(mockProducerBuilder).create();
         verify(mockProducerProperties).getProducerConfig();
     }
 
-    // Test to ensure an error is thrown if pulsar client isn't created with service url
+    // Test to ensure an error is thrown if pulsar client isn't created with service
+    // url
     @Test
     public void pulsarClient_missingServiceUrl_throwsException() {
         Map<String, Object> clientConfig = new HashMap<>(); // no service URL added to cause error
@@ -131,11 +128,12 @@ public class PulsarConfigTest {
                 exception.getMessage().contains(expectedMessage));
     }
 
-    // Test which ensures an error is thrown if pulsar producer isn't created with topicName
+    // Test which ensures an error is thrown if pulsar producer isn't created with
+    // topicName
     @Test
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
         setUpProducerTest();
-        
+
         when(mockProducerProperties.getProducerConfig()).thenReturn(new HashMap<>());
 
         String expectedErrorSubstring = "Topic name must be set on the producer builder";
@@ -149,11 +147,11 @@ public class PulsarConfigTest {
         assertTrue(exception.getMessage().contains(expectedErrorSubstring));
     }
 
-    // Test for environment variable is set, and user does NOT specify producerName 
+    // Test for environment variable is set, and user does NOT specify producerName
     @Test
     public void pulsarProducer_ProducerNameFromEnvVarNoUserConfig() throws Exception {
         setUpProducerTest();
-        
+
         final String envPodName = "NUMAFLOW_POD_VALUE";
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
 
@@ -174,7 +172,7 @@ public class PulsarConfigTest {
     @Test
     public void pulsarProducer_ProducerNameOverridden() throws Exception {
         setUpProducerTest();
-        
+
         final String envPodName = "my-env-pod";
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
 
@@ -191,13 +189,14 @@ public class PulsarConfigTest {
         assertEquals(envPodName, configCaptor.getValue().get("producerName"));
     }
 
-    // Test for if NUMAFLOW_POD environment variable is not set 
+    // Test for if NUMAFLOW_POD environment variable is not set
     @Test
     public void pulsarProducer_NoEnvVariableFoundFallbackName() throws Exception {
         setUpProducerTest();
-        
-        // Return null to simulate environment variable not set
-        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(null);
+
+        // Simulate NUMAFLOW_POD not being set by returning null
+        when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString()))
+            .thenAnswer(invocation -> invocation.getArgument(1));
 
         Map<String, Object> emptyConfig = new HashMap<>();
         emptyConfig.put("topicName", "test-topic");
@@ -208,8 +207,9 @@ public class PulsarConfigTest {
         assertNotNull(producer);
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(mockProducerBuilder).loadConf(captor.capture());
-        String actualProducerName = (String) captor.getValue().get("producerName");
-        assertTrue(actualProducerName.startsWith("pod-"));
-        assertNotEquals("pod-", actualProducerName);
+        
+        String producerName = (String) captor.getValue().get("producerName");
+        assertNotNull("Producer name should not be null", producerName);
+        assertTrue("Producer name should start with 'pod-'", producerName.startsWith("pod-"));
     }
 }
