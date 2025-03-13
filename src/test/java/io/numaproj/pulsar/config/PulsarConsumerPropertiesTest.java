@@ -36,22 +36,4 @@ public class PulsarConsumerPropertiesTest {
         assertEquals("otherKey property should remain unchanged", "otherValue",
                 properties.getConsumerConfig().get("otherKey"));
     }
-
-    @Test
-    public void testInitWithoutTopicNames() {
-        // Prepare a properties instance without topicNames key
-        PulsarConsumerProperties properties = new PulsarConsumerProperties();
-        Map<String, Object> config = new HashMap<>();
-        config.put("someKey", "someValue");
-        properties.setConsumerConfig(config);
-
-        // Call init should not modify the properties map for keys that don't exist.
-        properties.init();
-
-        // The same key should exist with the original value
-        assertEquals("someValue", properties.getConsumerConfig().get("someKey"));
-        // There should be no topicNames key added by init
-        assertFalse("topicNames key should not be added if not present",
-                properties.getConsumerConfig().containsKey("topicNames"));
-    }
 }

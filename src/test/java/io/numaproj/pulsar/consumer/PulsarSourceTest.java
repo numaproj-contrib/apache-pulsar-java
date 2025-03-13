@@ -21,6 +21,8 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 public class PulsarSourceTest {
@@ -156,7 +158,7 @@ public class PulsarSourceTest {
         assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
         assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
 
-        // Confirm  messages are tracked for ack.
+        // Confirm messages are tracked for ack.
         // The keys should be "msg1" and "msg2"
         java.util.Map<String, ?> ackMap = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
                 "messagesToAck");
@@ -218,10 +220,12 @@ public class PulsarSourceTest {
             }
         };
 
-        // Call ack. Since there is no matching message, nothing should happen.
         pulsarSource.ack(ackRequest);
 
-        // Verify no interactions with consumer are performed.
-        verify(consumerManagerMock, never()).getOrCreateConsumer(anyLong(), anyLong());
+        try {
+            verify(consumerManagerMock, never()).getOrCreateConsumer(anyLong(), anyLong());
+        } catch (PulsarClientException e) {
+            fail("Unexpected exception during verification: " + e.getMessage());
+        }
     }
 }
