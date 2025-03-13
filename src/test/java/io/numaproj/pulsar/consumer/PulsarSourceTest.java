@@ -207,7 +207,7 @@ public class PulsarSourceTest {
      * Test the ack method when the offset does not exist in messagesToAck.
      */
     @Test
-    public void testAckNoMatchingMessage() throws PulsarClientException {
+    public void testAckNoMatchingMessage() {
         // Ensure messagesToAck is empty.
         java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) ReflectionTestUtils
                 .getField(pulsarSource, "messagesToAck");
