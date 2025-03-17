@@ -3,6 +3,9 @@ package io.numaproj.pulsar.config;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import java.net.MalformedURLException;
 
 import java.util.Map;
 import java.util.UUID;
@@ -56,5 +59,15 @@ public class PulsarConfig {
         return pulsarClient.newProducer(Schema.BYTES)
                 .loadConf(producerConfig)
                 .create();
+    }
+
+    @Bean
+    public PulsarAdmin pulsarAdmin(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
+        // String serviceUrl = (String)
+        // pulsarClientProperties.getClientConfig().get("serviceUrl");
+        return PulsarAdmin.builder()
+                .serviceHttpUrl("http://host.docker.internal:8080/")
+                // .authentication(...) if needed
+                .build();
     }
 }

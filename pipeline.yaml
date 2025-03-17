@@ -4,11 +4,11 @@ metadata:
   name: simple-pipeline
 spec:
   limits: 
-    readBatchSize: 6
+    readBatchSize: 1
   vertices:
     - name: in
       scale:
-        min: 2
+        min: 1
       volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
         - name: pulsar-config-volume
           configMap:

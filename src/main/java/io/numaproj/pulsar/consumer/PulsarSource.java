@@ -7,11 +7,17 @@ import io.numaproj.numaflow.sourcer.OutputObserver;
 import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
+import io.numaproj.pulsar.config.PulsarConsumerProperties;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.ConsumerStats;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.common.policies.data.TopicStats;
+import org.apache.pulsar.common.policies.data.SubscriptionStats;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -22,6 +28,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -35,6 +42,12 @@ public class PulsarSource extends Sourcer {
 
     @Autowired
     private PulsarConsumerManager pulsarConsumerManager;
+
+    @Autowired
+    private PulsarAdmin pulsarAdmin;
+
+    @Autowired
+    PulsarConsumerProperties pulsarConsumerProperties;
 
     @PostConstruct
     public void startServer() throws Exception {
@@ -122,11 +135,32 @@ public class PulsarSource extends Sourcer {
         }
     }
 
+    // @Override
+    // // public long getPending() {
+    // // // TO DO: Currently this is received but not acked. Should be num messages
+    // in
+    // // // backlog
+    // // return messagesToAck.size();
+    // // }
     @Override
     public long getPending() {
-        // TO DO: Currently this is received but not acked. Should be num messages in
-        // backlog
-        return messagesToAck.size();
+        try {
+            // If changing to support multiple topics, need to update this
+            Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
+            String topicName = (String) topicNames.iterator().next(); 
+            String subscriptionName = (String) pulsarConsumerProperties.getConsumerConfig().get("subscriptionName");
+
+            TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
+            SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
+            log.info("this is the number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
+
+            return subscriptionStats.getMsgBacklog();
+        } catch (PulsarAdminException e) {
+            log.error("Error while fetching admin stats for pending messages", e);
+            // Return a negative value to indicate an error state
+            return -1;
+            // the no pending avalaibale thing from the docs?
+        }
     }
 
     @Override
