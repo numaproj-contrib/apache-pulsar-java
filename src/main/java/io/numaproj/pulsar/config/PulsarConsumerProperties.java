@@ -25,12 +25,23 @@ public class PulsarConsumerProperties {
     @PostConstruct
     public void init() {
         // Pulsar expects topicNames to be type set, but the configMap accepts a string
-        if (consumerConfig.containsKey("topicNames")) {
-            String topicName = (String) consumerConfig.remove("topicNames");
+        String topicNameKey = "topicNames";
+        if (consumerConfig.containsKey(topicNameKey)) {
+            String topicName = (String) consumerConfig.remove(topicNameKey);
             Set<String> topicNames = new HashSet<>();
             topicNames.add(topicName);
-            consumerConfig.put("topicNames", topicNames);
+            consumerConfig.put(topicNameKey, topicNames);
         }
-        log.info("Consumer Config: " + consumerConfig);
+
+        // If 'subscriptionName' not present, provide a default
+        String subscriptionNameKey = "subscriptionName";
+        if (!consumerConfig.containsKey(subscriptionNameKey)) {
+            consumerConfig.put(subscriptionNameKey, "sub");
+            log.info("No subscriptionName provided. Setting default: 'sub'");
+        } else {
+            log.info("subscriptionName was already set, leaving as-is.");
+        }
+
+        log.info("Consumer Config: {}", consumerConfig);
     }
 }

@@ -63,8 +63,6 @@ public class PulsarConfig {
 
     @Bean
     public PulsarAdmin pulsarAdmin(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
-        // String serviceUrl = (String)
-        // pulsarClientProperties.getClientConfig().get("serviceUrl");
         return PulsarAdmin.builder()
                 .serviceHttpUrl("http://host.docker.internal:8080/")
                 // .authentication(...) if needed

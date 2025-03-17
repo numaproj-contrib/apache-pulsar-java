@@ -11,7 +11,6 @@ import io.numaproj.pulsar.config.PulsarConsumerProperties;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
-import org.apache.pulsar.client.api.ConsumerStats;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.admin.PulsarAdmin;
@@ -135,31 +134,23 @@ public class PulsarSource extends Sourcer {
         }
     }
 
-    // @Override
-    // // public long getPending() {
-    // // // TO DO: Currently this is received but not acked. Should be num messages
-    // in
-    // // // backlog
-    // // return messagesToAck.size();
-    // // }
     @Override
     public long getPending() {
         try {
             // If changing to support multiple topics, need to update this
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            String topicName = (String) topicNames.iterator().next(); 
+            String topicName = (String) topicNames.iterator().next(); // Assumes there is only one topic name in the set
             String subscriptionName = (String) pulsarConsumerProperties.getConsumerConfig().get("subscriptionName");
 
             TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
             SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
-            log.info("this is the number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
-
+            // will remove later - used for testing
+            log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog()); 
             return subscriptionStats.getMsgBacklog();
         } catch (PulsarAdminException e) {
             log.error("Error while fetching admin stats for pending messages", e);
-            // Return a negative value to indicate an error state
+            // Return a negative value to indicate no pending information
             return -1;
-            // the no pending avalaibale thing from the docs?
         }
     }
 

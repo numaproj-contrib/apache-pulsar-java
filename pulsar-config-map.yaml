@@ -16,7 +16,6 @@ data:
           enabled: true
           consumerConfig: 
             topicNames: "marchtwelve"
-            subscriptionName: "sub"
 
 
 
