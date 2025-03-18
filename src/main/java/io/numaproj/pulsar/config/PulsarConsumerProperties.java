@@ -20,17 +20,31 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "spring.pulsar.consumer")
 @Slf4j
 public class PulsarConsumerProperties {
+
+    private static final String DEFAULT_SUBSCRIPTION_NAME = "sub";
+    
     private Map<String, Object> consumerConfig = new HashMap<>(); // Default to an empty map
 
     @PostConstruct
     public void init() {
         // Pulsar expects topicNames to be type set, but the configMap accepts a string
-        if (consumerConfig.containsKey("topicNames")) {
-            String topicName = (String) consumerConfig.remove("topicNames");
+        String topicNameKey = "topicNames";
+        if (consumerConfig.containsKey(topicNameKey)) {
+            String topicName = (String) consumerConfig.remove(topicNameKey);
             Set<String> topicNames = new HashSet<>();
             topicNames.add(topicName);
-            consumerConfig.put("topicNames", topicNames);
+            consumerConfig.put(topicNameKey, topicNames);
         }
-        log.info("Consumer Config: " + consumerConfig);
+
+        // If 'subscriptionName' not present, provide a default
+        String subscriptionNameKey = "subscriptionName";
+        if (!consumerConfig.containsKey(subscriptionNameKey)) {
+            consumerConfig.put(subscriptionNameKey, DEFAULT_SUBSCRIPTION_NAME);
+            log.info("No subscriptionName provided. Setting default: '{}'", DEFAULT_SUBSCRIPTION_NAME);
+        } else {
+            log.info("subscriptionName was already set, leaving as-is.");
+        }
+
+        log.info("Consumer Config: {}", consumerConfig);
     }
 }
