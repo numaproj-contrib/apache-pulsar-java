@@ -1,6 +1,9 @@
 package io.numaproj.pulsar.config;
 
 import org.junit.Test;
+
+import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
+
 import static org.junit.Assert.*;
 
 import java.util.HashMap;
@@ -34,6 +37,6 @@ public class PulsarConsumerPropertiesTest {
 
         // Ensure that unrelated properties remain unchanged
         assertEquals("otherKey property should remain unchanged", "otherValue",
-                properties.getConsumerConfig().get("otherKey"));
+        properties.getConsumerConfig().get("otherKey"));
     }
 }

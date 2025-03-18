@@ -8,7 +8,7 @@ data:
       pulsar:
         client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
           clientConfig:
-            serviceUrl: "pulsar://host.docker.internal:6650"
+            serviceUrl: "pulsar://host.docker.internal:6650" # aka brokerServiceUrl
         producer:
           enabled: false
         consumer: 
@@ -17,4 +17,4 @@ data:
             topicNames: "marchtwelve"
         admin: 
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
-            serviceUrl: "http://host.docker.internal:8080/"
+            serviceUrl: "http://host.docker.internal:8080/" # aka webServiceUrl
