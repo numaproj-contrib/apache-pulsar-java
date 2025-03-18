@@ -13,7 +13,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Configuration
-// @ConfigurationProperties(prefix = "spring.pulsar.admin")
+@ConfigurationProperties(prefix = "spring.pulsar.admin")
 public class PulsarAdminProperties {
     private Map<String, Object> adminConfig = new HashMap<>(); // Admin-specific configuration map
 }
