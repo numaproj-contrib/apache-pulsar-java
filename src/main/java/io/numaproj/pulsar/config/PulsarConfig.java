@@ -4,9 +4,9 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.admin.PulsarAdmin;
-import org.apache.pulsar.client.admin.PulsarAdminException;
-import java.net.MalformedURLException;
+import org.apache.pulsar.client.admin.PulsarAdminBuilder;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,6 +35,7 @@ public class PulsarConfig {
 
     @Bean
     public PulsarClient pulsarClient(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
+
         return PulsarClient.builder()
                 .loadConf(pulsarClientProperties.getClientConfig())
                 .build();
@@ -62,10 +63,14 @@ public class PulsarConfig {
     }
 
     @Bean
-    public PulsarAdmin pulsarAdmin(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
-        return PulsarAdmin.builder()
-                .serviceHttpUrl("http://host.docker.internal:8080/")
-                // .authentication(...) if needed
-                .build();
+    public PulsarAdmin pulsarAdmin() throws PulsarClientException {
+        Map<String, Object> config = new HashMap<>();
+        config.put("serviceUrl", "http://host.docker.internal:8080/");
+        
+        PulsarAdminBuilder builder = PulsarAdmin.builder();  // Initialize the builder
+        builder = builder.loadConf(config);  // Load configuration into the builder
+        PulsarAdmin client = builder.build();  // Build the PulsarAdmin client
+
+        return client;
     }
 }

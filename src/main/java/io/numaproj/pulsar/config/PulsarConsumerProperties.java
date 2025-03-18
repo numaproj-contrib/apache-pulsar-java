@@ -44,7 +44,6 @@ public class PulsarConsumerProperties {
         } else {
             log.info("subscriptionName was already set, leaving as-is.");
         }
-
         log.info("Consumer Config: {}", consumerConfig);
     }
 }
