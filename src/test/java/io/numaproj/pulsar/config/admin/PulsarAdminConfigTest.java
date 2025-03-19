@@ -1,7 +1,5 @@
 package io.numaproj.pulsar.config.admin;
 
-import io.numaproj.pulsar.config.admin.PulsarAdminConfig;
-
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.junit.Before;
 import org.junit.Test;

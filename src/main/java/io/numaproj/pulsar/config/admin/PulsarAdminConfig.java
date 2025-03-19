@@ -8,9 +8,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Configuration
 public class PulsarAdminConfig {
-
     @Bean
-    @ConditionalOnProperty(prefix = "spring.pulsar.admin", name = "enabled", havingValue = "true", matchIfMissing = false)
+    @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true", matchIfMissing = false)
     public PulsarAdmin pulsarAdmin(PulsarAdminProperties pulsarAdminProperties) throws PulsarClientException {
         return PulsarAdmin.builder()
                 .loadConf(pulsarAdminProperties.getAdminConfig())
