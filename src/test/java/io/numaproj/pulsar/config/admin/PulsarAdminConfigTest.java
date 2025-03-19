@@ -30,8 +30,8 @@ public class PulsarAdminConfigTest {
     @Test
     public void pulsarAdmin_validConfig() throws Exception {
         Map<String, Object> config = new HashMap<>();
-        // URL must include the protocol (pulsar:// or pulsar+ssl://)
-        config.put("serviceUrl", "pulsar://test:1234");
+        // URL must include the protocol (http://)
+        config.put("serviceUrl", "http://test:1234");
         when(mockAdminProperties.getAdminConfig()).thenReturn(config);
 
         PulsarAdmin Admin = pulsarAdminConfig.pulsarAdmin(mockAdminProperties);
