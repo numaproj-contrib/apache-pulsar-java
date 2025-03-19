@@ -1,7 +1,6 @@
 package io.numaproj.pulsar.config.client;
 
 import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
