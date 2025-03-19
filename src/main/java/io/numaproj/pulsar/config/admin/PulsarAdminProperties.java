@@ -1,4 +1,4 @@
-package io.numaproj.pulsar.config;
+package io.numaproj.pulsar.config.admin;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -11,7 +11,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Configuration
-@ConfigurationProperties(prefix = "spring.pulsar.client")
-public class PulsarClientProperties {
-    private Map<String, Object> clientConfig = new HashMap<>(); // Default to an empty map
+@ConfigurationProperties(prefix = "spring.pulsar.admin")
+public class PulsarAdminProperties {
+    private Map<String, Object> adminConfig = new HashMap<>(); // Admin-specific configuration map
 }

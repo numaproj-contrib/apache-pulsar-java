@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import io.numaproj.pulsar.config.PulsarConsumerProperties;
+import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 
 import javax.annotation.PreDestroy;
 import java.util.concurrent.TimeUnit;

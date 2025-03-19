@@ -1,4 +1,4 @@
-package io.numaproj.pulsar.config;
+package io.numaproj.pulsar.config.consumer;
 
 import lombok.Getter;
 import lombok.Setter;

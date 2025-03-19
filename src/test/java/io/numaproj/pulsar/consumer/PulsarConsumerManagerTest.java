@@ -1,6 +1,5 @@
 package io.numaproj.pulsar.consumer;
 
-import io.numaproj.pulsar.config.PulsarConsumerProperties;
 import org.apache.pulsar.client.api.BatchReceivePolicy;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.ConsumerBuilder;
@@ -13,6 +12,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 
 import java.util.HashMap;
 import java.util.Map;
