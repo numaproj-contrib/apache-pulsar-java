@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,7 +146,7 @@ public class PulsarSource extends Sourcer {
             TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
             SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
             // will remove later - used for testing
-            log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog()); 
+            log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
             return subscriptionStats.getMsgBacklog();
         } catch (PulsarAdminException e) {
             log.error("Error while fetching admin stats for pending messages", e);
@@ -154,8 +155,44 @@ public class PulsarSource extends Sourcer {
         }
     }
 
+    /***
+     * • We retrieve the topic name from pulsarConsumerProperties.
+     * • Use pulsarAdmin.topics().getPartitionedTopicMetadata(...) to find out how
+     * many partitions exist.
+     * • If getPartitions() <= 1 (i.e., topic is non-partitioned or has only one
+     * partition), use the default single partition.
+     * • Otherwise, return a list of partition indices.
+     */
+    // Could also be handled by Pulsar Client... where we get the partitions for a
+    // topic and parse the string to get the last index
+
     @Override
     public List<Integer> getPartitions() {
-        return Sourcer.defaultPartitions();
+        try {
+            Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
+
+            // Assume single topic in the set
+            String topicName = topicNames.iterator().next();
+
+            // Determine how many partitions are available for this topic
+            int partitionCount = pulsarAdmin.topics()
+                    .getPartitionedTopicMetadata(topicName).partitions;
+            log.info("Number of partitions for topic {}: {}", topicName, partitionCount);
+
+            // If the topic is non-partitioned, partitionCount is typically 0
+            if (partitionCount <= 1) {
+                log.debug("Topic {} is non-partitioned or only one partition. Using default partition.", topicName);
+                return Sourcer.defaultPartitions();
+            } else {
+                List<Integer> partitions = new ArrayList<>();
+                for (int i = 0; i < partitionCount; i++) {
+                    partitions.add(i);
+                }
+                return partitions;
+            }
+        } catch (Exception e) {
+            log.error("Failed to retrieve Pulsar partition info, returning default partition", e);
+            return Sourcer.defaultPartitions();
+        }
     }
 }
