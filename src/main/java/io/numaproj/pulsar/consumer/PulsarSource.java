@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Messages;
+import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
@@ -29,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -45,6 +47,9 @@ public class PulsarSource extends Sourcer {
 
     @Autowired
     private PulsarAdmin pulsarAdmin;
+
+    @Autowired
+    private PulsarClient pulsarClient;
 
     @Autowired
     PulsarConsumerProperties pulsarConsumerProperties;
@@ -155,17 +160,6 @@ public class PulsarSource extends Sourcer {
         }
     }
 
-    /***
-     * • We retrieve the topic name from pulsarConsumerProperties.
-     * • Use pulsarAdmin.topics().getPartitionedTopicMetadata(...) to find out how
-     * many partitions exist.
-     * • If getPartitions() <= 1 (i.e., topic is non-partitioned or has only one
-     * partition), use the default single partition.
-     * • Otherwise, return a list of partition indices.
-     */
-    // Could also be handled by Pulsar Client... where we get the partitions for a
-    // topic and parse the string to get the last index
-
     @Override
     public List<Integer> getPartitions() {
         try {
@@ -174,25 +168,20 @@ public class PulsarSource extends Sourcer {
             // Assume single topic in the set
             String topicName = topicNames.iterator().next();
 
-            // Determine how many partitions are available for this topic
-            int partitionCount = pulsarAdmin.topics()
-                    .getPartitionedTopicMetadata(topicName).partitions;
-            log.info("Number of partitions for topic {}: {}", topicName, partitionCount);
+            List<String> partitions = pulsarClient.getPartitionsForTopic(topicName).get();
+            log.info("Number of partitions for topic {}: {}", topicName, partitions.size());
 
-            // If the topic is non-partitioned, partitionCount is typically 0
-            if (partitionCount <= 1) {
-                log.debug("Topic {} is non-partitioned or only one partition. Using default partition.", topicName);
-                return Sourcer.defaultPartitions();
-            } else {
-                List<Integer> partitions = new ArrayList<>();
-                for (int i = 0; i < partitionCount; i++) {
-                    partitions.add(i);
-                }
-                return partitions;
-            }
+            return partitions.stream()
+                    .map(partition -> Integer.parseInt(partition.substring(partition.lastIndexOf('-') + 1)))
+                    .collect(Collectors.toList());
+
         } catch (Exception e) {
-            log.error("Failed to retrieve Pulsar partition info, returning default partition", e);
-            return Sourcer.defaultPartitions();
+            e.printStackTrace();
+            // Fallback to default partitions if there's an issue getting partitions
+            log.info("Fallback to default partitions");
+
+            return defaultPartitions();
         }
     }
+
 }
