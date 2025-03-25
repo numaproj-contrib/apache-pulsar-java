@@ -12,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Messages;
-import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
@@ -30,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -47,9 +45,6 @@ public class PulsarSource extends Sourcer {
 
     @Autowired
     private PulsarAdmin pulsarAdmin;
-
-    @Autowired
-    private PulsarClient pulsarClient;
 
     @Autowired
     PulsarConsumerProperties pulsarConsumerProperties;
@@ -143,16 +138,47 @@ public class PulsarSource extends Sourcer {
     @Override
     public long getPending() {
         try {
-            // If changing to support multiple topics, need to update this
+            // If changing to support multiple topics, we need to update this
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
             String topicName = (String) topicNames.iterator().next(); // Assumes there is only one topic name in the set
             String subscriptionName = (String) pulsarConsumerProperties.getConsumerConfig().get("subscriptionName");
 
-            TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
-            SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
-            // will remove later - used for testing
-            log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
-            return subscriptionStats.getMsgBacklog();
+            int partitionCount = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
+            if (partitionCount > 0) {
+                // Topic is partitioned, so we should use partitionedStats
+                var partitionedStats = pulsarAdmin.topics().getPartitionedStats(topicName, false);
+                // If the subscription exists at the partitioned level, get its aggregated
+                // backlog
+                if (partitionedStats.getSubscriptions().containsKey(subscriptionName)) {
+                    long backlog = partitionedStats.getSubscriptions().get(subscriptionName).getMsgBacklog();
+                    log.info("Number of messages in the backlog (partitioned) for {}: {}", subscriptionName, backlog);
+                    return backlog;
+                } else {
+                    // If subscription not found at top-level stats, sum the backlog across each
+                    // partition
+                    long totalBacklog = partitionedStats.getPartitions().values().stream()
+                            .mapToLong(ts -> {
+                                var subStats = ts.getSubscriptions().get(subscriptionName);
+                                return (subStats != null) ? subStats.getMsgBacklog() : 0;
+                            })
+                            .sum();
+                    log.info("Number of messages in the backlog (partitioned sum) for {}: {}", subscriptionName,
+                            totalBacklog);
+                    return totalBacklog;
+                }
+            } else {
+                // Non-partitioned topic–safe to call getStats directly
+                TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
+                SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
+                if (subscriptionStats == null) {
+                    log.warn("Subscription {} not found in topic stats for non-partitioned topic {}.", subscriptionName,
+                            topicName);
+                    return 0;
+                }
+                log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
+                return subscriptionStats.getMsgBacklog();
+            }
+
         } catch (PulsarAdminException e) {
             log.error("Error while fetching admin stats for pending messages", e);
             // Return a negative value to indicate no pending information
@@ -164,22 +190,27 @@ public class PulsarSource extends Sourcer {
     public List<Integer> getPartitions() {
         try {
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-
             // Assume single topic in the set
             String topicName = topicNames.iterator().next();
 
-            List<String> partitions = pulsarClient.getPartitionsForTopic(topicName).get();
-            log.info("Number of partitions for topic {}: {}", topicName, partitions.size());
+            int numPartitions = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
+            log.info("Number of partitions reported by metadata for topic {}: {}", topicName, numPartitions);
 
-            return partitions.stream()
-                    .map(partition -> Integer.parseInt(partition.substring(partition.lastIndexOf('-') + 1)))
-                    .collect(Collectors.toList());
+            // If it's not partitioned, Pulsar returns 0 partitions
+            if (numPartitions < 1) {
+                log.warn("Topic {} is not reported as partitioned", topicName);
+                return List.of(0);
+            }
+
+            // Otherwise, build the partition indexes from 0..(numPartitions-1)
+            List<Integer> partitionIndexes = new ArrayList<>();
+            for (int i = 0; i < numPartitions; i++) {
+                partitionIndexes.add(i);
+            }
+            return partitionIndexes;
 
         } catch (Exception e) {
-            e.printStackTrace();
-            // Fallback to default partitions if there's an issue getting partitions
-            log.info("Fallback to default partitions");
-
+            log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();
         }
     }

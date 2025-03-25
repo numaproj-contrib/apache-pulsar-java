@@ -5,6 +5,11 @@ metadata:
 spec:
   limits: 
     readBatchSize: 1
+  watermark:
+    idleSource:
+      threshold: 5s # The pipeline will be considered idle if the source has not emitted any data for given threshold value.
+      incrementBy: 3s # If source is found to be idle then increment the watermark by given incrementBy value.
+      stepInterval: 2s # If source is idling then publish the watermark only when step interval has passed.
   vertices:
     - name: in
       scale:
@@ -19,7 +24,7 @@ spec:
       source:
         udsource: 
           container:
-            image: apache-pulsar-java:v0.2.0
+            image: apache-pulsar-java:v0.3.0
             args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
             imagePullPolicy: Never
             volumeMounts:
