@@ -45,7 +45,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-
 public class PulsarSourceTest {
 
     private PulsarSource pulsarSource;
@@ -279,13 +278,11 @@ public class PulsarSourceTest {
      * subscription at partitioned level.
      */
     @Test
-    public void getPendingPartitionedTopic() throws Exception {
-        // Arrange
+    public void getPendingPartitionedTopic() {
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
         Topics mockTopics = mock(Topics.class);
 
-        // Set up the topic and subscription
         Set<String> topicNames = new HashSet<>();
         topicNames.add("persistent://tenant/namespace/topic");
         String subscriptionName = "test-subscription";
@@ -294,11 +291,9 @@ public class PulsarSourceTest {
         consumerConfig.put("topicNames", topicNames);
         consumerConfig.put("subscriptionName", subscriptionName);
 
-        // Set up partitioned topic metadata
         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
         metadata.partitions = 3;
 
-        // Set up partitioned stats
         PartitionedTopicStats partitionedStats = mock(PartitionedTopicStats.class);
         Map<String, SubscriptionStats> subscriptions = new HashMap<>();
         SubscriptionStats subscriptionStats = mock(SubscriptionStats.class);
@@ -307,36 +302,41 @@ public class PulsarSourceTest {
         // Configure mocks
         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
         when(mockAdmin.topics()).thenReturn(mockTopics);
-        when(mockTopics.getPartitionedTopicMetadata(anyString())).thenReturn(metadata);
-        when(mockTopics.getPartitionedStats(anyString(), anyBoolean())).thenReturn(partitionedStats);
-        @SuppressWarnings("unchecked")
-        Map<String, SubscriptionStats> castedSubscriptions = (Map<String, SubscriptionStats>) (Map<?, ?>) subscriptions;
-        when(partitionedStats.getSubscriptions()).thenReturn((Map) castedSubscriptions);
-        when(subscriptionStats.getMsgBacklog()).thenReturn(100L);
+        try {
+            when(mockTopics.getPartitionedTopicMetadata(anyString())).thenReturn(metadata);
+            when(mockTopics.getPartitionedStats(anyString(), anyBoolean())).thenReturn(partitionedStats);
+            @SuppressWarnings("unchecked")
+            Map<String, SubscriptionStats> castedSubscriptions = (Map<String, SubscriptionStats>) (Map<?, ?>) subscriptions;
+            when(partitionedStats.getSubscriptions()).thenReturn((Map) castedSubscriptions);
+            when(subscriptionStats.getMsgBacklog()).thenReturn(100L);
 
-        // Use reflection to set private fields
-        Field pulsarConsumerPropertiesField = PulsarSource.class.getDeclaredField("pulsarConsumerProperties");
-        pulsarConsumerPropertiesField.setAccessible(true);
-        pulsarConsumerPropertiesField.set(pulsarSource, mockProperties);
+            // Use reflection to set private fields
+            Field pulsarConsumerPropertiesField = PulsarSource.class.getDeclaredField("pulsarConsumerProperties");
+            pulsarConsumerPropertiesField.setAccessible(true);
+            pulsarConsumerPropertiesField.set(pulsarSource, mockProperties);
 
-        Field pulsarAdminField = PulsarSource.class.getDeclaredField("pulsarAdmin");
-        pulsarAdminField.setAccessible(true);
-        pulsarAdminField.set(pulsarSource, mockAdmin);
+            Field pulsarAdminField = PulsarSource.class.getDeclaredField("pulsarAdmin");
+            pulsarAdminField.setAccessible(true);
+            pulsarAdminField.set(pulsarSource, mockAdmin);
 
-        // Act
-        long result = pulsarSource.getPending();
+            // Act
+            long result = pulsarSource.getPending();
 
-        // Assert
-        assertEquals(100L, result);
-        verify(mockTopics).getPartitionedTopicMetadata(anyString());
-        verify(mockTopics).getPartitionedStats(anyString(), eq(false));
-        verify(subscriptionStats).getMsgBacklog();
+            // Assert
+            assertEquals(100L, result);
+            verify(mockTopics).getPartitionedTopicMetadata(anyString());
+            verify(mockTopics).getPartitionedStats(anyString(), eq(false));
+            verify(subscriptionStats).getMsgBacklog();
+
+        } catch (PulsarAdminException | NoSuchFieldException | IllegalAccessException e) {
+            fail("Unexpected exception in getPendingPartitionedTopic: " + e.getMessage());
+        }
+
     }
 
     // Returns backlog count for a non-partitioned topic
     @Test
-    public void getPendingNonPartitionedTopic() throws Exception {
-        // Arrange
+    public void getPendingNonPartitionedTopic() {
         PulsarAdmin mockPulsarAdmin = mock(PulsarAdmin.class);
         Topics mockTopics = mock(Topics.class);
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
@@ -353,31 +353,32 @@ public class PulsarSourceTest {
         // Mock partitioned topic metadata with 0 partitions (non-partitioned)
         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
         metadata.partitions = 0;
-        when(mockTopics.getPartitionedTopicMetadata("test-topic")).thenReturn(metadata);
+        try {
+            when(mockTopics.getPartitionedTopicMetadata("test-topic")).thenReturn(metadata);
 
-        // Mock topic stats
-        TopicStats mockTopicStats = mock(TopicStats.class);
-        SubscriptionStats mockSubStats = mock(SubscriptionStats.class);
-        Map<String, SubscriptionStats> subscriptions = new HashMap<>();
-        subscriptions.put("test-subscription", mockSubStats);
+            TopicStats mockTopicStats = mock(TopicStats.class);
+            SubscriptionStats mockSubStats = mock(SubscriptionStats.class);
+            Map<String, SubscriptionStats> subscriptions = new HashMap<>();
+            subscriptions.put("test-subscription", mockSubStats);
 
-        when(mockTopics.getStats("test-topic")).thenReturn(mockTopicStats);
-        when(mockTopicStats.getSubscriptions()).thenReturn((Map) subscriptions);
-        when(mockSubStats.getMsgBacklog()).thenReturn(100L);
+            when(mockTopics.getStats("test-topic")).thenReturn(mockTopicStats);
+            when(mockTopicStats.getSubscriptions()).thenReturn((Map) subscriptions);
+            when(mockSubStats.getMsgBacklog()).thenReturn(100L);
 
-        // Create the class under test
-        PulsarSource pulsarSource = new PulsarSource();
-        // Set the mocked dependencies using reflection
-        ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockPulsarAdmin);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
+            PulsarSource pulsarSource = new PulsarSource();
+            ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockPulsarAdmin);
+            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
 
-        // Act
-        long result = pulsarSource.getPending();
+            long result = pulsarSource.getPending();
 
-        // Assert
-        assertEquals(100L, result);
-        verify(mockTopics).getPartitionedTopicMetadata("test-topic");
-        verify(mockTopics).getStats("test-topic");
+            assertEquals(100L, result);
+            verify(mockTopics).getPartitionedTopicMetadata("test-topic");
+            verify(mockTopics).getStats("test-topic");
+
+        } catch (PulsarAdminException e) {
+            fail("Unexpected PulsarAdminException thrown in getPendingNonPartitionedTopic: " + e.getMessage());
+        }
+
     }
 
     /**
@@ -385,11 +386,11 @@ public class PulsarSourceTest {
      * numPartitions-1 for a partitioned topic.
      */
     @Test
-    public void getPartitionsPartitionedTopic() throws Exception {
-        // Arrange
+    public void getPartitionsPartitionedTopic() {
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
         Map<String, Object> consumerConfig = new HashMap<>();
-        Set<String> topicNames = Set.of("test-topic");
+        String topicName = "test-topic";
+        Set<String> topicNames = Set.of(topicName);
         consumerConfig.put("topicNames", topicNames);
         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
 
@@ -399,21 +400,24 @@ public class PulsarSourceTest {
 
         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
         metadata.partitions = 3;
-        when(mockTopics.getPartitionedTopicMetadata("test-topic")).thenReturn(metadata);
+        try {
+            when(mockTopics.getPartitionedTopicMetadata(topicName)).thenReturn(metadata);
 
-        // Use reflection to set private fields
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
+            // Use reflection to set private fields
+            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
+            ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
 
-        // Act
-        List<Integer> result = pulsarSource.getPartitions();
+            List<Integer> result = pulsarSource.getPartitions();
 
-        // Assert
-        assertEquals(3, result.size());
-        assertEquals(List.of(0, 1, 2), result);
+            assertEquals(3, result.size());
+            assertEquals(List.of(0, 1, 2), result);
 
-        // Verify
-        verify(mockTopics).getPartitionedTopicMetadata("test-topic");
+            verify(mockTopics).getPartitionedTopicMetadata(topicName);
+
+        } catch (PulsarAdminException e) {
+            fail("Unexpected PulsarAdminException thrown in getPartitionsPartitionedTopic: " + e.getMessage());
+        }
+
     }
 
     /**
@@ -449,7 +453,7 @@ public class PulsarSourceTest {
      * defaultPartitions().
      */
     @Test
-    public void getPartitionsException() throws Exception {
+    public void getPartitionsException() {
         // Arrange
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
         when(mockProperties.getConsumerConfig()).thenThrow(new RuntimeException("Test exception"));
@@ -464,13 +468,8 @@ public class PulsarSourceTest {
             ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
             ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
 
-            // Act
             List<Integer> result = pulsarSource.getPartitions();
-
-            // Assert
             assertEquals(List.of(42), result);
-
-            // Verify
             mockedSourcer.verify(Sourcer::defaultPartitions);
         }
     }
