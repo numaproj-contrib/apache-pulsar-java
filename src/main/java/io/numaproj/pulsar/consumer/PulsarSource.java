@@ -138,9 +138,9 @@ public class PulsarSource extends Sourcer {
     @Override
     public long getPending() {
         try {
-            // If changing to support multiple topics, we need to update this
+            // TODO - If changing to support multiple topics, we need to update this
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            String topicName = (String) topicNames.iterator().next(); // Assumes there is only one topic name in the set
+            String topicName = topicNames.iterator().next(); // Assumes there is only one topic name in the set
             String subscriptionName = (String) pulsarConsumerProperties.getConsumerConfig().get("subscriptionName");
 
             int partitionCount = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
@@ -151,7 +151,8 @@ public class PulsarSource extends Sourcer {
                 // backlog
                 if (partitionedStats.getSubscriptions().containsKey(subscriptionName)) {
                     long backlog = partitionedStats.getSubscriptions().get(subscriptionName).getMsgBacklog();
-                    log.info("Number of messages in the backlog (partitioned) for {}: {}", subscriptionName, backlog);
+                    log.info("Number of messages in the backlog (partitioned) for subscription {}: {}",
+                            subscriptionName, backlog);
                     return backlog;
                 } else {
                     // If subscription not found at top-level stats, sum the backlog across each
@@ -162,7 +163,8 @@ public class PulsarSource extends Sourcer {
                                 return (subStats != null) ? subStats.getMsgBacklog() : 0;
                             })
                             .sum();
-                    log.info("Number of messages in the backlog (partitioned sum) for {}: {}", subscriptionName,
+                    log.info("Number of messages in the backlog (partitioned sum) for subscription {}: {}",
+                            subscriptionName,
                             totalBacklog);
                     return totalBacklog;
                 }
@@ -170,11 +172,6 @@ public class PulsarSource extends Sourcer {
                 // Non-partitioned topic–safe to call getStats directly
                 TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
                 SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
-                if (subscriptionStats == null) {
-                    log.warn("Subscription {} not found in topic stats for non-partitioned topic {}.", subscriptionName,
-                            topicName);
-                    return 0;
-                }
                 log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
                 return subscriptionStats.getMsgBacklog();
             }
