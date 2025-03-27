@@ -84,12 +84,12 @@
                                 <image>amazoncorretto:17</image>
                             </from>
                             <container>
+                                <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
                                 <mainClass>io.numaproj.pulsar.PulsarApplication</mainClass>
-
                             </container>
                             <to>
                                 <image>
-                                    apache-pulsar-java:v0.2.0
+                                    apache-pulsar-java:v0.3.0
                                 </image>
                             </to>
                         </configuration>

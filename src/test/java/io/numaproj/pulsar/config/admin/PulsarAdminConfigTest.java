@@ -44,5 +44,4 @@ public class PulsarAdminConfigTest {
             fail("Exception should not have been thrown: " + e.getMessage());
         }
     }
-
 }

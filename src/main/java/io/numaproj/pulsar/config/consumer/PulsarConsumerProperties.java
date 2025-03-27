@@ -30,6 +30,15 @@ public class PulsarConsumerProperties {
         // Pulsar expects topicNames to be type set, but the configMap accepts a string
         String topicNameKey = "topicNames";
         if (consumerConfig.containsKey(topicNameKey)) {
+            Object topicNameObj = consumerConfig.get(topicNameKey);
+            if (!(topicNameObj instanceof String)) {
+                throw new IllegalArgumentException(
+                    String.format("Value for key '%s' must be a String, but found: %s",
+                        topicNameKey,
+                        topicNameObj == null ? "null" : topicNameObj.getClass().getName()
+                    )
+                );
+            }
             String topicName = (String) consumerConfig.remove(topicNameKey);
             Set<String> topicNames = new HashSet<>();
             topicNames.add(topicName);
