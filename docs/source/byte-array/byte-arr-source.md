@@ -22,7 +22,7 @@ In the ConfigMap:
 * `clientConfig` allows you to configure the pulsar client. See all avalaible configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client):
     * serviceUrl must be specified as it is a required field. This is the brokerServiceUrl.
 
-* `consumerConfig` allows you to set consumer configurations for the pulsar client. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer):
+* `consumerConfig` allows you to set consumer configurations for the pulsar client. Below are some common configurations to consider specifying. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer):
     * `topicNames` is the Pulsar topic name to write data to, and is a required field. It must be in the ConfigMap. Currently we only support 1 topic therefore only one **string** value is accepted even though the Pulsar docs indicate that topicNames is of type Set. 
     * If a `subscriptionName` is not specified, the image will give it a default value of sub 
     * `subscriptionInitialPosition` is the initial position of the subscription. It can be `Earliest` or `Latest`. If it is not specified, Pulsar defaults to Latest meaning that the subscription will start consuming messages from the latest available message in the topic. So if messages were produced to a topic before the subscription, they will not be consumered. If you want to start consuming messages from the earliest available message, you can specify `Earliest`.

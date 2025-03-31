@@ -15,7 +15,7 @@ target topic `test-config-topic`.
 
 Have a Pulsar cluster running.
 
-#### Configure the Kafka producer
+#### Configure the Pulsar producer
 
 Use the example [ConfigMap](manifests/byte-arr-producer-config.yaml) to configure the Pulsar sink.
 
