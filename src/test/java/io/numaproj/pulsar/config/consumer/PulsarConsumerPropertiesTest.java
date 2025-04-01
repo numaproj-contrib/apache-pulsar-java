@@ -1,4 +1,4 @@
-package io.numaproj.pulsar.config;
+package io.numaproj.pulsar.config.consumer;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -69,7 +69,12 @@ public class PulsarConsumerPropertiesTest {
 
         Object subscriptionName = properties.getConsumerConfig().get("subscriptionName");
         assertNotNull("subscriptionName should not be null after init", subscriptionName);
-        assertTrue("subscriptionName should be a non-empty string", subscriptionName.toString().length() > 0);
+        // Verify the expected default format: myPipeline-myVertex-sub
+        assertEquals(
+            "Expected subscription name to be 'myPipeline-myVertex-sub'",
+            "myPipeline-myVertex-sub",
+            subscriptionName
+        );
     }
 
     /**
