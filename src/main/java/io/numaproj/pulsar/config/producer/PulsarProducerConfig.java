@@ -9,9 +9,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Configuration
 public class PulsarProducerConfig {
 
@@ -27,7 +30,8 @@ public class PulsarProducerConfig {
 
         Map<String, Object> producerConfig = pulsarProducerProperties.getProducerConfig();
         if (producerConfig.containsKey(producerName)) {
-            // Log.warning would go here
+            log.warn("User configured a 'producerName' in the config, but this can cause errors if multiple pods spin "
+                    + "up with the same name. Overriding with '{}'", podName);
         }
         producerConfig.put(producerName, podName);
 
