@@ -7,11 +7,11 @@ This document demonstrates how to use `apache-pulsar-java` to consume raw byte a
 
 ### Example
 
-In this example, we create a pipeline that reads from Apache Pulsar from the specified topic in the config map, and uses the built-in Numamflow [log sink](https://numaflow.numaproj.io/user-guide/sinks/log/) to print all received messages.
+In this example, we create a pipeline that reads from Apache Pulsar from the specified topic in the config map, and uses the built-in Numaflow [log sink](https://numaflow.numaproj.io/user-guide/sinks/log/) to print all received messages.
 
 #### Pre-requisite
 
-Have a Pulsar cluster running and if you want a partioned topic, you must create it before.
+Have a Pulsar cluster running and if you want a partitioned topic, you must create it before.
 
 #### Configure the Pulsar consumer
 
@@ -19,11 +19,11 @@ Use the example [ConfigMap](manifests/byte-arr-consumer-config.yaml) to configur
 
 In the ConfigMap:
 
-* `clientConfig` allows you to configure the pulsar client. See all avalaible configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client):
+* `clientConfig` allows you to configure the pulsar client. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client):
     * serviceUrl must be specified as it is a required field. This is the brokerServiceUrl.
 
 * `consumerConfig` allows you to set consumer configurations for the pulsar client. Below are some common configurations to consider specifying. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer):
-    * `topicNames` is the Pulsar topic name to write data to, and is a required field. It must be in the ConfigMap. Currently we only support 1 topic therefore only one **string** value is accepted even though the Pulsar docs indicate that topicNames is of type Set. 
+    * `topicNames` is the Pulsar topic name to write data to, and is a required field. It must be in the ConfigMap. Currently, we only support 1 topic therefore only one **string** value is accepted even though the Pulsar docs indicate that topicNames is of type Set. 
     * If a `subscriptionName` is not specified, the image will give it a default value of `{PipelineName}-{VertexName}-sub`
     * `subscriptionInitialPosition` is the initial position of the subscription. It can be `Earliest` or `Latest`. If it is not specified, Pulsar defaults to Latest meaning that the subscription will start consuming messages from the latest available message in the topic. So if messages were produced to a topic before the subscription, they will not be consumered. If you want to start consuming messages from the earliest available message, you can specify `Earliest`.
 * `adminConfig` must be specified in order for the consumer to work. The serviceUrl is a required field but note that this is **different** from the serviceUrl file in the clientConfig. This is the webServiceUrl.
