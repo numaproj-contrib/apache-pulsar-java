@@ -4,7 +4,7 @@ metadata:
   name: raw-producer-pipeline
 spec:
   limits: 
-    readBatchSize: 1 # Change if you want a differnt batch size
+    readBatchSize: 1 # Change if you want a different batch size
   vertices:
     - name: in
       scale:
