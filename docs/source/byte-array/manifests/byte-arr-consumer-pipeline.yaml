@@ -1,11 +1,10 @@
 apiVersion: numaflow.numaproj.io/v1alpha1
 kind: Pipeline
 metadata:
-  name: simple-pipeline
+  name: raw-producer-pipeline
 spec:
   limits: 
-    readBatchSize: 1 # CHANGE THIS
-    readBatchTimeout: "30s" # CHANGE THIS
+    readBatchSize: 1 # Change if you want a differnt batch size
   vertices:
     - name: in
       scale:
