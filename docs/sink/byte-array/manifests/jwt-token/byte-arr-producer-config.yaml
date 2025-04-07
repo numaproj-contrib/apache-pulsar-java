@@ -15,4 +15,4 @@ data:
         producer:
           enabled: true
           producerConfig: 
-            topicName: "persistent://public/default/three"
+            topicName: "persistent://public/default/test-topic"

@@ -15,7 +15,7 @@ data:
         consumer:  # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
           enabled: true
           consumerConfig: 
-            topicNames: "persistent://public/default/three"
+            topicName: "persistent://public/default/test-topic"
             subscriptionName: "test-subscription"
         admin: 
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
