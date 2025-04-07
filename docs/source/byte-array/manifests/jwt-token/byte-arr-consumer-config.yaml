@@ -1,3 +1,4 @@
+# JWT Token example
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,16 +9,16 @@ data:
       pulsar:
         client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
           clientConfig:
-            serviceUrl: "pulsar://host.docker.internal:6650" # aka brokerServiceUrl
-        producer:
-          enabled: false
+            serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl
+            authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
+            authParams: "insert token" # add JWT token here
         consumer:  # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
           enabled: true
           consumerConfig: 
-            topicNames: "tester"
-            subscriptionName: "test-subscription" 
-            subcriptionInitialPosition: "Earliest" # or "Latest" --> change this
+            topicName: "persistent://public/default/test-topic"
+            subscriptionName: "test-subscription"
         admin: 
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
-            serviceUrl: "http://host.docker.internal:8080/" # aka webServiceUrl
-
+            serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl
+            authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
+            authParams: "insert token" # add JWT token here

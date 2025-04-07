@@ -9,7 +9,7 @@ This document demonstrates how to use `apache-pulsar-java` to publish byte array
 
 In this example, we create a pipeline that reads from the
 builtin [generator source](https://numaflow.numaproj.io/user-guide/sources/generator/) and writes the messages to a
-target topic `test-config-topic`. 
+target topic `persistent://public/default/test-topic`. 
 
 #### Pre-requisite
 
@@ -21,7 +21,7 @@ Use the example [ConfigMap](manifests/byte-arr-producer-config.yaml) to configur
 
 In the ConfigMap:
 
-* `clientConfig` allows you to configure the pulsar client. See all avalaible configurations [here:](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client) 
+* `clientConfig` allows you to configure the pulsar client. See all available configurations [here:](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client) 
     * serviceUrl must be specified as it is a required field 
 
 * `producerConfig` allows you to set producer configurations for the pulsar client. See all available configurations [here:](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer) 

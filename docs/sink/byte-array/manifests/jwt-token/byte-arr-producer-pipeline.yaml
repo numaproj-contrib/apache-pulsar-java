@@ -8,7 +8,7 @@ spec:
       source:
         generator:
           rpu: 1
-          duration: 1s
+          duration: 10s
           msgSize: 10
     - name: p1
       udf:
@@ -25,7 +25,7 @@ spec:
       sink:
         udsink:
           container:
-            image: apache-pulsar-java:v0.2.0 # TO DO: Replace with quay.io link
+            image: apache-pulsar-java:v0.3.0 # TO DO: Replace with quay.io link
             args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
             imagePullPolicy: Never
             volumeMounts:
