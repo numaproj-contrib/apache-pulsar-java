@@ -13,7 +13,8 @@ target topic `persistent://public/default/test-topic`.
 
 #### Pre-requisite
 
-Have a Pulsar cluster running.
+Have a Pulsar cluster running. 
+If you don't have a Pulsar cluster running, you can follow the instructions [here](https://github.com/numaproj-contrib/apache-pulsar-java/blob/master/docs/get-started/pulsar-on-streamnative.md) to deploy a Pulsar cluster using StreamNative.
 
 #### Configure the Pulsar producer
 

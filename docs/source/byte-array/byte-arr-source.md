@@ -12,6 +12,7 @@ In this example, we create a pipeline that reads from Apache Pulsar from the spe
 #### Pre-requisite
 
 Have a Pulsar cluster running and if you want a partitioned topic, you must create it before.
+If you don't have a Pulsar cluster running, you can follow the instructions [here](https://github.com/numaproj-contrib/apache-pulsar-java/blob/master/docs/get-started/pulsar-on-streamnative.md) to deploy a Pulsar cluster using StreamNative.
 
 #### Configure the Pulsar consumer
 
