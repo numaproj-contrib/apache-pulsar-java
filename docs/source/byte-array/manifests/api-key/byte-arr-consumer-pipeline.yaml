@@ -1,7 +1,7 @@
 apiVersion: numaflow.numaproj.io/v1alpha1
 kind: Pipeline
 metadata:
-  name: raw-producer-pipeline
+  name: raw-consumer-pipeline
 spec:
   limits: 
     readBatchSize: 1 # Change if you want a different batch size
