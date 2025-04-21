@@ -10,34 +10,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.schema.GenericRecord;
+import org.apache.pulsar.common.schema.SchemaType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumWriter;
-import org.apache.avro.io.Encoder;
-import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.Decoder;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.generic.GenericDatumWriter;
-import java.io.ByteArrayOutputStream;
+import org.springframework.core.io.ClassPathResource;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.io.File;
 import java.io.IOException;
-import org.springframework.core.io.ClassPathResource;
 import java.io.InputStream;
-import org.apache.avro.generic.GenericDatumReader;
-import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.nio.charset.StandardCharsets;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Slf4j
@@ -46,24 +36,26 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class PulsarSink extends Sinker {
 
     @Autowired
-    private Producer<byte[]> producer;
+    private Producer<GenericRecord> producer;
 
     @Autowired
     private PulsarClient pulsarClient;
 
     private Server server;
-    private Schema schema;
+    private Schema<GenericRecord> schema;
 
-    @PostConstruct // starts server automatically when the spring context initializes
+    @PostConstruct
     public void startServer() throws Exception {
-        // Load Pulsar schema definition file and extract Avro schema
+        // Load Pulsar schema definition file
         InputStream inputStream = new ClassPathResource("static/schema.avsc").getInputStream();
         String fileContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(fileContent);
         String avroSchemaString = root.get("schema").asText();
-        schema = new Schema.Parser().parse(avroSchemaString);
-        log.info("Successfully loaded Avro schema: {}", schema.toString());
+
+        // Create Schema for Avro
+        schema = Schema.AUTO_CONSUME();
+        log.info("Successfully loaded Avro schema: {}", avroSchemaString);
 
         server = new Server(this);
         server.start();
@@ -73,7 +65,6 @@ public class PulsarSink extends Sinker {
     @Override
     public ResponseList processMessages(DatumIterator datumIterator) {
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
-
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         if (schema == null) {
@@ -89,7 +80,6 @@ public class PulsarSink extends Sinker {
                 Thread.currentThread().interrupt();
                 continue;
             }
-            // null means the iterator is closed, so we break
             if (datum == null) {
                 break;
             }
@@ -99,11 +89,10 @@ public class PulsarSink extends Sinker {
             try {
                 log.debug("Processing message ID: {}, content length: {}", msgId, datum.getValue().length);
 
-                // Log the incoming JSON for debugging
+                // Parse the incoming JSON
                 String jsonContent = new String(datum.getValue(), StandardCharsets.UTF_8);
                 log.info("Incoming JSON content: {}", jsonContent);
 
-                // Parse the incoming JSON to properly format it for Avro union type
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode originalJson = mapper.readTree(datum.getValue());
 
@@ -115,49 +104,28 @@ public class PulsarSink extends Sinker {
                 if (dataNode == null || dataNode.isNull()) {
                     formattedJson.putNull("Data");
                 } else {
-                    // For union types in Avro, we need to specify which type we're using
                     ObjectNode dataUnion = mapper.createObjectNode();
                     ObjectNode dataRecord = mapper.createObjectNode();
 
-                    // Copy the value field
                     if (dataNode.has("value")) {
                         dataRecord.put("value", dataNode.get("value").asLong());
                     }
-
-                    // Add the padding field (null by default as per schema)
                     dataRecord.putNull("padding");
-
-                    // Add the DataRecord to the union
                     dataUnion.set("DataRecord", dataRecord);
                     formattedJson.set("Data", dataUnion);
                 }
 
-                // Copy the Createdts field
                 if (originalJson.has("Createdts")) {
                     formattedJson.put("Createdts", originalJson.get("Createdts").asLong());
                 }
 
                 log.info("Formatted JSON for Avro: {}", formattedJson.toString());
 
-                // Convert the formatted JSON to Avro
-                byte[] formattedJsonBytes = formattedJson.toString().getBytes(StandardCharsets.UTF_8);
-                Decoder jsonDecoder = DecoderFactory.get().jsonDecoder(schema,
-                        new ByteArrayInputStream(formattedJsonBytes));
-                DatumReader<GenericRecord> reader = new GenericDatumReader<>(schema);
-                GenericRecord avroRecord = reader.read(null, jsonDecoder);
+                // Convert JSON to GenericRecord using Pulsar's Schema
+                GenericRecord record = schema.decode(formattedJson.toString().getBytes(StandardCharsets.UTF_8));
 
-                // Serialize the Avro record
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(schema);
-                Encoder encoder = EncoderFactory.get().binaryEncoder(out, null);
-                writer.write(avroRecord, encoder);
-                encoder.flush();
-                out.close();
-
-                final byte[] avroBytes = out.toByteArray();
-
-                // Send the serialized Avro message
-                CompletableFuture<Void> future = producer.sendAsync(avroBytes)
+                // Send the record using Pulsar's native Avro support
+                CompletableFuture<Void> future = producer.sendAsync(record)
                         .thenAccept(messageId -> {
                             log.info("Processed message ID: {}, Avro data sent successfully", msgId);
                             responseListBuilder.addResponse(Response.responseOK(msgId));
@@ -175,9 +143,7 @@ public class PulsarSink extends Sinker {
             }
         }
 
-        // Wait for all sends to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-
         return responseListBuilder.build();
     }
 
