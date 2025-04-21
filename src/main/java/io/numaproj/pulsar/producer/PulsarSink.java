@@ -10,25 +10,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.api.Schema;
-import org.apache.pulsar.client.api.schema.GenericRecord;
-import org.apache.pulsar.common.schema.SchemaType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.core.io.ClassPathResource;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Slf4j
 @Component
@@ -36,27 +29,17 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class PulsarSink extends Sinker {
 
     @Autowired
-    private Producer<GenericRecord> producer;
+    private Producer<NumagenMessage> producer;
 
     @Autowired
     private PulsarClient pulsarClient;
 
     private Server server;
-    private Schema<GenericRecord> schema;
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @PostConstruct
     public void startServer() throws Exception {
-        // Load Pulsar schema definition file
-        InputStream inputStream = new ClassPathResource("static/schema.avsc").getInputStream();
-        String fileContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode root = mapper.readTree(fileContent);
-        String avroSchemaString = root.get("schema").asText();
-
-        // Create Schema for Avro
-        schema = Schema.AUTO_CONSUME();
-        log.info("Successfully loaded Avro schema: {}", avroSchemaString);
-
         server = new Server(this);
         server.start();
         server.awaitTermination();
@@ -66,11 +49,6 @@ public class PulsarSink extends Sinker {
     public ResponseList processMessages(DatumIterator datumIterator) {
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
-
-        if (schema == null) {
-            log.error("Avro schema is not initialized");
-            return responseListBuilder.build();
-        }
 
         while (true) {
             Datum datum;
@@ -89,45 +67,22 @@ public class PulsarSink extends Sinker {
             try {
                 log.debug("Processing message ID: {}, content length: {}", msgId, datum.getValue().length);
 
-                // Parse the incoming JSON
+                // Parse the incoming JSON to our POJO
                 String jsonContent = new String(datum.getValue(), StandardCharsets.UTF_8);
                 log.info("Incoming JSON content: {}", jsonContent);
 
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode originalJson = mapper.readTree(datum.getValue());
+                NumagenMessage message = objectMapper.readValue(jsonContent, NumagenMessage.class);
 
-                // Create a new JSON structure that follows Avro union type format
-                ObjectNode formattedJson = mapper.createObjectNode();
+                // Log the message that will be sent
+                log.info("Sending message - createdts: {}, data.value: {}, data.padding: {}",
+                        message.getCreatedts(),
+                        message.getData() != null ? message.getData().getValue() : "null",
+                        message.getData() != null ? message.getData().getPadding() : "null");
 
-                // Handle the Data field as a union type
-                JsonNode dataNode = originalJson.get("Data");
-                if (dataNode == null || dataNode.isNull()) {
-                    formattedJson.putNull("Data");
-                } else {
-                    ObjectNode dataUnion = mapper.createObjectNode();
-                    ObjectNode dataRecord = mapper.createObjectNode();
-
-                    if (dataNode.has("value")) {
-                        dataRecord.put("value", dataNode.get("value").asLong());
-                    }
-                    dataRecord.putNull("padding");
-                    dataUnion.set("DataRecord", dataRecord);
-                    formattedJson.set("Data", dataUnion);
-                }
-
-                if (originalJson.has("Createdts")) {
-                    formattedJson.put("Createdts", originalJson.get("Createdts").asLong());
-                }
-
-                log.info("Formatted JSON for Avro: {}", formattedJson.toString());
-
-                // Convert JSON to GenericRecord using Pulsar's Schema
-                GenericRecord record = schema.decode(formattedJson.toString().getBytes(StandardCharsets.UTF_8));
-
-                // Send the record using Pulsar's native Avro support
-                CompletableFuture<Void> future = producer.sendAsync(record)
+                // Send the message
+                CompletableFuture<Void> future = producer.sendAsync(message)
                         .thenAccept(messageId -> {
-                            log.info("Processed message ID: {}, Avro data sent successfully", msgId);
+                            log.info("Processed message ID: {}, data sent successfully", msgId);
                             responseListBuilder.addResponse(Response.responseOK(msgId));
                         })
                         .exceptionally(ex -> {

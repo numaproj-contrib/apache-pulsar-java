@@ -1,18 +1,20 @@
 package io.numaproj.pulsar.config.producer;
 
+import io.numaproj.pulsar.producer.NumagenMessage;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
-import org.apache.pulsar.client.api.schema.GenericRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.Resource;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,7 +27,8 @@ public class PulsarProducerConfig {
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true", matchIfMissing = false)
-    public Producer<GenericRecord> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties)
+    public Producer<NumagenMessage> pulsarProducer(PulsarClient pulsarClient,
+            PulsarProducerProperties pulsarProducerProperties)
             throws Exception {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
         String producerName = "producerName";
@@ -37,7 +40,17 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
-        return pulsarClient.newProducer(Schema.AVRO(GenericRecord.class))
+        // Load the Avro schema
+        Resource schemaResource = new org.springframework.core.io.ClassPathResource("static/schema.avsc");
+        String schemaContent = new String(schemaResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        String avroSchemaString = mapper.readTree(schemaContent).get("schema").asText();
+
+        // Create the Avro schema
+        org.apache.pulsar.shade.org.apache.avro.Schema avroSchema = new org.apache.pulsar.shade.org.apache.avro.Schema.Parser()
+                .parse(avroSchemaString);
+
+        return pulsarClient.newProducer(Schema.AVRO(NumagenMessage.class))
                 .loadConf(producerConfig)
                 .create();
     }

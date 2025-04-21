@@ -1,0 +1,11 @@
+spring:
+  pulsar:
+    client:
+      service-url: pulsar://localhost:6650
+      auth-plugin-class-name: 
+      auth-params: 
+    producer:
+      enabled: true
+      topic-name: your-topic-name
+      schema-type: AVRO
+      message-type: io.numaproj.pulsar.producer.NumagenMessage 
