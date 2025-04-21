@@ -12,5 +12,5 @@ data:
         producer:
           enabled: true
           producerConfig: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer
-            topicName: "twentyone" 
+            topicName: "anotha" 
             sendTimeoutMs: 2000

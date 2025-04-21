@@ -1,6 +1,5 @@
 {
     "type": "AVRO",
-    "schema": "{\"name\":\"numagen\",\"type\":\"record\",\"fields\":[{\"name\":\"Data\",\"type\":{\"fields\":[{\"name\":\"value\",\"type\":\"long\"},{\"name\":\"padding\",\"type\":[\"null\",\"string\"],\"default\":null}],\"name\":\"Data\",\"type\":\"record\"}},{\"name\":\"Createdts\",\"type\":\"long\"}]}",
+    "schema": "{\"type\":\"record\",\"name\":\"numagen\",\"fields\":[{\"name\":\"Createdts\",\"type\":\"long\"},{\"name\":\"Data\",\"type\":[\"null\",{\"type\":\"record\",\"name\":\"DataRecord\",\"fields\":[{\"name\":\"padding\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"value\",\"type\":\"long\"}]}],\"default\":null}],\"aliases\":[\"numagen\"]}",
     "properties": {}
 }
-
