@@ -1,0 +1,6 @@
+{
+    "type": "AVRO",
+    "schema": "{\"name\":\"numagen\",\"type\":\"record\",\"fields\":[{\"name\":\"Data\",\"type\":{\"fields\":[{\"name\":\"value\",\"type\":\"long\"},{\"name\":\"padding\",\"type\":[\"null\",\"string\"],\"default\":null}],\"name\":\"Data\",\"type\":\"record\"}},{\"name\":\"Createdts\",\"type\":\"long\"}]}",
+    "properties": {}
+}
+

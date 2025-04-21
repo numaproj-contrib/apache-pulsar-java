@@ -1,0 +1,30 @@
+{
+    "fields": [
+      {
+        "name": "Data",
+        "type": {
+          "fields": [
+            {
+              "name": "value",
+              "type": "long"
+            },
+            {
+              "name": "padding",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          ],
+          "name": "Data",
+          "type": "record"
+        }
+      },
+      {
+        "name": "Createdts",
+        "type": "long"
+      }
+    ],
+    "name": "numagen",
+    "type": "record"
+  }
