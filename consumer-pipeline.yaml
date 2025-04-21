@@ -1,0 +1,43 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: consumer-pipeline
+spec:
+  limits: 
+    readBatchSize: 1 # Change if you want a different batch size
+  vertices:
+    - name: in
+      scale:
+        min: 1
+      volumes: 
+        - name: pulsar-config-volume
+          configMap:
+            name: consumer-config
+            items:
+              - key: application.yml
+                path: application.yml
+      source:
+        udsource: 
+          container:
+            image: apache-pulsar-java:v0.3.0
+            args: [ "--spring.config.location=file:/conf/application.yml" ]
+            imagePullPolicy: Never
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+    - name: p1
+      scale:
+        min: 1
+      udf:
+        builtin:
+          name: cat
+    - name: out
+      scale:
+        min: 1
+      sink:
+        log: {}
+  edges:
+    - from: in
+      to: p1
+    - from: p1
+      to: out

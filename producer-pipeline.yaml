@@ -1,0 +1,44 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: producer-pipeline
+spec:
+  vertices:
+    - name: in
+      scale:
+        min: 1
+      source:
+        generator:
+          rpu: 1
+          duration: 1s
+          msgSize: 01
+    - name: p1
+      scale:
+        min: 1
+      udf:
+        builtin:
+          name: cat
+    - name: out
+      scale:
+        min: 1
+      volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
+        - name: pulsar-config-volume
+          configMap:
+            name: producer-config
+            items:
+              - key: application.yml
+                path: application.yml
+      sink:
+        udsink:
+          container:
+            image: apache-pulsar-java:v0.3.0 # TO DO: Replace with quay.io link
+            args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
+            imagePullPolicy: Never
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+  edges:
+    - from: in
+      to: p1
+    - from: p1
+      to: out
