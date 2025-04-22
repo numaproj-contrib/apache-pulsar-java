@@ -40,17 +40,7 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
-        // Load the Avro schema
-        Resource schemaResource = new org.springframework.core.io.ClassPathResource("static/schema.avsc");
-        String schemaContent = new String(schemaResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        String avroSchemaString = mapper.readTree(schemaContent).get("schema").asText();
-
-        // Create the Avro schema
-        org.apache.pulsar.shade.org.apache.avro.Schema avroSchema = new org.apache.pulsar.shade.org.apache.avro.Schema.Parser()
-                .parse(avroSchemaString);
-
-        return pulsarClient.newProducer(Schema.AVRO(NumagenMessage.class))
+        return pulsarClient.newProducer(Schema.AVRO(NumagenMessage.class)) 
                 .loadConf(producerConfig)
                 .create();
     }
