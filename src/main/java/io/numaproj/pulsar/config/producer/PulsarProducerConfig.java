@@ -1,6 +1,8 @@
 package io.numaproj.pulsar.config.producer;
 
 import io.numaproj.pulsar.producer.NumagenMessage;
+
+import org.apache.avro.generic.GenericRecord;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
@@ -27,7 +29,7 @@ public class PulsarProducerConfig {
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true", matchIfMissing = false)
-    public Producer<NumagenMessage> pulsarProducer(PulsarClient pulsarClient,
+    public Producer<GenericRecord> pulsarProducer(PulsarClient pulsarClient,
             PulsarProducerProperties pulsarProducerProperties)
             throws Exception {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
@@ -40,7 +42,7 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
-        return pulsarClient.newProducer(Schema.AVRO(NumagenMessage.class)) 
+        return pulsarClient.newProducer(Schema.AVRO(GenericRecord.class)) 
                 .loadConf(producerConfig)
                 .create();
     }
