@@ -8,10 +8,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class DataRecord {
-    @JsonProperty("value")
-    private long value;
+public class numagen {
+    @JsonProperty("Data")
+    private DataRecord Data;
 
-    @JsonProperty("padding")
-    private String padding;
+    @JsonProperty("Createdts")
+    private long Createdts;
 }

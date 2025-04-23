@@ -29,7 +29,7 @@ import java.nio.charset.StandardCharsets;
 public class PulsarSink extends Sinker {
 
     @Autowired
-    private Producer<NumagenMessage> producer;
+    private Producer<numagen> producer;
 
     @Autowired
     private PulsarClient pulsarClient;
@@ -71,10 +71,10 @@ public class PulsarSink extends Sinker {
                 String jsonContent = new String(datum.getValue(), StandardCharsets.UTF_8);
                 log.info("Incoming JSON content: {}", jsonContent);
 
-                NumagenMessage message = objectMapper.readValue(jsonContent, NumagenMessage.class);
+                numagen message = objectMapper.readValue(jsonContent, numagen.class);
 
                 // Log the message that will be sent
-                log.info("Sending message - createdts: {}, data.value: {}, data.padding: {}",
+                log.info("Sending message - Createdts: {}, Data.value: {}, Data.padding: {}",
                         message.getCreatedts(),
                         message.getData() != null ? message.getData().getValue() : "null",
                         message.getData() != null ? message.getData().getPadding() : "null");

@@ -8,7 +8,7 @@ import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
 import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
-import io.numaproj.pulsar.producer.NumagenMessage;
+import io.numaproj.pulsar.producer.numagen;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
@@ -38,7 +38,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PulsarSource extends Sourcer {
 
     // Map tracking received messages (keyed by Pulsar message ID string)
-    private final Map<String, org.apache.pulsar.client.api.Message<NumagenMessage>> messagesToAck = new HashMap<>();
+    private final Map<String, org.apache.pulsar.client.api.Message<numagen>> messagesToAck = new HashMap<>();
 
     private Server server;
 
@@ -68,21 +68,21 @@ public class PulsarSource extends Sourcer {
                 return;
             }
 
-            Consumer<NumagenMessage> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(),
+            Consumer<numagen> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(),
                     request.getTimeout().toMillis());
 
-            Messages<NumagenMessage> messages = consumer.batchReceive();
+            Messages<numagen> messages = consumer.batchReceive();
             if (messages == null) {
                 log.debug("No messages received within timeout");
                 return;
             }
 
-            for (org.apache.pulsar.client.api.Message<NumagenMessage> msg : messages) {
+            for (org.apache.pulsar.client.api.Message<numagen> msg : messages) {
                 String messageId = msg.getMessageId().toString();
                 messagesToAck.put(messageId, msg);
 
-                NumagenMessage message = msg.getValue();
-                log.info("Received message - createdts: {}, data.value: {}, data.padding: {}",
+                numagen message = msg.getValue();
+                log.info("Received message - Createdts: {}, Data.value: {}, Data.padding: {}",
                         message.getCreatedts(),
                         message.getData() != null ? message.getData().getValue() : "null",
                         message.getData() != null ? message.getData().getPadding() : "null");
@@ -120,10 +120,10 @@ public class PulsarSource extends Sourcer {
 
         for (Map.Entry<String, Offset> entry : requestOffsetMap.entrySet()) {
             String messageIdKey = entry.getKey();
-            org.apache.pulsar.client.api.Message<NumagenMessage> pMsg = messagesToAck.get(messageIdKey);
+            org.apache.pulsar.client.api.Message<numagen> pMsg = messagesToAck.get(messageIdKey);
             if (pMsg != null) {
                 try {
-                    Consumer<NumagenMessage> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
+                    Consumer<numagen> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
                     consumer.acknowledge(pMsg);
                     log.info("Acknowledged Pulsar message with ID: {}", messageIdKey);
                 } catch (PulsarClientException e) {
