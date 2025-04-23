@@ -84,21 +84,26 @@ public class PulsarSource extends Sourcer {
 
                 GenericRecord message = msg.getValue();
 
-                // Create a Map to hold the message data
+                // Convert GenericRecord to Map recursively
                 Map<String, Object> messageData = new HashMap<>();
-                messageData.put("Createdts", message.getField("Createdts"));
+                message.getFields().forEach(field -> {
+                    String fieldName = field.getName();
+                    Object fieldValue = message.getField(field);
 
-                // Handle the nested Data record if it exists
-                Object dataField = message.getField("Data");
-                if (dataField != null && dataField instanceof GenericRecord) {
-                    GenericRecord dataRecord = (GenericRecord) dataField;
-                    Map<String, Object> dataMap = new HashMap<>();
-                    dataMap.put("padding", dataRecord.getField("padding"));
-                    dataMap.put("value", dataRecord.getField("value"));
-                    messageData.put("Data", dataMap);
-                } else {
-                    messageData.put("Data", null);
-                }
+                    // Handle nested GenericRecord
+                    if (fieldValue instanceof GenericRecord) {
+                        Map<String, Object> nestedMap = new HashMap<>();
+                        GenericRecord nestedRecord = (GenericRecord) fieldValue;
+                        nestedRecord.getFields().forEach(nestedField -> {
+                            String nestedName = nestedField.getName();
+                            Object nestedValue = nestedRecord.getField(nestedField);
+                            nestedMap.put(nestedName, nestedValue);
+                        });
+                        messageData.put(fieldName, nestedMap);
+                    } else {
+                        messageData.put(fieldName, fieldValue);
+                    }
+                });
 
                 // Convert the map to JSON
                 String jsonValue = objectMapper.writeValueAsString(messageData);
