@@ -7,6 +7,8 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.SubscriptionType;
+import org.apache.pulsar.client.api.schema.GenericRecord;
+
 import io.numaproj.pulsar.producer.numagen;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,10 +36,10 @@ public class PulsarConsumerManager {
     private PulsarClient pulsarClient;
 
     // The current consumer instance.
-    private Consumer<numagen> currentConsumer;
+    private Consumer<GenericRecord> currentConsumer;
 
     // Returns the current consumer if it exists. If not, creates a new one.
-    public Consumer<numagen> getOrCreateConsumer(long count, long timeoutMillis)
+    public Consumer<GenericRecord> getOrCreateConsumer(long count, long timeoutMillis)
             throws PulsarClientException {
         if (currentConsumer != null) {
             return currentConsumer;
@@ -49,7 +51,7 @@ public class PulsarConsumerManager {
                                                                      // than 2^63 - 1 which will cause an overflow
                 .build();
 
-        currentConsumer = pulsarClient.newConsumer(Schema.AVRO(numagen.class))
+        currentConsumer = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
                 .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
