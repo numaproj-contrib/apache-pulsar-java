@@ -15,19 +15,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.io.DatumWriter;
-import org.apache.avro.io.Encoder;
 import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.io.BinaryEncoder;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.core.io.ClassPathResource;
-import org.json.JSONObject;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.generic.GenericDatumReader;
+import io.numaproj.pulsar.config.producer.PulsarProducerProperties;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -36,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
+import org.json.JSONObject;
 
 @Slf4j
 @Component
@@ -48,225 +44,123 @@ public class PulsarSink extends Sinker {
     @Autowired
     private PulsarClient pulsarClient;
 
+    @Autowired
+    private PulsarProducerProperties producerProperties;
+
     private Server server;
-    private Schema avroSchema;
+    private ObjectMapper objectMapper;
 
     @PostConstruct
     public void startServer() throws Exception {
-        // Parse and log the AVRO schema
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            // Read the schema directly since it's now in the proper format
-            String schemaStr = new String(new ClassPathResource("schema.avsc").getInputStream().readAllBytes());
-            avroSchema = new Schema.Parser().parse(schemaStr);
-            log.info("Loaded AVRO schema: {}", avroSchema.toString(true));
-        } catch (IOException e) {
-            log.error("Failed to parse AVRO schema", e);
-            throw e;
-        }
-
+        objectMapper = new ObjectMapper();
         server = new Server(this);
         server.start();
         server.awaitTermination();
     }
 
-    private GenericRecord createAvroRecord(JSONObject json, Schema schema) {
-        GenericRecord record = new GenericData.Record(schema);
+    private byte[] validateAndSerializeMessage(byte[] jsonBytes) throws IOException {
+        // If no schema validation is required, return the raw bytes
+        if (!producerProperties.getAvroSchema().isPresent()) {
+            return jsonBytes;
+        }
 
-        for (Schema.Field field : schema.getFields()) {
+        Schema avroSchema = producerProperties.getAvroSchema().get();
+
+        // Parse JSON and create Avro record
+        String jsonStr = new String(jsonBytes);
+        JSONObject json = new JSONObject(jsonStr);
+        GenericRecord record = new GenericData.Record(avroSchema);
+
+        // Set fields from JSON to record
+        avroSchema.getFields().forEach(field -> {
             String fieldName = field.name();
-            Schema fieldSchema = field.schema();
-
-            // Handle null values
-            if (!json.has(fieldName) || json.isNull(fieldName)) {
-                if (fieldSchema.getType() == Schema.Type.UNION &&
-                        fieldSchema.getTypes().stream().anyMatch(s -> s.getType() == Schema.Type.NULL)) {
-                    record.put(fieldName, null);
-                } else if (field.hasDefaultValue()) {
-                    record.put(fieldName, field.defaultVal());
-                } else {
-                    throw new IllegalArgumentException("Required field " + fieldName + " missing from JSON");
-                }
-                continue;
-            }
-
-            // If it's a union type, find the actual schema
-            if (fieldSchema.getType() == Schema.Type.UNION) {
-                for (Schema s : fieldSchema.getTypes()) {
-                    if (s.getType() != Schema.Type.NULL) {
-                        fieldSchema = s;
-                        break;
+            if (json.has(fieldName)) {
+                Object value = json.get(fieldName);
+                if (value instanceof JSONObject) {
+                    // Handle nested JSON object by creating a nested GenericRecord
+                    JSONObject nestedJson = (JSONObject) value;
+                    Schema fieldSchema = field.schema();
+                    // If it's a union type, find the record type
+                    if (fieldSchema.getType() == Schema.Type.UNION) {
+                        for (Schema s : fieldSchema.getTypes()) {
+                            if (s.getType() == Schema.Type.RECORD) {
+                                fieldSchema = s;
+                                break;
+                            }
+                        }
                     }
-                }
-            }
-
-            // Handle different types of fields
-            switch (fieldSchema.getType()) {
-                case RECORD:
-                    JSONObject nestedJson = json.getJSONObject(fieldName);
-                    GenericRecord nestedRecord = createAvroRecord(nestedJson, fieldSchema);
+                    GenericRecord nestedRecord = new GenericData.Record(fieldSchema);
+                    fieldSchema.getFields().forEach(nestedField -> {
+                        String nestedFieldName = nestedField.name();
+                        if (nestedJson.has(nestedFieldName)) {
+                            nestedRecord.put(nestedFieldName, nestedJson.get(nestedFieldName));
+                        }
+                    });
                     record.put(fieldName, nestedRecord);
-                    break;
-                case STRING:
-                    record.put(fieldName, json.getString(fieldName));
-                    break;
-                case LONG:
-                    record.put(fieldName, json.getLong(fieldName));
-                    break;
-                case INT:
-                    record.put(fieldName, json.getInt(fieldName));
-                    break;
-                case BOOLEAN:
-                    record.put(fieldName, json.getBoolean(fieldName));
-                    break;
-                case FLOAT:
-                    record.put(fieldName, (float) json.getDouble(fieldName));
-                    break;
-                case DOUBLE:
-                    record.put(fieldName, json.getDouble(fieldName));
-                    break;
-                case ARRAY:
-                    // Handle array type if needed
-                    break;
-                case MAP:
-                    // Handle map type if needed
-                    break;
-                default:
-                    throw new IllegalArgumentException(
-                            "Unsupported field type: " + fieldSchema.getType() + " for field " + fieldName);
-            }
-        }
-
-        return record;
-    }
-
-    private void logAvroRecord(GenericRecord record) {
-        log.info("Record content:");
-        logAvroRecordField(record, "  ");
-    }
-
-    private void logAvroRecordField(GenericRecord record, String indent) {
-        for (Schema.Field field : record.getSchema().getFields()) {
-            String fieldName = field.name();
-            Object value = record.get(fieldName);
-
-            if (value == null) {
-                log.info("{}{}: null", indent, fieldName);
-                continue;
-            }
-
-            Schema fieldSchema = field.schema();
-            // If it's a union type, find the actual schema
-            if (fieldSchema.getType() == Schema.Type.UNION) {
-                for (Schema s : fieldSchema.getTypes()) {
-                    if (s.getType() != Schema.Type.NULL) {
-                        fieldSchema = s;
-                        break;
-                    }
+                } else {
+                    record.put(fieldName, value);
                 }
             }
+        });
 
-            switch (fieldSchema.getType()) {
-                case RECORD:
-                    if (value instanceof GenericRecord) {
-                        log.info("{}{}: ", indent, fieldName);
-                        logAvroRecordField((GenericRecord) value, indent + "  ");
-                    }
-                    break;
-                case ARRAY:
-                    // Handle array type if needed
-                    break;
-                case MAP:
-                    // Handle map type if needed
-                    break;
-                default:
-                    log.info("{}{}: {}", indent, fieldName, value);
-                    break;
-            }
+        // Let Avro's built-in validation handle all the type checking and constraints
+        if (!GenericData.get().validate(avroSchema, record)) {
+            throw new IOException("Message failed Avro schema validation");
         }
+
+        // If validation passes, serialize to Avro binary format
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(outputStream, null);
+        DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(avroSchema);
+        writer.write(record, encoder);
+        encoder.flush();
+        return outputStream.toByteArray();
     }
 
     @Override
     public ResponseList processMessages(DatumIterator datumIterator) {
-        ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
+        List<Response> responses = new ArrayList<>();
+        List<CompletableFuture<Response>> futures = new ArrayList<>();
 
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-        while (true) {
-            Datum datum;
-            try {
-                datum = datumIterator.next();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                continue;
+        try {
+            while (true) {
+                Datum datum = datumIterator.next();
+                if (datum == null) {
+                    break;
+                }
+                try {
+                    byte[] messageBytes = validateAndSerializeMessage(datum.getValue());
+
+                    CompletableFuture<Response> future = producer.sendAsync(messageBytes)
+                            .thenApply(msgId -> {
+                                log.info("Successfully sent message with ID: {}", msgId);
+                                return Response.responseOK(datum.getId());
+                            })
+                            .exceptionally(throwable -> {
+                                log.error("Failed to send message", throwable);
+                                return Response.responseFailure(datum.getId(), throwable.getMessage());
+                            });
+
+                    futures.add(future);
+                } catch (Exception e) {
+                    log.error("Error processing message", e);
+                    responses.add(Response.responseFailure(datum.getId(), e.getMessage()));
+                }
             }
-            if (datum == null) {
-                break;
-            }
-
-            final String id = datum.getId();
-            try {
-                String jsonString = new String(datum.getValue());
-                JSONObject jsonObject = new JSONObject(jsonString);
-                log.info("Processing message ID: {} with input JSON: {}", id, jsonString);
-
-                // Create Avro record using generic method
-                GenericRecord avroRecord = createAvroRecord(jsonObject, avroSchema);
-
-                // Log the pre-serialized Avro record in a readable format
-                log.info("Pre-serialization - Message ID {}: Avro Record Content:", id);
-                logAvroRecord(avroRecord);
-
-                // Serialize to Avro binary format
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(avroSchema);
-                Encoder encoder = EncoderFactory.get().binaryEncoder(outputStream, null);
-                writer.write(avroRecord, encoder);
-                encoder.flush();
-                outputStream.close();
-
-                byte[] serializedBytes = outputStream.toByteArray();
-                log.info("Post-serialization - Message ID {}: Serialized to {} bytes", id, serializedBytes.length);
-                log.info("Serialized bytes: {}", java.util.Arrays.toString(serializedBytes));
-
-                // Deserialize and verify
-                GenericRecord deserializedRecord = deserializeAvroRecord(serializedBytes);
-                log.info("Post-deserialization - Message ID {}: Deserialized Record Content:", id);
-                logAvroRecord(deserializedRecord);
-
-                // Verify records match
-                boolean recordsMatch = avroRecord.equals(deserializedRecord);
-                log.info("Verification - Message ID {}: Original and deserialized records {} match",
-                        id, recordsMatch ? "DO" : "DO NOT");
-
-                // Send the serialized Avro message
-                CompletableFuture<Void> future = producer.sendAsync(serializedBytes)
-                        .thenAccept(messageId -> {
-                            log.info("Successfully sent message ID: {} to Pulsar with messageId: {}", id, messageId);
-                            responseListBuilder.addResponse(Response.responseOK(id));
-                        })
-                        .exceptionally(ex -> {
-                            log.error("Error sending message ID {}: {}", id, ex.getMessage(), ex);
-                            responseListBuilder.addResponse(Response.responseFailure(id, ex.getMessage()));
-                            return null;
-                        });
-
-                futures.add(future);
-            } catch (Exception e) {
-                log.error("Error processing message ID {}: {}", id, e.getMessage(), e);
-                responseListBuilder.addResponse(Response.responseFailure(id, e.getMessage()));
-            }
+        } catch (InterruptedException e) {
+            log.error("Iterator was interrupted", e);
+            Thread.currentThread().interrupt();
         }
 
-        // Wait for all sends to complete
+        // Wait for all async operations to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        return responseListBuilder.build();
-    }
+        // Collect all responses
+        futures.forEach(future -> responses.add(future.join()));
 
-    private GenericRecord deserializeAvroRecord(byte[] bytes) throws IOException {
-        DatumReader<GenericRecord> reader = new GenericDatumReader<>(avroSchema);
-        BinaryDecoder decoder = DecoderFactory.get().binaryDecoder(bytes, null);
-        return reader.read(null, decoder);
+        ResponseList.ResponseListBuilder builder = ResponseList.newBuilder();
+        responses.forEach(builder::addResponse);
+        return builder.build();
     }
 
     @PreDestroy

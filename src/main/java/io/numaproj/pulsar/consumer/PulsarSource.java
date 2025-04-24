@@ -99,22 +99,67 @@ public class PulsarSource extends Sourcer {
     }
 
     private byte[] convertAvroRecordToJson(GenericRecord record) {
-        JSONObject json = new JSONObject();
-        json.put("Createdts", record.get("Createdts"));
+        JSONObject json = convertAvroFieldToJson(record);
+        return json.toString().getBytes(StandardCharsets.UTF_8);
+    }
 
-        if (record.get("Data") != null) {
-            GenericRecord dataRecord = (GenericRecord) record.get("Data");
-            JSONObject dataJson = new JSONObject();
-            dataJson.put("value", dataRecord.get("value"));
-            if (dataRecord.get("padding") != null) {
-                dataJson.put("padding", dataRecord.get("padding"));
-            }
-            json.put("Data", dataJson);
-        } else {
-            json.putOpt("Data", null);
+    private JSONObject convertAvroFieldToJson(Object value) {
+        if (value == null) {
+            return null;
         }
 
-        return json.toString().getBytes(StandardCharsets.UTF_8);
+        if (value instanceof GenericRecord) {
+            GenericRecord record = (GenericRecord) value;
+            JSONObject json = new JSONObject();
+            record.getSchema().getFields().forEach(field -> {
+                String fieldName = field.name();
+                Object fieldValue = record.get(fieldName);
+                if (fieldValue instanceof GenericRecord) {
+                    json.put(fieldName, convertAvroFieldToJson(fieldValue));
+                } else if (fieldValue instanceof List) {
+                    json.put(fieldName, convertAvroListToJson((List<?>) fieldValue));
+                } else if (fieldValue instanceof Map) {
+                    json.put(fieldName, convertAvroMapToJson((Map<?, ?>) fieldValue));
+                } else {
+                    json.put(fieldName, fieldValue);
+                }
+            });
+            return json;
+        }
+
+        return new JSONObject().put("value", value);
+    }
+
+    private JSONObject convertAvroMapToJson(Map<?, ?> map) {
+        JSONObject json = new JSONObject();
+        map.forEach((key, value) -> {
+            if (value instanceof GenericRecord) {
+                json.put(key.toString(), convertAvroFieldToJson(value));
+            } else if (value instanceof List) {
+                json.put(key.toString(), convertAvroListToJson((List<?>) value));
+            } else if (value instanceof Map) {
+                json.put(key.toString(), convertAvroMapToJson((Map<?, ?>) value));
+            } else {
+                json.put(key.toString(), value);
+            }
+        });
+        return json;
+    }
+
+    private org.json.JSONArray convertAvroListToJson(List<?> list) {
+        org.json.JSONArray jsonArray = new org.json.JSONArray();
+        list.forEach(item -> {
+            if (item instanceof GenericRecord) {
+                jsonArray.put(convertAvroFieldToJson(item));
+            } else if (item instanceof List) {
+                jsonArray.put(convertAvroListToJson((List<?>) item));
+            } else if (item instanceof Map) {
+                jsonArray.put(convertAvroMapToJson((Map<?, ?>) item));
+            } else {
+                jsonArray.put(item);
+            }
+        });
+        return jsonArray;
     }
 
     @Override
