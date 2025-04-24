@@ -13,15 +13,17 @@ import org.apache.pulsar.client.api.PulsarClientException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.apache.avro.Schema;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.core.io.ClassPathResource;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 @Slf4j
 @Component
@@ -29,17 +31,27 @@ import java.nio.charset.StandardCharsets;
 public class PulsarSink extends Sinker {
 
     @Autowired
-    private Producer<numagen> producer;
+    private Producer<byte[]> producer;
 
     @Autowired
     private PulsarClient pulsarClient;
 
     private Server server;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private Schema avroSchema;
 
     @PostConstruct
     public void startServer() throws Exception {
+        // Parse and log the AVRO schema
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode schemaJson = mapper.readTree(new ClassPathResource("schema.avsc").getInputStream());
+            String schemaStr = schemaJson.get("schema").asText();
+            avroSchema = new Schema.Parser().parse(schemaStr);
+            log.info("Loaded AVRO schema: {}", avroSchema.toString(true));
+        } catch (IOException e) {
+            log.error("Failed to parse AVRO schema", e);
+        }
+
         server = new Server(this);
         server.start();
         server.awaitTermination();
@@ -48,8 +60,8 @@ public class PulsarSink extends Sinker {
     @Override
     public ResponseList processMessages(DatumIterator datumIterator) {
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
 
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         while (true) {
             Datum datum;
             try {
@@ -58,47 +70,32 @@ public class PulsarSink extends Sinker {
                 Thread.currentThread().interrupt();
                 continue;
             }
+            // null means the iterator is closed, so we break
             if (datum == null) {
                 break;
             }
 
-            final String msgId = datum.getId();
+            final byte[] msg = datum.getValue();
+            final String id = datum.getId(); // Get message ID from datum
+            // Won't wait for broker to confirm receipt of msg before continuing
+            // sendSync returns CompletableFuture which will complete when broker ack
+            CompletableFuture<Void> future = producer.sendAsync(msg)
+                    .thenAccept(messageId -> {
+                        log.info("Processed message ID: {}, Content: {}", id, new String(msg));
+                        responseListBuilder.addResponse(Response.responseOK(id));
+                    })
+                    .exceptionally(ex -> {
+                        log.error("Error processing message ID {}: {}", id, ex.getMessage(), ex);
+                        responseListBuilder.addResponse(Response.responseFailure(id, ex.getMessage()));
+                        return null;
+                    });
 
-            try {
-                log.debug("Processing message ID: {}, content length: {}", msgId, datum.getValue().length);
-
-                // Parse the incoming JSON to our POJO
-                String jsonContent = new String(datum.getValue(), StandardCharsets.UTF_8);
-                log.info("Incoming JSON content: {}", jsonContent);
-
-                numagen message = objectMapper.readValue(jsonContent, numagen.class);
-
-                // Log the message that will be sent
-                log.info("Sending message - Createdts: {}, Data.value: {}, Data.padding: {}",
-                        message.getCreatedts(),
-                        message.getData() != null ? message.getData().getValue() : "null",
-                        message.getData() != null ? message.getData().getPadding() : "null");
-
-                // Send the message
-                CompletableFuture<Void> future = producer.sendAsync(message)
-                        .thenAccept(messageId -> {
-                            log.info("Processed message ID: {}, data sent successfully", msgId);
-                            responseListBuilder.addResponse(Response.responseOK(msgId));
-                        })
-                        .exceptionally(ex -> {
-                            log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
-                            responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
-                            return null;
-                        });
-
-                futures.add(future);
-            } catch (Exception e) {
-                log.error("Exception during message processing for ID {}: {}", msgId, e.getMessage(), e);
-                responseListBuilder.addResponse(Response.responseFailure(msgId, e.getMessage()));
-            }
+            futures.add(future);
         }
 
+        // Wait for all sends to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
         return responseListBuilder.build();
     }
 
