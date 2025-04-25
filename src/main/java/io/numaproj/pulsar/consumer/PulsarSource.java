@@ -183,18 +183,15 @@ public class PulsarSource extends Sourcer {
                 return;
             }
 
-            // Process each message in the batch.
             for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
                 String msgId = pMsg.getMessageId().toString();
                 byte[] rawBytes = pMsg.getValue();
 
                 try {
-                    // Deserialize and log the Avro record
                     GenericRecord deserializedRecord = deserializeAvroRecord(rawBytes);
                     log.info("Consumed Pulsar message [id: {}]:", msgId);
                     logAvroRecord(deserializedRecord);
 
-                    // Convert deserialized record to JSON bytes
                     byte[] jsonBytes = convertAvroRecordToJson(deserializedRecord);
                     log.debug("Converted to JSON: {}", new String(jsonBytes, StandardCharsets.UTF_8));
 
@@ -208,7 +205,6 @@ public class PulsarSource extends Sourcer {
                     messagesToAck.put(msgId, pMsg);
                 } catch (IOException e) {
                     log.error("Failed to process Avro message [id: {}]: {}", msgId, e.getMessage());
-                    // Skip this message if we can't process it
                     continue;
                 }
             }

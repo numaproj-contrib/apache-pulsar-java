@@ -20,8 +20,6 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.io.BinaryEncoder;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.core.io.ClassPathResource;
 import io.numaproj.pulsar.config.producer.PulsarProducerProperties;
 
 import javax.annotation.PostConstruct;
@@ -48,11 +46,9 @@ public class PulsarSink extends Sinker {
     private PulsarProducerProperties producerProperties;
 
     private Server server;
-    private ObjectMapper objectMapper;
 
     @PostConstruct
     public void startServer() throws Exception {
-        objectMapper = new ObjectMapper();
         server = new Server(this);
         server.start();
         server.awaitTermination();
@@ -129,6 +125,7 @@ public class PulsarSink extends Sinker {
                     break;
                 }
                 try {
+                    log.info("Preparing to send message: {}", new String(datum.getValue()));
                     byte[] messageBytes = validateAndSerializeMessage(datum.getValue());
 
                     CompletableFuture<Response> future = producer.sendAsync(messageBytes)
