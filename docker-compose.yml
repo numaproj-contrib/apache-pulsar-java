@@ -5,9 +5,6 @@ services:
     command: bin/pulsar standalone
     environment:
       PULSAR_MEM: "-Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g"
-    volumes:
-      - ./schema.avsc:/pulsar/schemas/schema.avsc
-
 
     ports:
       - "6650:6650"
