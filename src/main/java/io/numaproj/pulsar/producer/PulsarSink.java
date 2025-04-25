@@ -32,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import org.json.JSONObject;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Component
@@ -58,6 +59,48 @@ public class PulsarSink extends Sinker {
         server.awaitTermination();
     }
 
+    private Object convertValueToSchemaType(Object value, Schema schema) {
+        if (value == null) {
+            return null;
+        }
+
+        // If it's a union type, find the non-null type
+        if (schema.getType() == Schema.Type.UNION) {
+            for (Schema s : schema.getTypes()) {
+                if (s.getType() != Schema.Type.NULL) {
+                    schema = s;
+                    break;
+                }
+            }
+        }
+
+        switch (schema.getType()) {
+            case LONG:
+                if (value instanceof Integer) {
+                    return ((Integer) value).longValue();
+                } else if (value instanceof String) {
+                    return Long.parseLong((String) value);
+                }
+                return value;
+            case INT:
+                if (value instanceof Long) {
+                    return ((Long) value).intValue();
+                } else if (value instanceof String) {
+                    return Integer.parseInt((String) value);
+                }
+                return value;
+            case STRING:
+                return value.toString();
+            case BYTES:
+                if (value instanceof String) {
+                    return ((String) value).getBytes(StandardCharsets.UTF_8);
+                }
+                return value;
+            default:
+                return value;
+        }
+    }
+
     private byte[] validateAndSerializeMessage(byte[] jsonBytes) throws IOException {
         // If no schema validation is required, return the raw bytes
         if (!producerProperties.getAvroSchema().isPresent()) {
@@ -65,46 +108,70 @@ public class PulsarSink extends Sinker {
         }
 
         Schema avroSchema = producerProperties.getAvroSchema().get();
+        log.debug("Using Avro schema: {}", avroSchema.toString(true));
 
         // Parse JSON and create Avro record
         String jsonStr = new String(jsonBytes);
         JSONObject json = new JSONObject(jsonStr);
+        log.debug("Incoming JSON: {}", json.toString(2));
         GenericRecord record = new GenericData.Record(avroSchema);
 
         // Set fields from JSON to record
         avroSchema.getFields().forEach(field -> {
             String fieldName = field.name();
+            Schema fieldSchema = field.schema();
+            log.debug("Processing field '{}' with schema: {}", fieldName, fieldSchema.toString(true));
+
             if (json.has(fieldName)) {
                 Object value = json.get(fieldName);
+                log.debug("Field '{}' has value: {} (type: {})", fieldName, value, value.getClass().getName());
+
                 if (value instanceof JSONObject) {
                     // Handle nested JSON object by creating a nested GenericRecord
                     JSONObject nestedJson = (JSONObject) value;
-                    Schema fieldSchema = field.schema();
                     // If it's a union type, find the record type
+                    Schema recordSchema = fieldSchema;
                     if (fieldSchema.getType() == Schema.Type.UNION) {
+                        log.debug("Field '{}' is a union type: {}", fieldName, fieldSchema.getTypes());
                         for (Schema s : fieldSchema.getTypes()) {
                             if (s.getType() == Schema.Type.RECORD) {
-                                fieldSchema = s;
+                                recordSchema = s;
+                                log.debug("Selected record schema from union for '{}': {}", fieldName,
+                                        s.toString(true));
                                 break;
                             }
                         }
                     }
-                    GenericRecord nestedRecord = new GenericData.Record(fieldSchema);
-                    fieldSchema.getFields().forEach(nestedField -> {
+                    GenericRecord nestedRecord = new GenericData.Record(recordSchema);
+                    recordSchema.getFields().forEach(nestedField -> {
                         String nestedFieldName = nestedField.name();
                         if (nestedJson.has(nestedFieldName)) {
-                            nestedRecord.put(nestedFieldName, nestedJson.get(nestedFieldName));
+                            Object nestedValue = nestedJson.get(nestedFieldName);
+                            log.debug("Setting nested field '{}' to value: {} (type: {})",
+                                    nestedFieldName, nestedValue, nestedValue.getClass().getName());
+                            Object convertedValue = convertValueToSchemaType(nestedValue, nestedField.schema());
+                            log.debug("Converted nested field '{}' to type: {}",
+                                    nestedFieldName, convertedValue.getClass().getName());
+                            nestedRecord.put(nestedFieldName, convertedValue);
                         }
                     });
                     record.put(fieldName, nestedRecord);
                 } else {
-                    record.put(fieldName, value);
+                    log.debug("Setting field '{}' to value: {}", fieldName, value);
+                    Object convertedValue = convertValueToSchemaType(value, fieldSchema);
+                    log.debug("Converted field '{}' to type: {}", fieldName, convertedValue.getClass().getName());
+                    record.put(fieldName, convertedValue);
                 }
+            } else {
+                log.debug("Field '{}' not present in JSON", fieldName);
             }
         });
 
+        log.debug("Created Avro record: {}", record);
+
         // Let Avro's built-in validation handle all the type checking and constraints
         if (!GenericData.get().validate(avroSchema, record)) {
+            log.error("Validation failed for record: {}", record);
             throw new IOException("Message failed Avro schema validation");
         }
 

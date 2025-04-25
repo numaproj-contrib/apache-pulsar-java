@@ -12,7 +12,7 @@ data:
         producer:
           enabled: true
           producerConfig: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer
-            topicName: "twentyfour" 
+            topicName: "ged-rocks" 
             sendTimeoutMs: 2000
 
           

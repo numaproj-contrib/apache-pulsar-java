@@ -11,13 +11,17 @@ spec:
         generator:
           rpu: 1
           duration: 1s
-          msgSize: 10
     - name: p1
       scale:
         min: 1
       udf:
         builtin:
           name: cat
+    - name: log-out
+      scale:
+        min: 1
+      sink:
+        log: {}
     - name: out
       scale:
         min: 1
@@ -42,3 +46,5 @@ spec:
       to: p1
     - from: p1
       to: out
+    - from: p1
+      to: log-out

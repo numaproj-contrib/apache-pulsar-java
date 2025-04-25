@@ -16,8 +16,7 @@
                     "fields": [
                         {
                             "name": "padding",
-                            "type": ["null", "string"],
-                            "default": null
+                            "type": "string",
                         },
                         {
                             "name": "value",

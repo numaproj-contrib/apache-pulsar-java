@@ -66,7 +66,7 @@ public class PulsarSource extends Sourcer {
     public void startServer() throws Exception {
         // Load the Avro schema
         try {
-            ObjectMapper mapper = new ObjectMapper();
+            // ObjectMapper mapper = new ObjectMapper();
             String schemaStr = new String(new ClassPathResource("schema.avsc").getInputStream().readAllBytes());
             avroSchema = new Schema.Parser().parse(schemaStr);
             log.info("Loaded AVRO schema for consumer: {}", avroSchema.toString(true));
@@ -92,7 +92,7 @@ public class PulsarSource extends Sourcer {
             GenericRecord dataRecord = (GenericRecord) record.get("Data");
             log.info("  Data:");
             log.info("    value: {}", dataRecord.get("value"));
-            log.info("    padding: {}", dataRecord.get("padding"));
+            log.info("    padding: {}", dataRecord.get("padding") != null ? dataRecord.get("padding") : "");
         } else {
             log.info("  Data: null");
         }
@@ -121,7 +121,12 @@ public class PulsarSource extends Sourcer {
                 } else if (fieldValue instanceof Map) {
                     json.put(fieldName, convertAvroMapToJson((Map<?, ?>) fieldValue));
                 } else {
-                    json.put(fieldName, fieldValue);
+                    // Handle null values explicitly
+                    if (fieldValue == null) {
+                        json.put(fieldName, JSONObject.NULL);
+                    } else {
+                        json.put(fieldName, fieldValue);
+                    }
                 }
             });
             return json;
