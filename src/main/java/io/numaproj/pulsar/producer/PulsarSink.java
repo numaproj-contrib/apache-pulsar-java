@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import io.numaproj.pulsar.model.numagen;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -29,7 +30,7 @@ import java.nio.charset.StandardCharsets;
 public class PulsarSink extends Sinker {
 
     @Autowired
-    private Producer<NumagenMessage> producer;
+    private Producer<numagen> producer;
 
     @Autowired
     private PulsarClient pulsarClient;
@@ -67,11 +68,11 @@ public class PulsarSink extends Sinker {
             try {
                 log.debug("Processing message ID: {}, content length: {}", msgId, datum.getValue().length);
 
-                // Parse the incoming JSON to our POJO
+                // Parse the incoming JSON to our Avro-generated class
                 String jsonContent = new String(datum.getValue(), StandardCharsets.UTF_8);
                 log.info("Incoming JSON content: {}", jsonContent);
 
-                NumagenMessage message = objectMapper.readValue(jsonContent, NumagenMessage.class);
+                numagen message = objectMapper.readValue(jsonContent, numagen.class);
 
                 // Log the message that will be sent
                 log.info("Sending message - createdts: {}, data.value: {}, data.padding: {}",

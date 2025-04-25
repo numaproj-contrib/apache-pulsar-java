@@ -12,7 +12,7 @@ data:
         consumer:
           enabled: true
           consumerConfig: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer
-            topicNames: "anotha" 
+            topicNames: "demo-test" 
             subscriptionName: "sub"
         admin: 
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client

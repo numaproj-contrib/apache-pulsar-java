@@ -8,12 +8,12 @@ import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
 import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
-import io.numaproj.pulsar.producer.NumagenMessage;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.schema.GenericRecord;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.policies.data.TopicStats;
@@ -38,7 +38,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PulsarSource extends Sourcer {
 
     // Map tracking received messages (keyed by Pulsar message ID string)
-    private final Map<String, org.apache.pulsar.client.api.Message<NumagenMessage>> messagesToAck = new HashMap<>();
+    private final Map<String, org.apache.pulsar.client.api.Message<GenericRecord>> messagesToAck = new HashMap<>();
 
     private Server server;
 
@@ -68,27 +68,44 @@ public class PulsarSource extends Sourcer {
                 return;
             }
 
-            Consumer<NumagenMessage> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(),
+            Consumer<GenericRecord> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(),
                     request.getTimeout().toMillis());
 
-            Messages<NumagenMessage> messages = consumer.batchReceive();
+            Messages<GenericRecord> messages = consumer.batchReceive();
             if (messages == null) {
                 log.debug("No messages received within timeout");
                 return;
             }
 
-            for (org.apache.pulsar.client.api.Message<NumagenMessage> msg : messages) {
+            for (org.apache.pulsar.client.api.Message<GenericRecord> msg : messages) {
                 String messageId = msg.getMessageId().toString();
                 messagesToAck.put(messageId, msg);
 
-                NumagenMessage message = msg.getValue();
-                log.info("Received message - createdts: {}, data.value: {}, data.padding: {}",
-                        message.getCreatedts(),
-                        message.getData() != null ? message.getData().getValue() : "null",
-                        message.getData() != null ? message.getData().getPadding() : "null");
+                GenericRecord message = msg.getValue();
 
-                // Convert to JSON for sending to next vertex
-                String jsonValue = objectMapper.writeValueAsString(message);
+                // Convert GenericRecord to Map recursively
+                Map<String, Object> messageData = new HashMap<>();
+                message.getFields().forEach(field -> {
+                    String fieldName = field.getName();
+                    Object fieldValue = message.getField(field);
+
+                    // Handle nested GenericRecord
+                    if (fieldValue instanceof GenericRecord) {
+                        Map<String, Object> nestedMap = new HashMap<>();
+                        GenericRecord nestedRecord = (GenericRecord) fieldValue;
+                        nestedRecord.getFields().forEach(nestedField -> {
+                            String nestedName = nestedField.getName();
+                            Object nestedValue = nestedRecord.getField(nestedField);
+                            nestedMap.put(nestedName, nestedValue);
+                        });
+                        messageData.put(fieldName, nestedMap);
+                    } else {
+                        messageData.put(fieldName, fieldValue);
+                    }
+                });
+
+                // Convert the map to JSON
+                String jsonValue = objectMapper.writeValueAsString(messageData);
                 log.info("Sending message to observer: {}", jsonValue);
 
                 Message numaMessage = new Message(
@@ -120,10 +137,10 @@ public class PulsarSource extends Sourcer {
 
         for (Map.Entry<String, Offset> entry : requestOffsetMap.entrySet()) {
             String messageIdKey = entry.getKey();
-            org.apache.pulsar.client.api.Message<NumagenMessage> pMsg = messagesToAck.get(messageIdKey);
+            org.apache.pulsar.client.api.Message<GenericRecord> pMsg = messagesToAck.get(messageIdKey);
             if (pMsg != null) {
                 try {
-                    Consumer<NumagenMessage> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
+                    Consumer<GenericRecord> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
                     consumer.acknowledge(pMsg);
                     log.info("Acknowledged Pulsar message with ID: {}", messageIdKey);
                 } catch (PulsarClientException e) {

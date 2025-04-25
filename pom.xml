@@ -38,7 +38,7 @@
         <dependency>
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
-            <version>1.11.0</version>
+            <version>1.10.2</version>
         </dependency>
     </dependencies>
 
@@ -100,6 +100,39 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro-maven-plugin</artifactId>
+                <version>1.10.2</version>
+                <executions>
+                    <execution>
+                        <id>schemas</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>schema</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirectory>${project.basedir}/src/main/resources/</sourceDirectory>
+                            <outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
+                            <stringType>String</stringType>
+                            <createSetters>true</createSetters>
+                            <enableDecimalLogicalType>true</enableDecimalLogicalType>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>UTF-8</encoding>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                </configuration>
             </plugin>
         </plugins>
     </build>
