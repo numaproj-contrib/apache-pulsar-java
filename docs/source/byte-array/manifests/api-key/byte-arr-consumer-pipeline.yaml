@@ -25,12 +25,6 @@ spec:
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf
-    - name: p1
-      scale:
-        min: 1
-      udf:
-        builtin:
-          name: cat
     - name: out
       scale:
         min: 1
@@ -38,6 +32,4 @@ spec:
         log: {}
   edges:
     - from: in
-      to: p1
-    - from: p1
       to: out
