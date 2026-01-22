@@ -10,10 +10,6 @@ spec:
           rpu: 1
           duration: 10s
           msgSize: 10
-    - name: p1
-      udf:
-        builtin:
-          name: cat
     - name: out
       volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
         - name: pulsar-config-volume
@@ -33,6 +29,4 @@ spec:
                 mountPath: /conf
   edges:
     - from: in
-      to: p1
-    - from: p1
       to: out
