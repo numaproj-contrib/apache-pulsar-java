@@ -1,0 +1,33 @@
+{
+    "type": "record",
+    "name": "numagen",
+    "fields": [
+        {
+            "name": "Createdts",
+            "type": "long"
+        },
+        {
+            "name": "Data",
+            "type": [
+                "null",
+                {
+                    "type": "record",
+                    "name": "DataRecord",
+                    "fields": [
+                        {
+                            "name": "padding",
+                            "type": ["null", "string"],
+                            "default": null
+                        },
+                        {
+                            "name": "value",
+                            "type": "long"
+                        }
+                    ]
+                }
+            ],
+            "default": null
+        }
+    ],
+    "aliases": ["numagen"]
+}

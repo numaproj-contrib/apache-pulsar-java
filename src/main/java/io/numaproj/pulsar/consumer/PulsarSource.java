@@ -22,6 +22,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,6 +30,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.BinaryDecoder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.ClassPathResource;
+import org.json.JSONObject;
 
 @Slf4j
 @Component
@@ -49,11 +60,106 @@ public class PulsarSource extends Sourcer {
     @Autowired
     PulsarConsumerProperties pulsarConsumerProperties;
 
+    private Schema avroSchema;
+
     @PostConstruct
     public void startServer() throws Exception {
+        // Load the Avro schema
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            String schemaStr = new String(new ClassPathResource("schema.avsc").getInputStream().readAllBytes());
+            avroSchema = new Schema.Parser().parse(schemaStr);
+            log.info("Loaded AVRO schema for consumer: {}", avroSchema.toString(true));
+        } catch (IOException e) {
+            log.error("Failed to parse AVRO schema", e);
+            throw e;
+        }
+
         server = new Server(this);
         server.start();
         server.awaitTermination();
+    }
+
+    private GenericRecord deserializeAvroRecord(byte[] bytes) throws IOException {
+        DatumReader<GenericRecord> reader = new GenericDatumReader<>(avroSchema);
+        BinaryDecoder decoder = DecoderFactory.get().binaryDecoder(bytes, null);
+        return reader.read(null, decoder);
+    }
+
+    private void logAvroRecord(GenericRecord record) {
+        log.info("  Createdts: {}", record.get("Createdts"));
+        if (record.get("Data") != null) {
+            GenericRecord dataRecord = (GenericRecord) record.get("Data");
+            log.info("  Data:");
+            log.info("    value: {}", dataRecord.get("value"));
+            log.info("    padding: {}", dataRecord.get("padding"));
+        } else {
+            log.info("  Data: null");
+        }
+    }
+
+    private byte[] convertAvroRecordToJson(GenericRecord record) {
+        JSONObject json = convertAvroFieldToJson(record);
+        return json.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private JSONObject convertAvroFieldToJson(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof GenericRecord) {
+            GenericRecord record = (GenericRecord) value;
+            JSONObject json = new JSONObject();
+            record.getSchema().getFields().forEach(field -> {
+                String fieldName = field.name();
+                Object fieldValue = record.get(fieldName);
+                if (fieldValue instanceof GenericRecord) {
+                    json.put(fieldName, convertAvroFieldToJson(fieldValue));
+                } else if (fieldValue instanceof List) {
+                    json.put(fieldName, convertAvroListToJson((List<?>) fieldValue));
+                } else if (fieldValue instanceof Map) {
+                    json.put(fieldName, convertAvroMapToJson((Map<?, ?>) fieldValue));
+                } else {
+                    json.put(fieldName, fieldValue);
+                }
+            });
+            return json;
+        }
+
+        return new JSONObject().put("value", value);
+    }
+
+    private JSONObject convertAvroMapToJson(Map<?, ?> map) {
+        JSONObject json = new JSONObject();
+        map.forEach((key, value) -> {
+            if (value instanceof GenericRecord) {
+                json.put(key.toString(), convertAvroFieldToJson(value));
+            } else if (value instanceof List) {
+                json.put(key.toString(), convertAvroListToJson((List<?>) value));
+            } else if (value instanceof Map) {
+                json.put(key.toString(), convertAvroMapToJson((Map<?, ?>) value));
+            } else {
+                json.put(key.toString(), value);
+            }
+        });
+        return json;
+    }
+
+    private org.json.JSONArray convertAvroListToJson(List<?> list) {
+        org.json.JSONArray jsonArray = new org.json.JSONArray();
+        list.forEach(item -> {
+            if (item instanceof GenericRecord) {
+                jsonArray.put(convertAvroFieldToJson(item));
+            } else if (item instanceof List) {
+                jsonArray.put(convertAvroListToJson((List<?>) item));
+            } else if (item instanceof Map) {
+                jsonArray.put(convertAvroMapToJson((Map<?, ?>) item));
+            } else {
+                jsonArray.put(item);
+            }
+        });
+        return jsonArray;
     }
 
     @Override
@@ -77,19 +183,30 @@ public class PulsarSource extends Sourcer {
                 return;
             }
 
-            // Process each message in the batch.
             for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
                 String msgId = pMsg.getMessageId().toString();
-                log.info("Consumed Pulsar message [id: {}]: {}", pMsg.getMessageId(),
-                        new String(pMsg.getValue(), StandardCharsets.UTF_8));
+                byte[] rawBytes = pMsg.getValue();
 
-                byte[] offsetBytes = msgId.getBytes(StandardCharsets.UTF_8);
-                Offset offset = new Offset(offsetBytes);
+                try {
+                    GenericRecord deserializedRecord = deserializeAvroRecord(rawBytes);
+                    log.info("Consumed Pulsar message [id: {}]:", msgId);
+                    logAvroRecord(deserializedRecord);
 
-                Message message = new Message(pMsg.getValue(), offset, Instant.now());
-                observer.send(message);
+                    byte[] jsonBytes = convertAvroRecordToJson(deserializedRecord);
+                    log.debug("Converted to JSON: {}", new String(jsonBytes, StandardCharsets.UTF_8));
 
-                messagesToAck.put(msgId, pMsg);
+                    byte[] offsetBytes = msgId.getBytes(StandardCharsets.UTF_8);
+                    Offset offset = new Offset(offsetBytes);
+
+                    // Send the JSON bytes instead of raw Avro bytes
+                    Message message = new Message(jsonBytes, offset, Instant.now());
+                    observer.send(message);
+
+                    messagesToAck.put(msgId, pMsg);
+                } catch (IOException e) {
+                    log.error("Failed to process Avro message [id: {}]: {}", msgId, e.getMessage());
+                    continue;
+                }
             }
         } catch (PulsarClientException e) {
             log.error("Failed to get consumer or receive messages from Pulsar", e);
