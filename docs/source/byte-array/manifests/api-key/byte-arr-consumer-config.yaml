@@ -11,7 +11,7 @@ data:
           clientConfig:
             serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
-            authParams: "insert key" # add API key here
+            authParams: "${PULSAR_AUTH_TOKEN}"
         consumer:  # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
           enabled: true
           consumerConfig: 
@@ -21,4 +21,4 @@ data:
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
             serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
-            authParams: "insert key" # add API key here
+            authParams: "${PULSAR_AUTH_TOKEN}" 

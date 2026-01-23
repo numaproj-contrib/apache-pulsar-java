@@ -86,6 +86,11 @@
                             <container>
                                 <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
                                 <mainClass>io.numaproj.pulsar.PulsarApplication</mainClass>
+                                <jvmFlags>
+                                    <jvmFlag>--add-opens=java.base/java.lang=ALL-UNNAMED</jvmFlag>
+                                    <jvmFlag>--add-opens=java.base/java.util=ALL-UNNAMED</jvmFlag>
+                                    <jvmFlag>--add-opens=java.base/sun.net=ALL-UNNAMED</jvmFlag>
+                                </jvmFlags>
                             </container>
                             <to>
                                 <image>

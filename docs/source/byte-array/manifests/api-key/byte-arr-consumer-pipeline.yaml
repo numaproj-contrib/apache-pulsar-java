@@ -22,6 +22,12 @@ spec:
             image: apache-pulsar-java:v0.3.0
             args: [ "--spring.config.location=file:/conf/application.yml" ]
             imagePullPolicy: Never
+            env:
+              - name: PULSAR_AUTH_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: pulsar-consumer-auth-secret
+                    key: pulsar-token
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf
