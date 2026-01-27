@@ -1,6 +1,8 @@
 # Apache Pulsar Java 
 Apache Pulsar user-defined source and sink implemented using Java. 
 
+**Prerequisites:** This project requires **Java 23**
+
 **Note for Production:** For StreamNative Cloud or secured clusters, see [Pulsar on StreamNative](docs/get-started/pulsar-on-streamnative.md)
 
 ## Getting Started: Local Development Setup

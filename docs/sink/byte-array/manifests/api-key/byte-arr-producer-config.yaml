@@ -11,7 +11,8 @@ data:
           clientConfig:
             serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl here 
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
-            authParams: "insert key" # add API key here
+            authParams: "${PULSAR_AUTH_TOKEN}"
+            # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}" 
         producer:
           enabled: true
           producerConfig: 
