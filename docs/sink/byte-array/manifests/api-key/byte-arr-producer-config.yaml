@@ -11,8 +11,8 @@ data:
           clientConfig:
             serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl here 
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
-            authParams: "${PULSAR_AUTH_TOKEN}" 
-            # operationTimeoutMs: "${PULSAR_OPERATION_TIMEOUT_MS}" 
+            authParams: "${PULSAR_AUTH_TOKEN}"
+            # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}" 
         producer:
           enabled: true
           producerConfig: 

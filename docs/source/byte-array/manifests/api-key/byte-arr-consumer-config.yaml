@@ -12,8 +12,7 @@ data:
             serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
             authParams: "${PULSAR_AUTH_TOKEN}"
-            # operationTimeoutMs: "${PULSAR_OPERATION_TIMEOUT_MS}"
-            # connectionTimeoutMs: "${PULSAR_CONNECTION_TIMEOUT_MS}"
+            # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}"
         consumer:  # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
           enabled: true
           consumerConfig: 
@@ -24,5 +23,4 @@ data:
             serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
             authParams: "${PULSAR_AUTH_TOKEN}"
-            # operationTimeoutMs: "${PULSAR_OPERATION_TIMEOUT_MS}"
-            # connectionTimeoutMs: "${PULSAR_CONNECTION_TIMEOUT_MS}" 
+            # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}" 
