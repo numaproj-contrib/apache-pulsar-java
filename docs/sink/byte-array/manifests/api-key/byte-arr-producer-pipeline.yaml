@@ -24,12 +24,9 @@ spec:
             image: apache-pulsar-java:v0.3.0 # TO DO: Replace with quay.io link
             args: [ "--spring.config.location=file:/conf/application.yml" ] # Use external configuration file 
             imagePullPolicy: Never
-            env:
-              - name: PULSAR_AUTH_TOKEN
-                valueFrom:
-                  secretKeyRef:
-                    name: pulsar-producer-auth-secret
-                    key: pulsar-token
+            envFrom:
+              - secretRef:
+                  name: pulsar-producer-auth-secret  # All secret keys injected as env vars
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf

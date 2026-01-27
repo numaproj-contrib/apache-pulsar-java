@@ -54,6 +54,13 @@ This guide focuses on using the StreamNative Cloud Console for management and in
     kubectl apply -f docs/sink/byte-array/manifests/api-key/byte-arr-producer-secret.yaml
     ```
     
+    **How it works:** The Secret stores your credentials as key-value pairs. The Pipeline uses `envFrom` to automatically inject ALL secret keys as environment variables. The ConfigMap references these using `${ENV_VAR_NAME}` syntax (e.g., `${PULSAR_AUTH_TOKEN}`), and Spring Boot automatically resolves them at runtime.
+    
+    **Adding extra configuration:** To add more parameters (timeouts, OAuth credentials, etc.), simply:
+    1. Add new key-value pairs to the Secret YAML (e.g., `PULSAR_OPERATION_TIMEOUT_MS: "30000"`)
+    2. Reference them in the ConfigMap YAML (e.g., `operationTimeoutMs: "${PULSAR_OPERATION_TIMEOUT_MS}"`)
+    3. Apply both files - no Java code changes needed!
+    
     **Note:** For production environments, consider using cloud-native secret managers like AWS Secrets Manager, Google Secret Manager, Azure Key Vault, or HashiCorp Vault with the [External Secrets Operator](https://external-secrets.io/).
 
 11. **Deploy the producer pipeline** (this generates one message every 10 seconds):

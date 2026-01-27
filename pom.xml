@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.3</version>
+        <version>3.3.6</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>io.numaproj.pulsar</groupId>
@@ -13,7 +13,9 @@
     <version>1.0-SNAPSHOT</version>
     <name>apache-pulsar-java</name>
     <properties>
-        <java.version>17</java.version>
+        <java.version>23</java.version>
+        <lombok.version>1.18.36</lombok.version>
+        <maven.compiler.proc>full</maven.compiler.proc>
     </properties>
     <dependencies>
         <dependency>
@@ -28,6 +30,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
             <optional>true</optional>
         </dependency>
         <dependency>
@@ -39,6 +42,19 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -81,16 +97,11 @@
                         </goals>
                         <configuration>
                             <from>
-                                <image>amazoncorretto:17</image>
+                                <image>amazoncorretto:23</image>
                             </from>
                             <container>
                                 <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
                                 <mainClass>io.numaproj.pulsar.PulsarApplication</mainClass>
-                                <jvmFlags>
-                                    <jvmFlag>--add-opens=java.base/java.lang=ALL-UNNAMED</jvmFlag>
-                                    <jvmFlag>--add-opens=java.base/java.util=ALL-UNNAMED</jvmFlag>
-                                    <jvmFlag>--add-opens=java.base/sun.net=ALL-UNNAMED</jvmFlag>
-                                </jvmFlags>
                             </container>
                             <to>
                                 <image>
