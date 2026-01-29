@@ -165,6 +165,27 @@ public class PulsarSourceTest {
             when(msg2.getMessageId()).thenReturn(msgId2);
             when(msg1.getValue()).thenReturn("Hello".getBytes(StandardCharsets.UTF_8));
             when(msg2.getValue()).thenReturn("World".getBytes(StandardCharsets.UTF_8));
+            
+            // Stub metadata methods required by buildHeaders()
+            when(msg1.getProducerName()).thenReturn("test-producer");
+            when(msg2.getProducerName()).thenReturn("test-producer");
+            when(msg1.getTopicName()).thenReturn("test-topic");
+            when(msg2.getTopicName()).thenReturn("test-topic");
+            when(msg1.getPublishTime()).thenReturn(1000L);
+            when(msg2.getPublishTime()).thenReturn(2000L);
+            when(msg1.getEventTime()).thenReturn(1000L);
+            when(msg2.getEventTime()).thenReturn(2000L);
+            when(msg1.getRedeliveryCount()).thenReturn(0);
+            when(msg2.getRedeliveryCount()).thenReturn(0);
+            when(msg1.getProperties()).thenReturn(Collections.emptyMap());
+            when(msg2.getProperties()).thenReturn(Collections.emptyMap());
+
+            // Add custom properties to msg2
+            Map<String, String> customProps = new HashMap<>();
+            customProps.put("custom-key-1", "custom-value-1");
+            customProps.put("custom-key-2", "custom-value-2");
+            customProps.put("app-version", "1.2.3");
+            when(msg2.getProperties()).thenReturn(customProps);
 
             // Create a fake Messages<byte[]> object
             Messages<byte[]> messages = mock(Messages.class);
@@ -189,9 +210,35 @@ public class PulsarSourceTest {
             verify(observer, times(2)).send(messageCaptor.capture());
             java.util.List<Message> sentMessages = messageCaptor.getAllValues();
             assertEquals(2, sentMessages.size());
+            
             // Validate contents of messages using getValue().
             assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
             assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
+
+            // Verify headers are correctly populated for first message
+            Message firstMessage = sentMessages.get(0);
+            assertNotNull("Headers should not be null", firstMessage.getHeaders());
+            assertEquals("test-producer", firstMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg1", firstMessage.getHeaders().get("x-pulsar-message-id"));
+            assertEquals("test-topic", firstMessage.getHeaders().get("x-pulsar-topic-name"));
+            assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-publish-time"));
+            assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-event-time"));
+            assertEquals("0", firstMessage.getHeaders().get("x-pulsar-redelivery-count"));
+
+            // Verify headers are correctly populated for second message
+            Message secondMessage = sentMessages.get(1);
+            assertNotNull("Headers should not be null", secondMessage.getHeaders());
+            assertEquals("test-producer", secondMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg2", secondMessage.getHeaders().get("x-pulsar-message-id"));
+            assertEquals("test-topic", secondMessage.getHeaders().get("x-pulsar-topic-name"));
+            assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-publish-time"));
+            assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-event-time"));
+            assertEquals("0", secondMessage.getHeaders().get("x-pulsar-redelivery-count"));
+
+            // Verify custom properties are included in headers
+            assertEquals("custom-value-1", secondMessage.getHeaders().get("custom-key-1"));
+            assertEquals("custom-value-2", secondMessage.getHeaders().get("custom-key-2"));
+            assertEquals("1.2.3", secondMessage.getHeaders().get("app-version"));
 
             // Confirm messages are tracked for ack.
             // The keys should be "msg1" and "msg2"

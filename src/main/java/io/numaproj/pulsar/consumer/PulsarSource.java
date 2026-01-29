@@ -1,6 +1,7 @@
 package io.numaproj.pulsar.consumer;
 
 import io.numaproj.numaflow.sourcer.AckRequest;
+import io.numaproj.numaflow.sourcer.NackRequest;
 import io.numaproj.numaflow.sourcer.Message;
 import io.numaproj.numaflow.sourcer.Offset;
 import io.numaproj.numaflow.sourcer.OutputObserver;
@@ -86,7 +87,10 @@ public class PulsarSource extends Sourcer {
                 byte[] offsetBytes = msgId.getBytes(StandardCharsets.UTF_8);
                 Offset offset = new Offset(offsetBytes);
 
-                Message message = new Message(pMsg.getValue(), offset, Instant.now());
+                
+                Map<String, String> headers = buildHeaders(pMsg);
+
+                Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
                 observer.send(message);
 
                 messagesToAck.put(msgId, pMsg);
@@ -133,6 +137,38 @@ public class PulsarSource extends Sourcer {
                 log.warn("Requested message ID {} not found in the pending acks", messageIdKey);
             }
         }
+    }
+
+    /**
+     * Builds headers from Pulsar message metadata
+     */
+    private Map<String, String> buildHeaders(org.apache.pulsar.client.api.Message<byte[]> pulsarMessage) {
+        Map<String, String> headers = new HashMap<>();
+
+        headers.put(NumaHeaderKeys.PULSAR_PRODUCER_NAME, pulsarMessage.getProducerName());
+        headers.put(NumaHeaderKeys.PULSAR_MESSAGE_ID, pulsarMessage.getMessageId().toString());
+        headers.put(NumaHeaderKeys.PULSAR_TOPIC_NAME, pulsarMessage.getTopicName());
+        headers.put(NumaHeaderKeys.PULSAR_PUBLISH_TIME, String.valueOf(pulsarMessage.getPublishTime()));
+        headers.put(NumaHeaderKeys.PULSAR_EVENT_TIME, String.valueOf(pulsarMessage.getEventTime()));
+        headers.put(NumaHeaderKeys.PULSAR_REDELIVERY_COUNT, String.valueOf(pulsarMessage.getRedeliveryCount()));
+
+        // Add message properties as headers
+        if (pulsarMessage.getProperties() != null && !pulsarMessage.getProperties().isEmpty()) {
+            pulsarMessage.getProperties().forEach((key, value) -> {
+                if (key != null && value != null) {
+                    headers.put(key, value);
+                }
+            });
+        }
+
+        log.trace("Message headers: {}", headers);
+        return headers;
+    }
+
+    @Override
+    public void nack(NackRequest request) {
+        // TODO : implement nack logic
+        throw new UnsupportedOperationException("Unimplemented method 'nack'");
     }
 
     @Override
