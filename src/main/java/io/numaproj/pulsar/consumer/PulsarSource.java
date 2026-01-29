@@ -8,7 +8,6 @@ import io.numaproj.numaflow.sourcer.OutputObserver;
 import io.numaproj.numaflow.sourcer.ReadRequest;
 import io.numaproj.numaflow.sourcer.Server;
 import io.numaproj.numaflow.sourcer.Sourcer;
-import io.numaproj.pulsar.common.Constants;
 import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 import lombok.extern.slf4j.Slf4j;
 
@@ -146,12 +145,12 @@ public class PulsarSource extends Sourcer {
     private Map<String, String> buildHeaders(org.apache.pulsar.client.api.Message<byte[]> pulsarMessage) {
         Map<String, String> headers = new HashMap<>();
 
-        headers.put(Constants.PULSAR_PRODUCER_NAME, pulsarMessage.getProducerName());
-        headers.put(Constants.PULSAR_MESSAGE_ID, pulsarMessage.getMessageId().toString());
-        headers.put(Constants.PULSAR_TOPIC_NAME, pulsarMessage.getTopicName());
-        headers.put(Constants.PULSAR_PUBLISH_TIME, String.valueOf(pulsarMessage.getPublishTime()));
-        headers.put(Constants.PULSAR_EVENT_TIME, String.valueOf(pulsarMessage.getEventTime()));
-        headers.put(Constants.PULSAR_REDELIVERY_COUNT, String.valueOf(pulsarMessage.getRedeliveryCount()));
+        headers.put(NumaHeaderKeys.PULSAR_PRODUCER_NAME, pulsarMessage.getProducerName());
+        headers.put(NumaHeaderKeys.PULSAR_MESSAGE_ID, pulsarMessage.getMessageId().toString());
+        headers.put(NumaHeaderKeys.PULSAR_TOPIC_NAME, pulsarMessage.getTopicName());
+        headers.put(NumaHeaderKeys.PULSAR_PUBLISH_TIME, String.valueOf(pulsarMessage.getPublishTime()));
+        headers.put(NumaHeaderKeys.PULSAR_EVENT_TIME, String.valueOf(pulsarMessage.getEventTime()));
+        headers.put(NumaHeaderKeys.PULSAR_REDELIVERY_COUNT, String.valueOf(pulsarMessage.getRedeliveryCount()));
 
         // Add message properties as headers
         if (pulsarMessage.getProperties() != null && !pulsarMessage.getProperties().isEmpty()) {
