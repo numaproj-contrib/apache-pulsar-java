@@ -165,6 +165,20 @@ public class PulsarSourceTest {
             when(msg2.getMessageId()).thenReturn(msgId2);
             when(msg1.getValue()).thenReturn("Hello".getBytes(StandardCharsets.UTF_8));
             when(msg2.getValue()).thenReturn("World".getBytes(StandardCharsets.UTF_8));
+            
+            // Stub metadata methods required by buildHeaders()
+            when(msg1.getProducerName()).thenReturn("test-producer");
+            when(msg2.getProducerName()).thenReturn("test-producer");
+            when(msg1.getTopicName()).thenReturn("test-topic");
+            when(msg2.getTopicName()).thenReturn("test-topic");
+            when(msg1.getPublishTime()).thenReturn(1000L);
+            when(msg2.getPublishTime()).thenReturn(2000L);
+            when(msg1.getEventTime()).thenReturn(1000L);
+            when(msg2.getEventTime()).thenReturn(2000L);
+            when(msg1.getRedeliveryCount()).thenReturn(0);
+            when(msg2.getRedeliveryCount()).thenReturn(0);
+            when(msg1.getProperties()).thenReturn(Collections.emptyMap());
+            when(msg2.getProperties()).thenReturn(Collections.emptyMap());
 
             // Create a fake Messages<byte[]> object
             Messages<byte[]> messages = mock(Messages.class);
@@ -189,9 +203,30 @@ public class PulsarSourceTest {
             verify(observer, times(2)).send(messageCaptor.capture());
             java.util.List<Message> sentMessages = messageCaptor.getAllValues();
             assertEquals(2, sentMessages.size());
+            
             // Validate contents of messages using getValue().
             assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
             assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
+
+            // Verify headers are correctly populated for first message
+            Message firstMessage = sentMessages.get(0);
+            assertNotNull("Headers should not be null", firstMessage.getHeaders());
+            assertEquals("test-producer", firstMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg1", firstMessage.getHeaders().get("x-pulsar-message-id"));
+            assertEquals("test-topic", firstMessage.getHeaders().get("x-pulsar-topic-name"));
+            assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-publish-time"));
+            assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-event-time"));
+            assertEquals("0", firstMessage.getHeaders().get("x-pulsar-redelivery-count"));
+
+            // Verify headers are correctly populated for second message
+            Message secondMessage = sentMessages.get(1);
+            assertNotNull("Headers should not be null", secondMessage.getHeaders());
+            assertEquals("test-producer", secondMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg2", secondMessage.getHeaders().get("x-pulsar-message-id"));
+            assertEquals("test-topic", secondMessage.getHeaders().get("x-pulsar-topic-name"));
+            assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-publish-time"));
+            assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-event-time"));
+            assertEquals("0", secondMessage.getHeaders().get("x-pulsar-redelivery-count"));
 
             // Confirm messages are tracked for ack.
             // The keys should be "msg1" and "msg2"
@@ -201,6 +236,76 @@ public class PulsarSourceTest {
             assertTrue(ackMap.containsKey("msg2"));
         } catch (PulsarClientException e) {
             fail("Unexpected PulsarClientException thrown in testReadWhenMessagesReceived: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Test that custom message properties are included in headers.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWhenMessagesWithCustomProperties() {
+        try {
+            // Clear messagesToAck
+            java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils
+                    .getField(pulsarSource, "messagesToAck");
+            messagesToAck.clear();
+
+            // Setup a message with custom properties
+            org.apache.pulsar.client.api.Message<byte[]> msg = mock(org.apache.pulsar.client.api.Message.class);
+            MessageId msgId = mock(MessageId.class);
+            when(msgId.toString()).thenReturn("msg1");
+            when(msg.getMessageId()).thenReturn(msgId);
+            when(msg.getValue()).thenReturn("Test".getBytes(StandardCharsets.UTF_8));
+            
+            // Stub metadata methods
+            when(msg.getProducerName()).thenReturn("test-producer");
+            when(msg.getTopicName()).thenReturn("test-topic");
+            when(msg.getPublishTime()).thenReturn(1000L);
+            when(msg.getEventTime()).thenReturn(1000L);
+            when(msg.getRedeliveryCount()).thenReturn(0);
+            
+            // Add custom properties
+            Map<String, String> customProps = new HashMap<>();
+            customProps.put("custom-key-1", "custom-value-1");
+            customProps.put("custom-key-2", "custom-value-2");
+            customProps.put("app-version", "1.2.3");
+            when(msg.getProperties()).thenReturn(customProps);
+
+            // Create a fake Messages object
+            Messages<byte[]> messages = mock(Messages.class);
+            when(messages.size()).thenReturn(1);
+            when(messages.iterator()).thenReturn(Collections.singletonList(msg).iterator());
+
+            // Stub consumerManager and consumer behavior
+            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn(consumerMock);
+            when(consumerMock.batchReceive()).thenReturn(messages);
+
+            // Create request and observer
+            ReadRequest readRequest = mock(ReadRequest.class);
+            when(readRequest.getCount()).thenReturn(10L);
+            when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+            OutputObserver observer = mock(OutputObserver.class);
+
+            pulsarSource.read(readRequest, observer);
+
+            // Capture the sent message
+            ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+            verify(observer, times(1)).send(messageCaptor.capture());
+            Message sentMessage = messageCaptor.getValue();
+
+            // Verify standard headers are present
+            assertNotNull("Headers should not be null", sentMessage.getHeaders());
+            assertEquals("test-producer", sentMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg1", sentMessage.getHeaders().get("x-pulsar-message-id"));
+            
+            // Verify custom properties are included in headers
+            assertEquals("custom-value-1", sentMessage.getHeaders().get("custom-key-1"));
+            assertEquals("custom-value-2", sentMessage.getHeaders().get("custom-key-2"));
+            assertEquals("1.2.3", sentMessage.getHeaders().get("app-version"));
+
+        } catch (PulsarClientException e) {
+            fail("Unexpected PulsarClientException thrown: " + e.getMessage());
         }
     }
 
