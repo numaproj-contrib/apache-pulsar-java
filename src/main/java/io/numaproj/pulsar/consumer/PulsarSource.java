@@ -137,11 +137,8 @@ public class PulsarSource extends Sourcer {
         }
         try {
             Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
-            long startBatch = System.nanoTime();
             consumer.acknowledge(messageIds);
-            long endBatch = System.nanoTime();
-            double latencyMs = (endBatch - startBatch) / 1_000_000.0;
-            log.info("BATCH ACK: {} messages in {} ms", messageIds.size(), String.format("%.2f", latencyMs));
+            messageIdKeysToRemove.forEach(messagesToAck::remove);
             log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
             log.error("Failed to acknowledge Pulsar message", e);
