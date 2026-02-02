@@ -119,22 +119,13 @@ public class PulsarSource extends Sourcer {
             // Return early without processing the ack to prevent any inconsistent state
             return;
         }
- 
+
+        // because request key values and messsages to ack key values already match, can directly iterate over the messagesToAck map values to get the message ids
         List<MessageId> messageIds = new ArrayList<MessageId>();
-        List<String> messageIdKeysToRemove = new ArrayList<String>();
-
-        for (Map.Entry<String, Offset> entry : requestOffsetMap.entrySet()) {
-            String messageIdKey = entry.getKey();
-            org.apache.pulsar.client.api.Message<byte[]> pMsg = messagesToAck.get(messageIdKey);
-
-            if (pMsg != null) {             
-                messageIds.add(pMsg.getMessageId());
-                messageIdKeysToRemove.add(messageIdKey);
-                
-            } else {
-                log.warn("Requested message ID {} not found in the pending acks", messageIdKey);
-            }
+        for (org.apache.pulsar.client.api.Message<byte[]> pMsg : messagesToAck.values()) {
+            messageIds.add(pMsg.getMessageId());
         }
+
         try {
             Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
             consumer.acknowledge(messageIds);
@@ -142,7 +133,7 @@ public class PulsarSource extends Sourcer {
         } catch (PulsarClientException e) {
             log.error("Failed to acknowledge Pulsar messages", e);
         }
-        messageIdKeysToRemove.forEach(messagesToAck::remove);
+        messagesToAck.clear();
     }
 
     /**
