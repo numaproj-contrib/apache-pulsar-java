@@ -138,10 +138,9 @@ public class PulsarSource extends Sourcer {
         try {
             Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
             consumer.acknowledge(messageIds);
-            messageIdKeysToRemove.forEach(messagesToAck::remove);
             log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
-            log.error("Failed to acknowledge Pulsar message", e);
+            log.error("Failed to acknowledge Pulsar messages", e);
         }
         messageIdKeysToRemove.forEach(messagesToAck::remove);
     }
