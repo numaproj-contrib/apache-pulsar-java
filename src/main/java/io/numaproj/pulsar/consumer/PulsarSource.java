@@ -12,6 +12,7 @@ import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.admin.PulsarAdmin;
@@ -118,25 +119,34 @@ public class PulsarSource extends Sourcer {
             // Return early without processing the ack to prevent any inconsistent state
             return;
         }
+ 
+        List<MessageId> messageIds = new ArrayList<MessageId>();
+        List<String> messageIdKeysToRemove = new ArrayList<String>();
 
-        // If the check passed, process each ack request
         for (Map.Entry<String, Offset> entry : requestOffsetMap.entrySet()) {
             String messageIdKey = entry.getKey();
             org.apache.pulsar.client.api.Message<byte[]> pMsg = messagesToAck.get(messageIdKey);
-            if (pMsg != null) {
-                try {
-                    Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
-                    consumer.acknowledge(pMsg);
-                    log.info("Acknowledged Pulsar message with ID: {} and payload: {}",
-                            messageIdKey, new String(pMsg.getValue(), StandardCharsets.UTF_8));
-                } catch (PulsarClientException e) {
-                    log.error("Failed to acknowledge Pulsar message", e);
-                }
-                messagesToAck.remove(messageIdKey);
+
+            if (pMsg != null) {             
+                messageIds.add(pMsg.getMessageId());
+                messageIdKeysToRemove.add(messageIdKey);
+                
             } else {
                 log.warn("Requested message ID {} not found in the pending acks", messageIdKey);
             }
         }
+        try {
+            Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
+            long startBatch = System.nanoTime();
+            consumer.acknowledge(messageIds);
+            long endBatch = System.nanoTime();
+            double latencyMs = (endBatch - startBatch) / 1_000_000.0;
+            log.info("BATCH ACK: {} messages in {} ms", messageIds.size(), String.format("%.2f", latencyMs));
+            log.info("Successfully acknowledged {} messages", messageIds.size());
+        } catch (PulsarClientException e) {
+            log.error("Failed to acknowledge Pulsar message", e);
+        }
+        messageIdKeysToRemove.forEach(messagesToAck::remove);
     }
 
     /**
