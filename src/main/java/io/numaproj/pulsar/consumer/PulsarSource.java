@@ -121,10 +121,9 @@ public class PulsarSource extends Sourcer {
         }
 
         // because request key values and messsages to ack key values already match, can directly iterate over the messagesToAck map values to get the message ids
-        List<MessageId> messageIds = new ArrayList<MessageId>();
-        for (org.apache.pulsar.client.api.Message<byte[]> pMsg : messagesToAck.values()) {
-            messageIds.add(pMsg.getMessageId());
-        }
+        List<MessageId> messageIds = messagesToAck.values().stream()
+            .map(org.apache.pulsar.client.api.Message::getMessageId)
+            .toList();
 
         try {
             Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
