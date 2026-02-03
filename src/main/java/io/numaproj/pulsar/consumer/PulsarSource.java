@@ -12,6 +12,7 @@ import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.admin.PulsarAdmin;
@@ -119,24 +120,19 @@ public class PulsarSource extends Sourcer {
             return;
         }
 
-        // If the check passed, process each ack request
-        for (Map.Entry<String, Offset> entry : requestOffsetMap.entrySet()) {
-            String messageIdKey = entry.getKey();
-            org.apache.pulsar.client.api.Message<byte[]> pMsg = messagesToAck.get(messageIdKey);
-            if (pMsg != null) {
-                try {
-                    Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
-                    consumer.acknowledge(pMsg);
-                    log.info("Acknowledged Pulsar message with ID: {} and payload: {}",
-                            messageIdKey, new String(pMsg.getValue(), StandardCharsets.UTF_8));
-                } catch (PulsarClientException e) {
-                    log.error("Failed to acknowledge Pulsar message", e);
-                }
-                messagesToAck.remove(messageIdKey);
-            } else {
-                log.warn("Requested message ID {} not found in the pending acks", messageIdKey);
-            }
+        // because request key values and messsages to ack key values already match, can directly iterate over the messagesToAck map values to get the message ids
+        List<MessageId> messageIds = messagesToAck.values().stream()
+            .map(org.apache.pulsar.client.api.Message::getMessageId)
+            .toList();
+
+        try {
+            Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
+            consumer.acknowledge(messageIds);
+            log.info("Successfully acknowledged {} messages", messageIds.size());
+        } catch (PulsarClientException e) {
+            log.error("Failed to acknowledge Pulsar messages", e);
         }
+        messagesToAck.clear();
     }
 
     /**

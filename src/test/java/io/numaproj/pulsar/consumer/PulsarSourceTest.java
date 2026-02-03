@@ -284,8 +284,8 @@ public class PulsarSourceTest {
 
             pulsarSource.ack(ackRequest);
 
-            // Verify that consumer.acknowledge is called on the message.
-            verify(consumerMock, times(1)).acknowledge(msg);
+            // Verify that consumer.acknowledge is called with a list containing the message ID.
+            verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
             // Verify that the messagesToAck map is now empty.
             assertFalse(messagesToAck.containsKey("ackMsg"));
         } catch (PulsarClientException e) {
