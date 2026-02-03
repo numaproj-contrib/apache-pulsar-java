@@ -5,6 +5,10 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.ProducerBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.client.admin.Topics;
+import org.apache.pulsar.common.policies.data.TopicStats;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -18,6 +22,7 @@ import io.numaproj.pulsar.config.client.PulsarClientProperties;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -39,6 +44,8 @@ public class PulsarProducerConfigTest {
     private PulsarProducerProperties mockProducerProperties;
     private ProducerBuilder<byte[]> mockProducerBuilder;
     private Producer<byte[]> mockProducer;
+    private PulsarAdmin mockAdmin;
+    private Topics mockTopics;
 
     @Before
     public void setUp() throws Exception {
@@ -48,6 +55,8 @@ public class PulsarProducerConfigTest {
 
         mockProducerProperties = mock(PulsarProducerProperties.class);
         mockClient = mock(PulsarClient.class);
+        mockAdmin = mock(PulsarAdmin.class);
+        mockTopics = mock(Topics.class);
 
         spiedConfig = spy(pulsarProducerConfig);
         PulsarClientConfig mockClientConfig = mock(PulsarClientConfig.class);
@@ -62,6 +71,9 @@ public class PulsarProducerConfigTest {
         when(mockClient.newProducer(Schema.BYTES)).thenReturn(mockProducerBuilder);
         when(mockProducerBuilder.create()).thenReturn(mockProducer);
         when(mockProducerBuilder.loadConf(anyMap())).thenReturn(mockProducerBuilder);
+        
+        when(mockAdmin.topics()).thenReturn(mockTopics);
+        when(mockTopics.getStats(anyString(), anyBoolean())).thenReturn(mock(TopicStats.class));
     }
 
     @After
@@ -73,6 +85,8 @@ public class PulsarProducerConfigTest {
         mockProducerBuilder = null;
         mockProducer = null;
         mockEnvironment = null;
+        mockAdmin = null;
+        mockTopics = null;
     }
     // Test to successfully create Producer bean with valid configuration properties
     @Test
@@ -81,10 +95,11 @@ public class PulsarProducerConfigTest {
         producerConfig.put("topicName", "test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
 
-        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
 
         assertNotNull("Producer should be created", producer);
 
+        verify(mockTopics).getStats("test-topic", true);
         verify(mockProducerBuilder).loadConf(argThat(map -> "test-topic".equals(map.get("topicName"))));
         verify(mockProducerBuilder).create();
         verify(mockProducerProperties).getProducerConfig();
@@ -96,15 +111,11 @@ public class PulsarProducerConfigTest {
     public void pulsarProducer_missingTopicName_throwsException() throws Exception {
         when(mockProducerProperties.getProducerConfig()).thenReturn(new HashMap<>());
 
-        String expectedErrorSubstring = "Topic name must be set on the producer builder";
-        when(mockProducerBuilder.create())
-                .thenThrow(new IllegalArgumentException(expectedErrorSubstring));
-
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> pulsarProducerConfig.pulsarProducer(mockClient, mockProducerProperties));
+                () -> pulsarProducerConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin));
 
-        assertTrue(exception.getMessage().contains(expectedErrorSubstring));
+        assertTrue(exception.getMessage().contains("Topic name must be configured in producer config"));
     }
 
     // Test for environment variable is set, and user does NOT specify producerName
@@ -117,7 +128,7 @@ public class PulsarProducerConfigTest {
         emptyConfig.put("topicName", "test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(emptyConfig);
 
-        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
 
         assertNotNull(producer);
         // Check that the "producerName" is set to envPodName
@@ -137,7 +148,7 @@ public class PulsarProducerConfigTest {
         userConfig.put("topicName", "test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(userConfig);
 
-        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
 
         assertNotNull(producer);
         ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
@@ -156,7 +167,7 @@ public class PulsarProducerConfigTest {
         emptyConfig.put("topicName", "test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(emptyConfig);
 
-        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties);
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
 
         assertNotNull(producer);
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -165,5 +176,54 @@ public class PulsarProducerConfigTest {
         String producerName = (String) captor.getValue().get("producerName");
         assertNotNull("Producer name should not be null", producerName);
         assertTrue("Producer name should start with 'pod-'", producerName.startsWith("pod-"));
+    }
+
+    // Test for topic that does not exist - should throw IllegalStateException
+    @Test
+    public void pulsarProducer_topicDoesNotExist_throwsException() throws Exception {
+        Map<String, Object> producerConfig = new HashMap<>();
+        producerConfig.put("topicName", "non-existent-topic");
+        when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
+
+        PulsarAdminException.NotFoundException notFoundException = 
+                new PulsarAdminException.NotFoundException(new Exception("Not found"), "Topic not found", 404);
+        when(mockTopics.getStats(eq("non-existent-topic"), anyBoolean()))
+                .thenThrow(notFoundException);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin));
+
+        assertTrue("Error message should contain topic name", 
+                exception.getMessage().contains("non-existent-topic"));
+        assertTrue("Error message should indicate topic doesn't exist", 
+                exception.getMessage().contains("does not exist"));
+        
+        verify(mockTopics).getStats("non-existent-topic", true);
+        // Verify that producer was never created
+        verify(mockProducerBuilder, never()).create();
+    }
+
+    // Test for other PulsarAdminException during topic validation
+    @Test
+    public void pulsarProducer_topicValidationFails_throwsRuntimeException() throws Exception {
+        Map<String, Object> producerConfig = new HashMap<>();
+        producerConfig.put("topicName", "test-topic");
+        when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
+
+        PulsarAdminException adminException = new PulsarAdminException(new Exception("Connection error"));
+        when(mockTopics.getStats(eq("test-topic"), anyBoolean()))
+                .thenThrow(adminException);
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin));
+
+        assertTrue("Error message should indicate verification failure", 
+                exception.getMessage().contains("Failed to verify topic existence"));
+        
+        verify(mockTopics).getStats("test-topic", true);
+        // Verify that producer was never created
+        verify(mockProducerBuilder, never()).create();
     }
 }
