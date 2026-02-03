@@ -8,7 +8,6 @@ import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.admin.Topics;
-import org.apache.pulsar.common.policies.data.TopicStats;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -22,7 +21,6 @@ import io.numaproj.pulsar.config.client.PulsarClientProperties;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -73,7 +71,8 @@ public class PulsarProducerConfigTest {
         when(mockProducerBuilder.loadConf(anyMap())).thenReturn(mockProducerBuilder);
         
         when(mockAdmin.topics()).thenReturn(mockTopics);
-        when(mockTopics.getStats(anyString(), anyBoolean())).thenReturn(mock(TopicStats.class));
+        // By default, return a list with a test topic for validation (in tenant/namespace format)
+        when(mockTopics.getList(anyString())).thenReturn(java.util.List.of("persistent://tenant/namespace/test-topic"));
     }
 
     @After
@@ -92,15 +91,19 @@ public class PulsarProducerConfigTest {
     @Test
     public void pulsarProducer_validConfig() throws Exception {
         Map<String, Object> producerConfig = new HashMap<>();
-        producerConfig.put("topicName", "test-topic");
+        producerConfig.put("topicName", "persistent://tenant/namespace/test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
+        
+        // Simulate topic exists in the list
+        when(mockTopics.getList(eq("tenant/namespace")))
+                .thenReturn(java.util.List.of("persistent://tenant/namespace/test-topic"));
 
         Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
 
         assertNotNull("Producer should be created", producer);
 
-        verify(mockTopics).getStats("test-topic", true);
-        verify(mockProducerBuilder).loadConf(argThat(map -> "test-topic".equals(map.get("topicName"))));
+        verify(mockTopics).getList("tenant/namespace");
+        verify(mockProducerBuilder).loadConf(argThat(map -> "persistent://tenant/namespace/test-topic".equals(map.get("topicName"))));
         verify(mockProducerBuilder).create();
         verify(mockProducerProperties).getProducerConfig();
     }
@@ -117,6 +120,20 @@ public class PulsarProducerConfigTest {
 
         assertTrue(exception.getMessage().contains("Topic name must be configured in producer config"));
     }
+    
+    // Test for invalid topic name format
+    @Test
+    public void pulsarProducer_invalidTopicFormat_throwsException() throws Exception {
+        Map<String, Object> producerConfig = new HashMap<>();
+        producerConfig.put("topicName", "invalid-topic");  // Missing persistent:// prefix
+        when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin));
+
+        assertTrue(exception.getMessage().contains("Invalid topic name format"));
+    }
 
     // Test for environment variable is set, and user does NOT specify producerName
     @Test
@@ -125,7 +142,7 @@ public class PulsarProducerConfigTest {
         when(mockEnvironment.getProperty(eq("NUMAFLOW_POD"), anyString())).thenReturn(envPodName);
 
         Map<String, Object> emptyConfig = new HashMap<>();
-        emptyConfig.put("topicName", "test-topic");
+        emptyConfig.put("topicName", "persistent://tenant/namespace/test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(emptyConfig);
 
         Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
@@ -145,7 +162,7 @@ public class PulsarProducerConfigTest {
 
         Map<String, Object> userConfig = new HashMap<>();
         userConfig.put("producerName", "userProvidedName");
-        userConfig.put("topicName", "test-topic");
+        userConfig.put("topicName", "persistent://tenant/namespace/test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(userConfig);
 
         Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
@@ -164,7 +181,7 @@ public class PulsarProducerConfigTest {
             .thenAnswer(invocation -> invocation.getArgument(1));
 
         Map<String, Object> emptyConfig = new HashMap<>();
-        emptyConfig.put("topicName", "test-topic");
+        emptyConfig.put("topicName", "persistent://tenant/namespace/test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(emptyConfig);
 
         Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
@@ -182,13 +199,12 @@ public class PulsarProducerConfigTest {
     @Test
     public void pulsarProducer_topicDoesNotExist_throwsException() throws Exception {
         Map<String, Object> producerConfig = new HashMap<>();
-        producerConfig.put("topicName", "non-existent-topic");
+        producerConfig.put("topicName", "persistent://tenant/namespace/non-existent-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
 
-        PulsarAdminException.NotFoundException notFoundException = 
-                new PulsarAdminException.NotFoundException(new Exception("Not found"), "Topic not found", 404);
-        when(mockTopics.getStats(eq("non-existent-topic"), anyBoolean()))
-                .thenThrow(notFoundException);
+        // Return empty list (no topics exist in namespace)
+        when(mockTopics.getList(eq("tenant/namespace")))
+                .thenReturn(java.util.Collections.emptyList());
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
@@ -199,8 +215,7 @@ public class PulsarProducerConfigTest {
         assertTrue("Error message should indicate topic doesn't exist", 
                 exception.getMessage().contains("does not exist"));
         
-        verify(mockTopics).getStats("non-existent-topic", true);
-        // Verify that producer was never created
+        verify(mockTopics).getList("tenant/namespace");
         verify(mockProducerBuilder, never()).create();
     }
 
@@ -208,11 +223,11 @@ public class PulsarProducerConfigTest {
     @Test
     public void pulsarProducer_topicValidationFails_throwsRuntimeException() throws Exception {
         Map<String, Object> producerConfig = new HashMap<>();
-        producerConfig.put("topicName", "test-topic");
+        producerConfig.put("topicName", "persistent://tenant/namespace/test-topic");
         when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
 
         PulsarAdminException adminException = new PulsarAdminException(new Exception("Connection error"));
-        when(mockTopics.getStats(eq("test-topic"), anyBoolean()))
+        when(mockTopics.getList(eq("tenant/namespace")))
                 .thenThrow(adminException);
 
         RuntimeException exception = assertThrows(
@@ -222,8 +237,26 @@ public class PulsarProducerConfigTest {
         assertTrue("Error message should indicate verification failure", 
                 exception.getMessage().contains("Failed to verify topic existence"));
         
-        verify(mockTopics).getStats("test-topic", true);
+        verify(mockTopics).getList("tenant/namespace");
         // Verify that producer was never created
         verify(mockProducerBuilder, never()).create();
+    }
+    
+    // Test for partitioned topic that exists (happy path)
+    @Test
+    public void pulsarProducer_partitionedTopicExists() throws Exception {
+        Map<String, Object> producerConfig = new HashMap<>();
+        producerConfig.put("topicName", "persistent://tenant/namespace/partitioned-topic");
+        when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
+
+        // Simulate partitioned topic by returning partition-0 in the list
+        when(mockTopics.getList(eq("tenant/namespace")))
+                .thenReturn(java.util.List.of("persistent://tenant/namespace/partitioned-topic-partition-0"));
+
+        Producer<byte[]> producer = spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin);
+
+        assertNotNull("Producer should be created", producer);
+        verify(mockTopics).getList("tenant/namespace");
+        verify(mockProducerBuilder).create();
     }
 }

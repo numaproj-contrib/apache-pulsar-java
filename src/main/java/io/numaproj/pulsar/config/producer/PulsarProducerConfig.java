@@ -37,26 +37,48 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
+        // Validate that the topic configured in the producer config 
         String topicName = (String) producerConfig.get("topicName");
         if (topicName == null || topicName.trim().isEmpty()) {
             throw new IllegalArgumentException("Topic name must be configured in producer config");
         }
 
-        try {
-            // Check if topic exists by getting stats - works for both partitioned and non-partitioned topics
-            pulsarAdmin.topics().getStats(topicName, true);
-            log.info("Topic '{}' exists, proceeding with producer creation", topicName);
-        } catch (PulsarAdminException.NotFoundException e) {
-            String errorMsg = String.format("Topic '%s' does not exist. Please create the topic before starting the producer.", topicName);
-            log.error(errorMsg);
-            throw new IllegalStateException(errorMsg, e);
-        } catch (PulsarAdminException e) {
-            log.error("Failed to verify topic existence for '{}'", topicName, e);
-            throw new RuntimeException("Failed to verify topic existence", e);
-        }
+        validateTopicExists(pulsarAdmin, topicName);
 
         return pulsarClient.newProducer(Schema.BYTES)
                 .loadConf(producerConfig)
                 .create();
+    }
+
+    private void validateTopicExists(PulsarAdmin pulsarAdmin, String topicName) {
+        try {
+            // Extract namespace from topic name: persistent://tenant/namespace/topic
+            String[] parts = topicName.split("/");
+            if (parts.length < 4) {
+                throw new IllegalArgumentException("Invalid topic name format: " + topicName);
+            }
+            String namespace = parts[2] + "/" + parts[3];
+            
+            // List all topics in the namespace - works for both partitioned and non-partitioned
+            java.util.List<String> topics = pulsarAdmin.topics().getList(namespace);
+            
+            // Check if topic exists (exact match for non-partitioned, or partition-0 for partitioned)
+            boolean topicExists = topics.contains(topicName) || 
+                                  topics.stream().anyMatch(t -> t.startsWith(topicName + "-partition-"));
+            
+            if (topicExists) {
+                log.info("Topic '{}' exists", topicName);
+                return;
+            }
+            
+            String errorMsg = String.format("Topic '%s' does not exist. Please create the topic before starting the producer.", topicName);
+            log.error(errorMsg);
+            throw new IllegalStateException(errorMsg);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            throw e;
+        } catch (PulsarAdminException e) {
+            log.error("Failed to verify topic existence for '{}'", topicName, e);
+            throw new RuntimeException("Failed to verify topic existence", e);
+        }
     }
 }
