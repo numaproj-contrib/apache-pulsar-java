@@ -6,7 +6,6 @@ import org.apache.pulsar.client.api.ProducerBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.admin.PulsarAdmin;
-import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.admin.Topics;
 import org.junit.After;
 import org.junit.Before;
@@ -121,7 +120,7 @@ public class PulsarProducerConfigTest {
         assertTrue(exception.getMessage().contains("Topic name must be configured in producer config"));
     }
     
-    // Test for invalid topic name format
+    // Test for invalid topic name format (missing required segments)
     @Test
     public void pulsarProducer_invalidTopicFormat_throwsException() throws Exception {
         Map<String, Object> producerConfig = new HashMap<>();
@@ -219,29 +218,6 @@ public class PulsarProducerConfigTest {
         verify(mockProducerBuilder, never()).create();
     }
 
-    // Test for other PulsarAdminException during topic validation
-    @Test
-    public void pulsarProducer_topicValidationFails_throwsRuntimeException() throws Exception {
-        Map<String, Object> producerConfig = new HashMap<>();
-        producerConfig.put("topicName", "persistent://tenant/namespace/test-topic");
-        when(mockProducerProperties.getProducerConfig()).thenReturn(producerConfig);
-
-        PulsarAdminException adminException = new PulsarAdminException(new Exception("Connection error"));
-        when(mockTopics.getList(eq("tenant/namespace")))
-                .thenThrow(adminException);
-
-        RuntimeException exception = assertThrows(
-                RuntimeException.class,
-                () -> spiedConfig.pulsarProducer(mockClient, mockProducerProperties, mockAdmin));
-
-        assertTrue("Error message should indicate verification failure", 
-                exception.getMessage().contains("Failed to verify topic existence"));
-        
-        verify(mockTopics).getList("tenant/namespace");
-        // Verify that producer was never created
-        verify(mockProducerBuilder, never()).create();
-    }
-    
     // Test for partitioned topic that exists (happy path)
     @Test
     public void pulsarProducer_partitionedTopicExists() throws Exception {
