@@ -9,7 +9,7 @@ data:
       pulsar:
         client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
           clientConfig:
-            serviceUrl: "insert pulsar+ssl:// ...." # brokerServiceUrl here 
+            serviceUrl: "https://pc-xxxxx.aws-use2-production-snci-pool-kid.streamnative.aws.snio.cloud" # Example HTTPS URL
             authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
             authParams: "${PULSAR_AUTH_TOKEN}"
             # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}" 
@@ -17,3 +17,9 @@ data:
           enabled: true
           producerConfig: 
             topicName: "persistent://public/default/test-topic"
+        admin: 
+          adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
+            serviceUrl: "https://pc-xxxxx.aws-use2-production-snci-pool-kid.streamnative.aws.snio.cloud" # Example HTTPS URL
+            authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
+            authParams: "${PULSAR_AUTH_TOKEN}"
+            # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}"

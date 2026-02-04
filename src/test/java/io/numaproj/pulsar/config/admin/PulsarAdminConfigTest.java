@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,5 +45,20 @@ public class PulsarAdminConfigTest {
         } catch (PulsarClientException e) { // PulsarClientException could be thrown by PulsarAdmin.builder()
             fail("Exception should not have been thrown: " + e.getMessage());
         }
+    }
+
+    // Test to ensure an error is thrown when admin config is empty
+    @Test
+    public void pulsarAdmin_emptyConfig_throwsException() {
+        // Empty config map
+        when(mockAdminProperties.getAdminConfig()).thenReturn(new HashMap<>());
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> pulsarAdminConfig.pulsarAdmin(mockAdminProperties));
+
+        assertTrue("Error message should indicate admin config is required",
+                exception.getMessage().contains("Pulsar admin configuration is required"));
+        verify(mockAdminProperties).getAdminConfig();
     }
 }

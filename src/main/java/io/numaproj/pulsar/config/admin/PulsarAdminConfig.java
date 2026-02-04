@@ -4,15 +4,21 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+
+import java.util.Map;
 
 @Configuration
 public class PulsarAdminConfig {
     @Bean
-    @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true", matchIfMissing = false)
     public PulsarAdmin pulsarAdmin(PulsarAdminProperties pulsarAdminProperties) throws PulsarClientException {
+        Map<String, Object> config = pulsarAdminProperties.getAdminConfig();
+        
+        if (config.isEmpty()) {
+            throw new IllegalStateException("Pulsar admin configuration is required but not provided");
+        }
+        
         return PulsarAdmin.builder()
-                .loadConf(pulsarAdminProperties.getAdminConfig())
+                .loadConf(config)
                 .build();
     }
 }

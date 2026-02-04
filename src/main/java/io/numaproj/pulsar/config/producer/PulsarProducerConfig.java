@@ -1,6 +1,8 @@
 package io.numaproj.pulsar.config.producer;
 
 import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +25,7 @@ public class PulsarProducerConfig {
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true", matchIfMissing = false)
-    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties)
+    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties, PulsarAdmin pulsarAdmin)
             throws Exception {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
         String producerName = "producerName";
@@ -35,8 +37,44 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
+        // Validate that the topic configured in the producer config 
+        String topicName = (String) producerConfig.get("topicName");
+        if (topicName == null || topicName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Topic name must be configured in producer config");
+        }
+
+        validateTopicExists(pulsarAdmin, topicName);
+
         return pulsarClient.newProducer(Schema.BYTES)
                 .loadConf(producerConfig)
                 .create();
+    }
+
+    private void validateTopicExists(PulsarAdmin pulsarAdmin, String topicName) throws PulsarAdminException {
+        // Extract namespace from topic name: (persistent|non-persistent)://tenant/namespace/topic
+        // Split gives: ["persistent:", "", "tenant", "namespace", "topic", ...]
+        // Note: Topic names can contain slashes (for backward compatibility), so parts.length can be > 5
+        String[] parts = topicName.split("/");
+        if (parts.length < 5) {
+            throw new IllegalArgumentException(
+                "Invalid topic name format: " + topicName + 
+                ". Expected format: (persistent|non-persistent)://tenant/namespace/topic"
+            );
+        }
+        String namespace = parts[2] + "/" + parts[3];
+        
+        // List all topics in the namespace - works for both partitioned and non-partitioned
+        java.util.List<String> topics = pulsarAdmin.topics().getList(namespace);
+        
+        // Check if topic exists (exact match for non-partitioned, or starts with topic-partition- for partitioned)
+        boolean topicExists = topics.stream()
+            .anyMatch(t -> t.equals(topicName) || t.startsWith(topicName + "-partition-"));
+        
+        if (topicExists) {
+            return;
+        }
+        
+        String errorMsg = String.format("Topic '%s' does not exist. Please create the topic before starting the producer.", topicName);
+        throw new IllegalStateException(errorMsg);
     }
 }
