@@ -210,13 +210,17 @@ public class PulsarSource extends Sourcer {
         return subscriptionStats != null ? subscriptionStats.getMsgBacklog() : 0;
     }
 
+    /**
+     * Returns partition indices for this source. Numaflow uses this list to decide which partitions
+     * exist for watermark publishing and scaling (same contract as Kafka-style multi-partition sources).
+     * We expose one integer per Pulsar partition across all configured topics as a flat list [0, 1, 2, ...].
+     */
     @Override
     public List<Integer> getPartitions() {
         try {
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
             List<Integer> partitionIndexes = new ArrayList<>();
             // Assign one integer per partition across all topics (e.g. topic A has 3 partitions -> 0,1,2; topic B has 2 -> 3,4).
-            // Numaflow expects this flat list; each index identifies a distinct partition.
             int globalIndex = 0;
             for (String topicName : topicNames) {
                 int numPartitions = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
