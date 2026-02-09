@@ -31,5 +31,8 @@ build/
 .vscode/
 .qodo
 
+### Local env ###
+.env
+
 ### Mac OS ###
 .DS_Store
