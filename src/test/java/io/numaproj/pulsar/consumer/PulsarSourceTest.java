@@ -241,11 +241,11 @@ public class PulsarSourceTest {
             assertEquals("1.2.3", secondMessage.getHeaders().get("app-version"));
 
             // Confirm messages are tracked for ack.
-            // The keys should be "msg1" and "msg2"
+            // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic support.
             java.util.Map<String, ?> ackMap = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
                     "messagesToAck");
-            assertTrue(ackMap.containsKey("msg1"));
-            assertTrue(ackMap.containsKey("msg2"));
+            assertTrue(ackMap.containsKey("test-topicmsg1"));
+            assertTrue(ackMap.containsKey("test-topicmsg2"));
         } catch (PulsarClientException e) {
             fail("Unexpected PulsarClientException thrown in testReadWhenMessagesReceived: " + e.getMessage());
         }
@@ -265,20 +265,22 @@ public class PulsarSourceTest {
             when(msg.getValue()).thenReturn("AckPayload".getBytes(StandardCharsets.UTF_8));
 
             // Insert the dummy message into the messagesToAck map.
+            // Key is topicName + messageId for multi-topic support.
+            String ackKey = "test-topicackMsg";
             @SuppressWarnings("unchecked")
             java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) ReflectionTestUtils
                     .getField(pulsarSource, "messagesToAck");
             messagesToAck.clear();
-            messagesToAck.put("ackMsg", msg);
+            messagesToAck.put(ackKey, msg);
 
             // Stub consumerManager to return consumerMock for the ack call.
             when(consumerManagerMock.getOrCreateConsumer(0, 0)).thenReturn(consumerMock);
 
-            // Create a fake AckRequest with an offset corresponding to the message id.
+            // Create a fake AckRequest with an offset corresponding to topicName+messageId.
             AckRequest ackRequest = new AckRequest() {
                 @Override
                 public java.util.List<Offset> getOffsets() {
-                    return Collections.singletonList(new Offset("ackMsg".getBytes(StandardCharsets.UTF_8)));
+                    return Collections.singletonList(new Offset(ackKey.getBytes(StandardCharsets.UTF_8)));
                 }
             };
 
@@ -287,7 +289,7 @@ public class PulsarSourceTest {
             // Verify that consumer.acknowledge is called with a list containing the message ID.
             verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
             // Verify that the messagesToAck map is now empty.
-            assertFalse(messagesToAck.containsKey("ackMsg"));
+            assertFalse(messagesToAck.containsKey(ackKey));
         } catch (PulsarClientException e) {
             fail("Unexpected PulsarClientException thrown in testAckSuccessful: " + e.getMessage());
         }
