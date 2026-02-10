@@ -11,10 +11,11 @@ import org.springframework.core.env.Environment;
 
 import jakarta.annotation.PostConstruct;
 
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -29,7 +30,8 @@ public class PulsarConsumerProperties {
 
     @PostConstruct
     public void init() {
-        // Pulsar expects topicNames to be type set, but the configMap accepts a string
+        // Pulsar expects topicNames to be type Set<String>. Config accepts a single string
+        // (one topic) or comma-separated topics (e.g. "topic1,topic2,topic3").
         String topicNameKey = "topicNames";
         if (consumerConfig.containsKey(topicNameKey)) {
             Object topicNameObj = consumerConfig.get(topicNameKey);
@@ -39,9 +41,15 @@ public class PulsarConsumerProperties {
                                 topicNameKey,
                                 topicNameObj == null ? "null" : topicNameObj.getClass().getName()));
             }
-            String topicName = (String) consumerConfig.remove(topicNameKey);
-            Set<String> topicNames = new HashSet<>();
-            topicNames.add(topicName);
+            String topicNamesStr = (String) consumerConfig.remove(topicNameKey);
+            Set<String> topicNames = Arrays.stream(topicNamesStr.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+            if (topicNames.isEmpty()) {
+                throw new IllegalArgumentException(
+                        String.format("Value for key '%s' must contain at least one non-empty topic name", topicNameKey));
+            }
             consumerConfig.put(topicNameKey, topicNames);
         }
 

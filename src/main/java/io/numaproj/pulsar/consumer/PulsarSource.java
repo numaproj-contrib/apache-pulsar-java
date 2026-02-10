@@ -37,7 +37,7 @@ import java.util.Set;
 @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class PulsarSource extends Sourcer {
 
-    // Map tracking received messages (keyed by Pulsar message ID string)
+    // Map tracking received messages (keyed by topicName + messageId for multi-topic support)
     private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = new HashMap<>();
 
     private Server server;
@@ -81,20 +81,23 @@ public class PulsarSource extends Sourcer {
 
             // Process each message in the batch.
             for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
+                String topicName = pMsg.getTopicName();
                 String msgId = pMsg.getMessageId().toString();
-                log.info("Consumed Pulsar message [id: {}]: {}", pMsg.getMessageId(),
+                String topicMessageIdKey = topicName + msgId;
+                
+                // TODO : change to .debug or .trace to reduce log noise
+                log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", topicName, pMsg.getMessageId(),
                         new String(pMsg.getValue(), StandardCharsets.UTF_8));
 
-                byte[] offsetBytes = msgId.getBytes(StandardCharsets.UTF_8);
+                byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
                 Offset offset = new Offset(offsetBytes);
 
-                
                 Map<String, String> headers = buildHeaders(pMsg);
 
                 Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
                 observer.send(message);
 
-                messagesToAck.put(msgId, pMsg);
+                messagesToAck.put(topicMessageIdKey, pMsg);
             }
         } catch (PulsarClientException e) {
             log.error("Failed to get consumer or receive messages from Pulsar", e);
@@ -104,15 +107,14 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void ack(AckRequest request) {
-        // Convert offsets to message ID strings for comparison
-        Map<String, Offset> requestOffsetMap = new HashMap<>(); // key: msgId, value: offset object
+        // Offsets are topicName + messageId (same as messagesToAck key).
+        Map<String, Offset> requestOffsetMap = new HashMap<>();
         request.getOffsets().forEach(offset -> {
-            // Offset value is a byte array so convert byte arr to string
-            String messageIdKey = new String(offset.getValue(), StandardCharsets.UTF_8);
-            requestOffsetMap.put(messageIdKey, offset);
+            String topicMessageIdKey = new String(offset.getValue(), StandardCharsets.UTF_8);
+            requestOffsetMap.put(topicMessageIdKey, offset);
         });
 
-        // Verify that the keys in messagesToAck match the message IDs from the request
+        // Verify that the keys in messagesToAck match the offsets from the request
         if (!messagesToAck.keySet().equals(requestOffsetMap.keySet())) {
             log.error("Mismatch in acknowledgment: internal pending IDs {} do not match requested ack IDs {}",
                     messagesToAck.keySet(), requestOffsetMap.keySet());
@@ -122,8 +124,8 @@ public class PulsarSource extends Sourcer {
 
         // because request key values and messsages to ack key values already match, can directly iterate over the messagesToAck map values to get the message ids
         List<MessageId> messageIds = messagesToAck.values().stream()
-            .map(org.apache.pulsar.client.api.Message::getMessageId)
-            .toList();
+                .map(org.apache.pulsar.client.api.Message::getMessageId)
+                .toList();
 
         try {
             Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
@@ -170,74 +172,74 @@ public class PulsarSource extends Sourcer {
     @Override
     public long getPending() {
         try {
-            // TODO - If changing to support multiple topics, we need to update this
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            String topicName = topicNames.iterator().next(); // Assumes there is only one topic name in the set
             String subscriptionName = (String) pulsarConsumerProperties.getConsumerConfig().get("subscriptionName");
 
-            int partitionCount = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
-            if (partitionCount > 0) {
-                // Topic is partitioned, so we should use partitionedStats
-                var partitionedStats = pulsarAdmin.topics().getPartitionedStats(topicName, false);
-                // If the subscription exists at the partitioned level, get its aggregated
-                // backlog
-                if (partitionedStats.getSubscriptions().containsKey(subscriptionName)) {
-                    long backlog = partitionedStats.getSubscriptions().get(subscriptionName).getMsgBacklog();
-                    log.info("Number of messages in the backlog (partitioned) for subscription {}: {}",
-                            subscriptionName, backlog);
-                    return backlog;
-                } else {
-                    // If subscription not found at top-level stats, sum the backlog across each
-                    // partition
-                    long totalBacklog = partitionedStats.getPartitions().values().stream()
-                            .mapToLong(ts -> {
-                                var subStats = ts.getSubscriptions().get(subscriptionName);
-                                return (subStats != null) ? subStats.getMsgBacklog() : 0;
-                            })
-                            .sum();
-                    log.info("Number of messages in the backlog (partitioned sum) for subscription {}: {}",
-                            subscriptionName,
-                            totalBacklog);
-                    return totalBacklog;
-                }
-            } else {
-                // Non-partitioned topic–safe to call getStats directly
-                TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
-                SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
-                log.info("Number of messages in the backlog: {}", subscriptionStats.getMsgBacklog());
-                return subscriptionStats.getMsgBacklog();
+            long totalBacklog = 0;
+            for (String topicName : topicNames) {
+                totalBacklog += getBacklogForTopic(topicName, subscriptionName);
             }
-
+            log.info("Total messages in backlog across {} topic(s) for subscription {}: {}",
+                    topicNames.size(), subscriptionName, totalBacklog);
+            return totalBacklog;
         } catch (PulsarAdminException e) {
             log.error("Error while fetching admin stats for pending messages", e);
-            // Return a negative value to indicate no pending information
             return -1;
         }
     }
 
+    private long getBacklogForTopic(String topicName, String subscriptionName) throws PulsarAdminException {
+        var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
+        int partitionCount = (metadata != null) ? metadata.partitions : 0;
+        // Topic is partitioned, so we should use partitionedStats
+        if (partitionCount > 0) {
+            var partitionedStats = pulsarAdmin.topics().getPartitionedStats(topicName, false);
+            // If the subscription exists at the partitioned level, get its aggregated backlog
+            if (partitionedStats.getSubscriptions().containsKey(subscriptionName)) {
+                return partitionedStats.getSubscriptions().get(subscriptionName).getMsgBacklog();
+            }
+            // If subscription not found at top-level stats, sum the backlog across each partition
+            return partitionedStats.getPartitions().values().stream()
+                    .mapToLong(ts -> {
+                        var subStats = ts.getSubscriptions().get(subscriptionName);
+                        return (subStats != null) ? subStats.getMsgBacklog() : 0;
+                    })
+                    .sum();
+        }
+        // Non-partitioned topic - safe to call getStats directly
+        TopicStats topicStats = pulsarAdmin.topics().getStats(topicName);
+        SubscriptionStats subscriptionStats = topicStats.getSubscriptions().get(subscriptionName);
+        return subscriptionStats != null ? subscriptionStats.getMsgBacklog() : 0;
+    }
+
+    /**
+     * Returns partition indices for this source. Numaflow uses this list to decide which partitions
+     * exist for watermark publishing and scaling (same contract as Kafka-style multi-partition sources).
+     * We expose one integer per Pulsar partition across all configured topics as a flat list [0, 1, 2, ...].
+     */
     @Override
     public List<Integer> getPartitions() {
         try {
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            // Assume single topic in the set
-            String topicName = topicNames.iterator().next();
-
-            int numPartitions = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
-            log.info("Number of partitions reported by metadata for topic {}: {}", topicName, numPartitions);
-
-            // If it's not partitioned, Pulsar returns 0 partitions
-            if (numPartitions < 1) {
-                log.warn("Topic {} is not reported as partitioned", topicName);
-                return List.of(0);
-            }
-
-            // Otherwise, build the partition indexes from 0..(numPartitions-1)
             List<Integer> partitionIndexes = new ArrayList<>();
-            for (int i = 0; i < numPartitions; i++) {
-                partitionIndexes.add(i);
+            // Assign one integer per partition across all topics (e.g. topic A has 3 partitions -> 0,1,2; topic B has 2 -> 3,4).
+            int globalIndex = 0;
+            for (String topicName : topicNames) {
+                var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
+                int numPartitions = (metadata != null) ? metadata.partitions : 0;
+                log.info("Number of partitions reported for topic {}: {}", topicName, numPartitions);
+                if (numPartitions < 1) {
+                    log.warn("Topic '{}' is non-partitioned (partitions={}). It will be treated as a single partition.", topicName, numPartitions);
+                }
+                int effectivePartitions = numPartitions < 1 ? 1 : numPartitions;
+                for (int i = 0; i < effectivePartitions; i++) {
+                    partitionIndexes.add(globalIndex++);
+                }
+            }
+            if (partitionIndexes.isEmpty()) {
+                partitionIndexes.add(0);
             }
             return partitionIndexes;
-
         } catch (Exception e) {
             log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();

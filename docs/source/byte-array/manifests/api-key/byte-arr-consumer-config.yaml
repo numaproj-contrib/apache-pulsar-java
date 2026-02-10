@@ -15,8 +15,10 @@ data:
             # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}"
         consumer:  # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
           enabled: true
-          consumerConfig: 
+          consumerConfig:
+            # Single topic (string) or multiple topics (comma-separated string)
             topicNames: "persistent://public/default/test-topic"
+            # topicNames: "persistent://public/default/topic-a, persistent://public/default/topic-b"
             subscriptionName: "test-subscription"
         admin: 
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
