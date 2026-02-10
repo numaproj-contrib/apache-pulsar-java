@@ -84,7 +84,8 @@ public class PulsarSource extends Sourcer {
                 String topicName = pMsg.getTopicName();
                 String msgId = pMsg.getMessageId().toString();
                 String topicMessageIdKey = topicName + msgId;
-
+                
+                // TODO : change to .debug or .trace to reduce log noise
                 log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", topicName, pMsg.getMessageId(),
                         new String(pMsg.getValue(), StandardCharsets.UTF_8));
 
@@ -188,7 +189,8 @@ public class PulsarSource extends Sourcer {
     }
 
     private long getBacklogForTopic(String topicName, String subscriptionName) throws PulsarAdminException {
-        int partitionCount = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
+        var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
+        int partitionCount = (metadata != null) ? metadata.partitions : 0;
         // Topic is partitioned, so we should use partitionedStats
         if (partitionCount > 0) {
             var partitionedStats = pulsarAdmin.topics().getPartitionedStats(topicName, false);
@@ -223,7 +225,8 @@ public class PulsarSource extends Sourcer {
             // Assign one integer per partition across all topics (e.g. topic A has 3 partitions -> 0,1,2; topic B has 2 -> 3,4).
             int globalIndex = 0;
             for (String topicName : topicNames) {
-                int numPartitions = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName).partitions;
+                var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
+                int numPartitions = (metadata != null) ? metadata.partitions : 0;
                 log.info("Number of partitions reported for topic {}: {}", topicName, numPartitions);
                 if (numPartitions < 1) {
                     log.warn("Topic '{}' is non-partitioned (partitions={}). It will be treated as a single partition.", topicName, numPartitions);

@@ -22,7 +22,7 @@ export PULSAR_AUTH_TOKEN="<your-token>"
 export PULSAR_TENANT="demo"
 export PULSAR_NAMESPACE="dev"
 
-# Optional: comma-separated topic names (default: test-topic,test-topic-2)
+# Optional: comma-separated topic names (default: test-topic,test-topic-2).
 export TOPICS="test-topic,test-topic-2"
 ```
 
@@ -31,7 +31,7 @@ export TOPICS="test-topic,test-topic-2"
 From the **apache-pulsar-java** repo root or from this directory:
 
 ```bash
-cd scripts/produce-messages
+cd development/scripts/produce-messages
 chmod +x produce-messages.sh
 ./produce-messages.sh
 ```
@@ -46,14 +46,3 @@ TOPICS="topic-a,topic-b,topic-c" ./produce-messages.sh
 ## Message format (distinguishable by topic)
 
 Each message body is `[<topic-name>] Message <i> at <timestamp>`, so in consumer logs you can tell which topic each message came from. Default topics are `test-topic` and `test-topic-2`; override with `TOPICS="topic-a,topic-b"`.
-
-## Viewing consumer message bodies (log sink)
-
-If your consumer pipeline logs message payloads, you can filter for these bodies:
-
-```bash
-kubectl logs -n default -l app.kubernetes.io/name=cloud-consumer-pipeline-out -c numa --tail=5000 \
-  | grep "Payload -" | grep -E "\[test-topic\]|\[test-topic-2\]" | sed -n 's/.*Payload - \(.*\) Keys -.*/\1/p'
-```
-
-Use a larger `--tail` if needed, and ensure the **out** pod is running and messages were produced after the consumer started.
