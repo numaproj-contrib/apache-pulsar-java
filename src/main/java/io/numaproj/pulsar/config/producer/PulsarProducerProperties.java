@@ -15,4 +15,12 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "spring.pulsar.producer")
 public class PulsarProducerProperties {
     private Map<String, Object> producerConfig = new HashMap<>(); // Default to an empty map
+
+    /**
+     * When true (default), the producer uses Schema.AUTO_PRODUCE_BYTES so the broker enforces
+     * format compatibility (e.g. payload must be decodable as JSON/Avro). This is not full
+     * field-level validation. When false, uses Schema.BYTES (no format check). For strict
+     * schema field validation, validate payloads client-side before send.
+     */
+    private boolean useAutoProduceSchema = true;
 }
