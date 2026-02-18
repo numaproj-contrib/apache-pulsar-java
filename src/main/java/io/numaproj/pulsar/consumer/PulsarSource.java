@@ -115,7 +115,7 @@ public class PulsarSource extends Sourcer {
                 byte[] payloadBytes = GenericRecordToBytes.toBytes(record);
 
                 // TODO : change to .debug or .trace to reduce log noise
-                log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", topicName, pMsg.getMessageId(), payloadBytes.length);
+                log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", pMsg.getTopicName(), pMsg.getMessageId(), payloadBytes.length);
                 sendMessage(pMsg, payloadBytes, observer);
             } catch (Exception e) {
                 if (!isSchemaValidationFailure(e)) {
