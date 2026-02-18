@@ -91,20 +91,11 @@ public class PulsarSource extends Sourcer {
         }
 
         for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
-            String topicName = pMsg.getTopicName();
-            String msgId = pMsg.getMessageId().toString();
-            String topicMessageIdKey = topicName + msgId;
 
             // TODO : change to .debug or .trace to reduce log noise
-            log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", topicName, pMsg.getMessageId(),
+            log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", pMsg.getTopicName(), pMsg.getMessageId(),
                     new String(pMsg.getValue(), StandardCharsets.UTF_8));
-
-            byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
-            Offset offset = new Offset(offsetBytes);
-            Map<String, String> headers = buildHeaders(pMsg);
-
-            observer.send(new Message(pMsg.getValue(), offset, Instant.now(), headers));
-            messagesToAck.put(topicMessageIdKey, pMsg);
+            sendMessage(pMsg, pMsg.getValue(), observer);
         }
     }
 
@@ -118,9 +109,6 @@ public class PulsarSource extends Sourcer {
         }
 
         for (org.apache.pulsar.client.api.Message<GenericRecord> pMsg : batchMessages) {
-            String topicName = pMsg.getTopicName();
-            String msgId = pMsg.getMessageId().toString();
-            String topicMessageIdKey = topicName + msgId;
 
             try {
                 GenericRecord record = pMsg.getValue();
@@ -128,20 +116,14 @@ public class PulsarSource extends Sourcer {
 
                 // TODO : change to .debug or .trace to reduce log noise
                 log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", topicName, pMsg.getMessageId(), payloadBytes.length);
-
-                byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
-                Offset offset = new Offset(offsetBytes);
-                Map<String, String> headers = buildHeaders(pMsg);
-
-                observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
-                messagesToAck.put(topicMessageIdKey, pMsg);
+                sendMessage(pMsg, payloadBytes, observer);
             } catch (Exception e) {
                 if (!isSchemaValidationFailure(e)) {
                     throw new RuntimeException(e);
                 }
                 if (pulsarConsumerProperties.isDropMessageOnSchemaValidationFailure()) {
                     log.warn("Dropping message (ack as processed) due to schema validation failure [topic: {}, id: {}]: {}",
-                            topicName, pMsg.getMessageId(), e.getMessage());
+                            pMsg.getTopicName(), pMsg.getMessageId(), e.getMessage());
                     try {
                         consumer.acknowledge(pMsg);
                     } catch (PulsarClientException ackEx) {
@@ -152,6 +134,16 @@ public class PulsarSource extends Sourcer {
                 }
             }
         }
+    }
+
+    /** Builds offset and headers, sends the message to the observer, and records it for ack. */
+    private void sendMessage(org.apache.pulsar.client.api.Message<?> pMsg, byte[] payloadBytes, OutputObserver observer) {
+        String topicMessageIdKey = pMsg.getTopicName() + pMsg.getMessageId().toString();
+        byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
+        Offset offset = new Offset(offsetBytes);
+        Map<String, String> headers = buildHeaders(pMsg);
+        observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
+        messagesToAck.put(topicMessageIdKey, pMsg);
     }
 
     /** True if the exception indicates message schema validation / deserialization failure (wrong schema, unsupported type, or decode I/O). */

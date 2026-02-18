@@ -53,21 +53,16 @@ public class PulsarConsumerManager {
                                                                      // than 2^63 - 1 which will cause an overflow
                 .build();
 
-        if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
-            currentConsumer = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
-                    .loadConf(pulsarConsumerProperties.getConsumerConfig())
-                    .batchReceivePolicy(batchPolicy)
-                    .subscriptionType(SubscriptionType.Shared)
-                    .subscribe();
-            log.info("Created new consumer with Schema.AUTO_CONSUME (schema validation enabled); batch receive policy: {}, timeoutMillis: {}", count, timeoutMillis);
-        } else {
-            currentConsumer = pulsarClient.newConsumer(Schema.BYTES)
-                    .loadConf(pulsarConsumerProperties.getConsumerConfig())
-                    .batchReceivePolicy(batchPolicy)
-                    .subscriptionType(SubscriptionType.Shared)
-                    .subscribe();
-            log.info("Created new consumer with Schema.BYTES (no schema validation); batch receive policy: {}, timeoutMillis: {}", count, timeoutMillis);
-        }
+        boolean useAutoConsume = pulsarConsumerProperties.isUseAutoConsumeSchema();
+        Schema<?> schema = useAutoConsume ? Schema.AUTO_CONSUME() : Schema.BYTES;
+        String schemaLabel = useAutoConsume ? "AUTO_CONSUME (schema validation enabled)" : "BYTES (no schema validation)";
+
+        currentConsumer = pulsarClient.newConsumer(schema)
+                .loadConf(pulsarConsumerProperties.getConsumerConfig())
+                .batchReceivePolicy(batchPolicy)
+                .subscriptionType(SubscriptionType.Shared)
+                .subscribe();
+        log.info("Created new consumer with Schema.{}; batch receive policy: {}, timeoutMillis: {}", schemaLabel, count, timeoutMillis);
         return (Consumer<T>) currentConsumer;
     }
 
