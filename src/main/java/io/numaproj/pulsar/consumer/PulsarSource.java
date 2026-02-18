@@ -15,6 +15,7 @@ import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.schema.GenericRecord;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.policies.data.TopicStats;
@@ -24,6 +25,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,8 +39,9 @@ import java.util.Set;
 @ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class PulsarSource extends Sourcer {
 
-    // Map tracking received messages (keyed by topicName + messageId for multi-topic support)
-    private final Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = new HashMap<>();
+    // Map tracking received messages (keyed by topicName + messageId for multi-topic support).
+    // Holds either Message<byte[]> or Message<GenericRecord> depending on useAutoConsumeSchema.
+    private final Map<String, org.apache.pulsar.client.api.Message<?>> messagesToAck = new HashMap<>();
 
     private Server server;
 
@@ -60,48 +63,77 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
-        // If there are messages not acknowledged, return
         if (!messagesToAck.isEmpty()) {
             log.trace("messagesToAck not empty: {}", messagesToAck);
             return;
         }
 
-        Consumer<byte[]> consumer = null;
-
         try {
-            // Obtain a consumer with the desired settings.
-            consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
-
-            Messages<byte[]> batchMessages = consumer.batchReceive();
-
-            if (batchMessages == null || batchMessages.size() == 0) {
-                log.trace("Received 0 messages, return early.");
-                return;
-            }
-
-            // Process each message in the batch.
-            for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
-                String topicName = pMsg.getTopicName();
-                String msgId = pMsg.getMessageId().toString();
-                String topicMessageIdKey = topicName + msgId;
-                
-                // TODO : change to .debug or .trace to reduce log noise
-                log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", topicName, pMsg.getMessageId(),
-                        new String(pMsg.getValue(), StandardCharsets.UTF_8));
-
-                byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
-                Offset offset = new Offset(offsetBytes);
-
-                Map<String, String> headers = buildHeaders(pMsg);
-
-                Message message = new Message(pMsg.getValue(), offset, Instant.now(), headers);
-                observer.send(message);
-
-                messagesToAck.put(topicMessageIdKey, pMsg);
+            if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
+                readWithAutoConsume(request, observer);
+            } else {
+                readWithBytes(request, observer);
             }
         } catch (PulsarClientException e) {
             log.error("Failed to get consumer or receive messages from Pulsar", e);
             throw new RuntimeException("Failed to get consumer or receive messages from Pulsar", e);
+        } catch (IOException e) {
+            log.error("Failed to convert message payload to bytes", e);
+            throw new RuntimeException("Failed to convert message payload to bytes", e);
+        }
+    }
+
+    private void readWithBytes(ReadRequest request, OutputObserver observer) throws PulsarClientException {
+        Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
+        Messages<byte[]> batchMessages = consumer.batchReceive();
+
+        if (batchMessages == null || batchMessages.size() == 0) {
+            log.trace("Received 0 messages, return early.");
+            return;
+        }
+
+        for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
+            String topicName = pMsg.getTopicName();
+            String msgId = pMsg.getMessageId().toString();
+            String topicMessageIdKey = topicName + msgId;
+
+            log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", topicName, pMsg.getMessageId(),
+                    new String(pMsg.getValue(), StandardCharsets.UTF_8));
+
+            byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
+            Offset offset = new Offset(offsetBytes);
+            Map<String, String> headers = buildHeaders(pMsg);
+
+            observer.send(new Message(pMsg.getValue(), offset, Instant.now(), headers));
+            messagesToAck.put(topicMessageIdKey, pMsg);
+        }
+    }
+
+    private void readWithAutoConsume(ReadRequest request, OutputObserver observer) throws PulsarClientException, IOException {
+        Consumer<GenericRecord> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
+        Messages<GenericRecord> batchMessages = consumer.batchReceive();
+
+        if (batchMessages == null || batchMessages.size() == 0) {
+            log.trace("Received 0 messages, return early.");
+            return;
+        }
+
+        for (org.apache.pulsar.client.api.Message<GenericRecord> pMsg : batchMessages) {
+            String topicName = pMsg.getTopicName();
+            String msgId = pMsg.getMessageId().toString();
+            String topicMessageIdKey = topicName + msgId;
+
+            GenericRecord record = pMsg.getValue();
+            byte[] payloadBytes = GenericRecordToBytes.toBytes(record);
+
+            log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", topicName, pMsg.getMessageId(), payloadBytes.length);
+
+            byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
+            Offset offset = new Offset(offsetBytes);
+            Map<String, String> headers = buildHeaders(pMsg);
+
+            observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
+            messagesToAck.put(topicMessageIdKey, pMsg);
         }
     }
 
@@ -128,7 +160,7 @@ public class PulsarSource extends Sourcer {
                 .toList();
 
         try {
-            Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
+            Consumer<?> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
             consumer.acknowledge(messageIds);
             log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
@@ -138,9 +170,9 @@ public class PulsarSource extends Sourcer {
     }
 
     /**
-     * Builds headers from Pulsar message metadata
+     * Builds headers from Pulsar message metadata. Works for both Message&lt;byte[]&gt; and Message&lt;GenericRecord&gt;.
      */
-    private Map<String, String> buildHeaders(org.apache.pulsar.client.api.Message<byte[]> pulsarMessage) {
+    private Map<String, String> buildHeaders(org.apache.pulsar.client.api.Message<?> pulsarMessage) {
         Map<String, String> headers = new HashMap<>();
 
         headers.put(NumaHeaderKeys.PULSAR_PRODUCER_NAME, pulsarMessage.getProducerName());
@@ -150,7 +182,6 @@ public class PulsarSource extends Sourcer {
         headers.put(NumaHeaderKeys.PULSAR_EVENT_TIME, String.valueOf(pulsarMessage.getEventTime()));
         headers.put(NumaHeaderKeys.PULSAR_REDELIVERY_COUNT, String.valueOf(pulsarMessage.getRedeliveryCount()));
 
-        // Add message properties as headers
         if (pulsarMessage.getProperties() != null && !pulsarMessage.getProperties().isEmpty()) {
             pulsarMessage.getProperties().forEach((key, value) -> {
                 if (key != null && value != null) {

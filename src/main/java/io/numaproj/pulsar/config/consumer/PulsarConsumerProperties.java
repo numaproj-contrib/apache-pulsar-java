@@ -28,6 +28,13 @@ public class PulsarConsumerProperties {
 
     private Map<String, Object> consumerConfig = new HashMap<>(); // Default to an empty map
 
+    /**
+     * When true (default), the consumer uses Schema.AUTO_CONSUME so the client validates
+     * each message against the topic schema when decoding. When false, uses Schema.BYTES
+     * (no schema check; messages are read as raw bytes). Mirror of producer's useAutoProduceSchema.
+     */
+    private boolean useAutoConsumeSchema = true;
+
     @PostConstruct
     public void init() {
         // Pulsar expects topicNames to be type Set<String>. Config accepts a single string

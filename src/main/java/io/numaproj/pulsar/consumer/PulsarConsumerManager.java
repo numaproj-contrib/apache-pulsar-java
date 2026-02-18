@@ -32,14 +32,19 @@ public class PulsarConsumerManager {
     @Autowired
     private PulsarClient pulsarClient;
 
-    // The current consumer instance.
-    private Consumer<byte[]> currentConsumer;
+    // The current consumer instance (either Consumer<byte[]> or Consumer<GenericRecord>).
+    private Consumer<?> currentConsumer;
 
-    // Returns the current consumer if it exists. If not, creates a new one.
-    public Consumer<byte[]> getOrCreateConsumer(long count, long timeoutMillis)
+    /**
+     * Returns the current consumer if it exists. If not, creates a new one.
+     * When {@link PulsarConsumerProperties#isUseAutoConsumeSchema()} is true, returns
+     * Consumer&lt;GenericRecord&gt;; otherwise Consumer&lt;byte[]&gt;.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> Consumer<T> getOrCreateConsumer(long count, long timeoutMillis)
             throws PulsarClientException {
         if (currentConsumer != null) {
-            return currentConsumer;
+            return (Consumer<T>) currentConsumer;
         }
 
         BatchReceivePolicy batchPolicy = BatchReceivePolicy.builder()
@@ -48,14 +53,22 @@ public class PulsarConsumerManager {
                                                                      // than 2^63 - 1 which will cause an overflow
                 .build();
 
-        currentConsumer = pulsarClient.newConsumer(Schema.BYTES)
-                .loadConf(pulsarConsumerProperties.getConsumerConfig())
-                .batchReceivePolicy(batchPolicy)
-                .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
-                .subscribe();
-
-        log.info("Created new consumer with batch receive policy of: {} and timeoutMillis: {}", count, timeoutMillis);
-        return currentConsumer;
+        if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
+            currentConsumer = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
+                    .loadConf(pulsarConsumerProperties.getConsumerConfig())
+                    .batchReceivePolicy(batchPolicy)
+                    .subscriptionType(SubscriptionType.Shared)
+                    .subscribe();
+            log.info("Created new consumer with Schema.AUTO_CONSUME (schema validation enabled); batch receive policy: {}, timeoutMillis: {}", count, timeoutMillis);
+        } else {
+            currentConsumer = pulsarClient.newConsumer(Schema.BYTES)
+                    .loadConf(pulsarConsumerProperties.getConsumerConfig())
+                    .batchReceivePolicy(batchPolicy)
+                    .subscriptionType(SubscriptionType.Shared)
+                    .subscribe();
+            log.info("Created new consumer with Schema.BYTES (no schema validation); batch receive policy: {}, timeoutMillis: {}", count, timeoutMillis);
+        }
+        return (Consumer<T>) currentConsumer;
     }
 
     @PreDestroy

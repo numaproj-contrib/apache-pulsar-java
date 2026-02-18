@@ -121,7 +121,7 @@ public class PulsarSourceTest {
             messagesToAck.clear();
 
             // Stub the consumerManager to return the consumerMock.
-            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn(consumerMock);
+            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn((Consumer) consumerMock);
             // Simulate batchReceive returning null.
             when(consumerMock.batchReceive()).thenReturn(null);
 
@@ -194,7 +194,7 @@ public class PulsarSourceTest {
             when(messages.iterator()).thenReturn(messageList.iterator());
 
             // Stub consumerManager and consumer behavior.
-            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn(consumerMock);
+            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn((Consumer) consumerMock);
             when(consumerMock.batchReceive()).thenReturn(messages);
 
             // Create a fake ReadRequest and OutputObserver.
@@ -274,7 +274,7 @@ public class PulsarSourceTest {
             messagesToAck.put(ackKey, msg);
 
             // Stub consumerManager to return consumerMock for the ack call.
-            when(consumerManagerMock.getOrCreateConsumer(0, 0)).thenReturn(consumerMock);
+            when(consumerManagerMock.getOrCreateConsumer(0, 0)).thenReturn((Consumer) consumerMock);
 
             // Create a fake AckRequest with an offset corresponding to topicName+messageId.
             AckRequest ackRequest = new AckRequest() {
