@@ -35,11 +35,7 @@ public class PulsarConsumerManager {
     // The current consumer instance (either Consumer<byte[]> or Consumer<GenericRecord>).
     private Consumer<?> currentConsumer;
 
-    /**
-     * Returns the current consumer if it exists. If not, creates a new one.
-     * When {@link PulsarConsumerProperties#isUseAutoConsumeSchema()} is true, returns
-     * Consumer&lt;GenericRecord&gt;; otherwise Consumer&lt;byte[]&gt;.
-     */
+    /** Returns the current consumer if it exists, otherwise creates a new one. When useAutoConsumeSchema is true returns Consumer<GenericRecord>; otherwise Consumer<byte[]>. */
     @SuppressWarnings("unchecked")
     public <T> Consumer<T> getOrCreateConsumer(long count, long timeoutMillis)
             throws PulsarClientException {

@@ -10,23 +10,13 @@ import org.apache.pulsar.common.schema.SchemaType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-/**
- * Converts a Pulsar {@link GenericRecord} (from Schema.AUTO_CONSUME) to byte[] for downstream
- * use. Only AVRO schema is supported.
- */
+/** Converts a Pulsar GenericRecord (from Schema.AUTO_CONSUME) to byte[] for downstream use. Only AVRO schema is supported. */
 @Slf4j
 public final class GenericRecordToBytes {
 
     private GenericRecordToBytes() {}
 
-    /**
-     * Serializes the given GenericRecord to bytes. Only AVRO schema is supported.
-     *
-     * @param record the record from a Pulsar message (AUTO_CONSUME)
-     * @return serialized bytes, never null
-     * @throws IOException if serialization fails
-     * @throws UnsupportedOperationException if schema type is not AVRO
-     */
+    /** Serializes the given GenericRecord to bytes. Only AVRO schema is supported. */
     public static byte[] toBytes(GenericRecord record) throws IOException {
         if (record == null) {
             return new byte[0];
