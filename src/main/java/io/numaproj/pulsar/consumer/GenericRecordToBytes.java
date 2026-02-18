@@ -9,7 +9,6 @@ import org.apache.pulsar.common.schema.SchemaType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Converts a Pulsar {@link GenericRecord} (from Schema.AUTO_CONSUME) to byte[] for downstream
@@ -54,22 +53,5 @@ public final class GenericRecordToBytes {
         writer.write(avroRecord, encoder);
         encoder.flush();
         return out.toByteArray();
-    }
-
-    /**
-     * If value is byte[] return it; if GenericRecord convert to bytes. Used when handling
-     * both Schema.BYTES and Schema.AUTO_CONSUME in the same code path.
-     */
-    public static byte[] valueToBytes(Object value) throws IOException {
-        if (value == null) {
-            return new byte[0];
-        }
-        if (value instanceof byte[]) {
-            return (byte[]) value;
-        }
-        if (value instanceof GenericRecord) {
-            return toBytes((GenericRecord) value);
-        }
-        return value.toString().getBytes(StandardCharsets.UTF_8);
     }
 }

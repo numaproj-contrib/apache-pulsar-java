@@ -55,4 +55,12 @@ public class GenericRecordToBytesTest {
         assertNotNull(bytes);
         assertEquals(0, bytes.length);
     }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void toBytes_nonAvroSchema_throwsUnsupportedOperationException() throws IOException {
+        org.apache.pulsar.client.api.schema.GenericRecord record =
+                mock(org.apache.pulsar.client.api.schema.GenericRecord.class);
+        when(record.getSchemaType()).thenReturn(SchemaType.JSON);
+        GenericRecordToBytes.toBytes(record);
+    }
 }

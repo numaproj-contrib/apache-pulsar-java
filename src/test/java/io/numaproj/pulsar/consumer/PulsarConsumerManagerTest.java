@@ -35,6 +35,7 @@ public class PulsarConsumerManagerTest {
     public void setUp() {
         // Create a simple consumer properties object with a dummy config
         consumerProperties = new PulsarConsumerProperties();
+        consumerProperties.setUseAutoConsumeSchema(false); // use Schema.BYTES path so mocks apply
         Map<String, Object> config = new HashMap<>();
         config.put("dummyKey", "dummyValue");
         consumerProperties.setConsumerConfig(config);

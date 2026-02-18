@@ -35,6 +35,14 @@ public class PulsarConsumerProperties {
      */
     private boolean useAutoConsumeSchema = true;
 
+    /**
+     * When true, a message that fails schema validation (e.g. wrong Avro schema) is dropped:
+     * the message is ack'd as if processed (removed from subscription) and the consumer continues.
+     * When false (default), validation failure throws and the application fails (current behavior).
+     * Only applies when useAutoConsumeSchema is true.
+     */
+    private boolean dropMessageOnSchemaValidationFailure = false;
+
     @PostConstruct
     public void init() {
         // Pulsar expects topicNames to be type Set<String>. Config accepts a single string

@@ -15,6 +15,7 @@ import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SchemaSerializationException;
 import org.apache.pulsar.client.api.schema.GenericRecord;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
@@ -74,12 +75,9 @@ public class PulsarSource extends Sourcer {
             } else {
                 readWithBytes(request, observer);
             }
-        } catch (PulsarClientException e) {
-            log.error("Failed to get consumer or receive messages from Pulsar", e);
-            throw new RuntimeException("Failed to get consumer or receive messages from Pulsar", e);
-        } catch (IOException e) {
-            log.error("Failed to convert message payload to bytes", e);
-            throw new RuntimeException("Failed to convert message payload to bytes", e);
+        } catch (Exception e) {
+            log.error("Failed to read from Pulsar", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -97,6 +95,7 @@ public class PulsarSource extends Sourcer {
             String msgId = pMsg.getMessageId().toString();
             String topicMessageIdKey = topicName + msgId;
 
+            // TODO : change to .debug or .trace to reduce log noise
             log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", topicName, pMsg.getMessageId(),
                     new String(pMsg.getValue(), StandardCharsets.UTF_8));
 
@@ -109,7 +108,7 @@ public class PulsarSource extends Sourcer {
         }
     }
 
-    private void readWithAutoConsume(ReadRequest request, OutputObserver observer) throws PulsarClientException, IOException {
+    private void readWithAutoConsume(ReadRequest request, OutputObserver observer) throws PulsarClientException {
         Consumer<GenericRecord> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
         Messages<GenericRecord> batchMessages = consumer.batchReceive();
 
@@ -123,18 +122,48 @@ public class PulsarSource extends Sourcer {
             String msgId = pMsg.getMessageId().toString();
             String topicMessageIdKey = topicName + msgId;
 
-            GenericRecord record = pMsg.getValue();
-            byte[] payloadBytes = GenericRecordToBytes.toBytes(record);
+            try {
+                GenericRecord record = pMsg.getValue();
+                byte[] payloadBytes = GenericRecordToBytes.toBytes(record);
 
-            log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", topicName, pMsg.getMessageId(), payloadBytes.length);
+                // TODO : change to .debug or .trace to reduce log noise
+                log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", topicName, pMsg.getMessageId(), payloadBytes.length);
 
-            byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
-            Offset offset = new Offset(offsetBytes);
-            Map<String, String> headers = buildHeaders(pMsg);
+                byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
+                Offset offset = new Offset(offsetBytes);
+                Map<String, String> headers = buildHeaders(pMsg);
 
-            observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
-            messagesToAck.put(topicMessageIdKey, pMsg);
+                observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
+                messagesToAck.put(topicMessageIdKey, pMsg);
+            } catch (Exception e) {
+                if (!isSchemaValidationFailure(e)) {
+                    throw new RuntimeException(e);
+                }
+                if (pulsarConsumerProperties.isDropMessageOnSchemaValidationFailure()) {
+                    log.warn("Dropping message (ack as processed) due to schema validation failure [topic: {}, id: {}]: {}",
+                            topicName, pMsg.getMessageId(), e.getMessage());
+                    try {
+                        consumer.acknowledge(pMsg);
+                    } catch (PulsarClientException ackEx) {
+                        log.error("Failed to ack dropped message {}", pMsg.getMessageId(), ackEx);
+                    }
+                } else {
+                    throw new RuntimeException("Schema validation failure; set dropMessageOnSchemaValidationFailure=true to drop instead", e);
+                }
+            }
         }
+    }
+
+    /** True if the exception indicates message schema validation / deserialization failure (wrong schema, unsupported type, or decode I/O). */
+    private static boolean isSchemaValidationFailure(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof SchemaSerializationException
+                    || t instanceof IOException
+                    || t instanceof UnsupportedOperationException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

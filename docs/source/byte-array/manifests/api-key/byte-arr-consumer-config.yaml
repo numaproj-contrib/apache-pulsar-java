@@ -16,6 +16,7 @@ data:
         consumer:  # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
           enabled: true
           useAutoConsumeSchema: true
+          dropMessageOnSchemaValidationFailure: false
           consumerConfig:
             # Single topic (string) or multiple topics (comma-separated string)
             topicNames: "persistent://public/default/test-topic"

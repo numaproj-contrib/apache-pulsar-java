@@ -15,6 +15,12 @@ import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.schema.GenericRecord;
+import org.apache.pulsar.common.schema.SchemaType;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
 import org.apache.pulsar.common.policies.data.PartitionedTopicStats;
 import org.apache.pulsar.common.policies.data.SubscriptionStats;
@@ -57,9 +63,12 @@ public class PulsarSourceTest {
             pulsarSource = new PulsarSource();
             consumerManagerMock = mock(PulsarConsumerManager.class);
             consumerMock = mock(Consumer.class);
-            // Inject the mocked PulsarConsumerManager into pulsarSource using
+             // Inject the mocked PulsarConsumerManager into pulsarSource using
             // ReflectionTestUtils.
             ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerManager", consumerManagerMock);
+            PulsarConsumerProperties consumerProperties = new PulsarConsumerProperties();
+            consumerProperties.setUseAutoConsumeSchema(false); // tests use byte[] consumer path
+            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", consumerProperties);
         } catch (Exception e) {
             fail("Setup failed with exception: " + e.getMessage());
         }
@@ -609,6 +618,182 @@ public class PulsarSourceTest {
             List<Integer> result = pulsarSource.getPartitions();
             assertEquals(List.of(42), result);
             mockedSourcer.verify(Sourcer::defaultPartitions);
+        }
+    }
+
+    private static final String AVRO_SCHEMA_JSON = ""
+            + "{\"type\":\"record\",\"name\":\"TestMessage\",\"fields\":["
+            + "{\"name\":\"name\",\"type\":\"string\"},"
+            + "{\"name\":\"topic\",\"type\":\"string\"}"
+            + "]}";
+
+    /**
+     * AUTO_CONSUME happy path: valid AVRO message is converted to bytes and sent downstream.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_validAvroMessage_sendsToObserver() throws Exception {
+        PulsarConsumerProperties props = new PulsarConsumerProperties();
+        props.setUseAutoConsumeSchema(true);
+        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
+
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
+        messagesToAck.clear();
+
+        Schema schema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
+        GenericData.Record avroRecord = new GenericData.Record(schema);
+        avroRecord.put("name", "hello");
+        avroRecord.put("topic", "world");
+
+        GenericRecord pulsarRecord = mock(GenericRecord.class);
+        when(pulsarRecord.getSchemaType()).thenReturn(SchemaType.AVRO);
+        when(pulsarRecord.getNativeObject()).thenReturn(avroRecord);
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenReturn(pulsarRecord);
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(1000L);
+        when(pulsarMsg.getEventTime()).thenReturn(1000L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateConsumer(anyLong(), anyLong())).thenReturn((Consumer) consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        pulsarSource.read(readRequest, observer);
+
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        verify(observer, times(1)).send(messageCaptor.capture());
+        Message sent = messageCaptor.getValue();
+        assertNotNull(sent.getValue());
+        assertTrue("payload should be non-empty Avro bytes", sent.getValue().length > 0);
+
+        GenericDatumReader<org.apache.avro.generic.GenericRecord> reader = new GenericDatumReader<>(schema);
+        org.apache.avro.generic.GenericRecord decoded = reader.read(null,
+                DecoderFactory.get().binaryDecoder(sent.getValue(), null));
+        assertEquals("hello", decoded.get("name").toString());
+        assertEquals("world", decoded.get("topic").toString());
+    }
+
+    /**
+     * When dropMessageOnSchemaValidationFailure is true and a message fails validation
+     * (e.g. non-AVRO schema), the message is acked and not sent downstream.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_schemaValidationFailure_dropTrue_acksAndDoesNotSend() throws PulsarClientException {
+        // Use AUTO_CONSUME path with drop on schema failure
+        PulsarConsumerProperties dropProps = new PulsarConsumerProperties();
+        dropProps.setUseAutoConsumeSchema(true);
+        dropProps.setDropMessageOnSchemaValidationFailure(true);
+        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", dropProps);
+
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
+        messagesToAck.clear();
+
+        // One message whose GenericRecord has schema type JSON -> toBytes() throws UnsupportedOperationException
+        GenericRecord badRecord = mock(GenericRecord.class);
+        when(badRecord.getSchemaType()).thenReturn(SchemaType.JSON);
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenReturn(badRecord);
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(0L);
+        when(pulsarMsg.getEventTime()).thenReturn(0L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateConsumer(anyLong(), anyLong())).thenReturn((Consumer) consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        pulsarSource.read(readRequest, observer);
+
+        verify(observer, never()).send(any(Message.class));
+        verify(consumerGenericMock, times(1)).acknowledge(pulsarMsg);
+    }
+
+    /**
+     * When dropMessageOnSchemaValidationFailure is false and a message fails validation
+     * (e.g. JSON schema instead of AVRO), read() throws RuntimeException.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_schemaValidationFailure_dropFalse_throws() throws PulsarClientException {
+        PulsarConsumerProperties noDropProps = new PulsarConsumerProperties();
+        noDropProps.setUseAutoConsumeSchema(true);
+        noDropProps.setDropMessageOnSchemaValidationFailure(false);
+        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", noDropProps);
+
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
+        messagesToAck.clear();
+
+        // One message with JSON schema -> toBytes() throws UnsupportedOperationException
+        GenericRecord badRecord = mock(GenericRecord.class);
+        when(badRecord.getSchemaType()).thenReturn(SchemaType.JSON);
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenReturn(badRecord);
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(0L);
+        when(pulsarMsg.getEventTime()).thenReturn(0L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateConsumer(anyLong(), anyLong())).thenReturn((Consumer) consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        try {
+            pulsarSource.read(readRequest, observer);
+            fail("Expected RuntimeException when drop is off and schema validation fails");
+        } catch (RuntimeException e) {
+            assertTrue("Exception message should mention schema validation or drop flag",
+                    e.getMessage() != null && (e.getMessage().contains("Schema validation failure")
+                            || e.getMessage().contains("dropMessageOnSchemaValidationFailure")));
         }
     }
 
