@@ -34,5 +34,8 @@ build/
 ### Local env ###
 .env
 
+### Register-schema scripts (not fully tested; exclude from consumer-schema-validation) ###
+development/scripts/register-schema/
+
 ### Mac OS ###
 .DS_Store
