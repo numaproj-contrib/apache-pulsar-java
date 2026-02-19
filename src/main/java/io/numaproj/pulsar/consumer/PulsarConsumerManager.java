@@ -3,7 +3,6 @@ package io.numaproj.pulsar.consumer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.BatchReceivePolicy;
 import org.apache.pulsar.client.api.Consumer;
-import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component;
 import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 
 import javax.annotation.PreDestroy;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -35,80 +33,74 @@ public class PulsarConsumerManager {
     @Autowired
     private PulsarClient pulsarClient;
 
-    private Consumer<byte[]> consumerBytes;
-    private Consumer<GenericRecord> consumerGenericRecord;
+    private Consumer<byte[]> bytesConsumer;
+    private Consumer<GenericRecord> genericRecordConsumer;
 
     /** Returns the byte-array consumer, creating it if necessary. Use when not using AUTO_CONSUME. */
     public Consumer<byte[]> getOrCreateBytesConsumer(long count, long timeoutMillis) throws PulsarClientException {
-        if (consumerBytes != null) {
-            return consumerBytes;
+        if (bytesConsumer != null) {
+            return bytesConsumer;
         }
         BatchReceivePolicy batchPolicy = BatchReceivePolicy.builder()
                 .maxNumMessages((int) count)
                 .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS)
                 .build();
-        consumerBytes = pulsarClient.newConsumer(Schema.BYTES)
+        bytesConsumer = pulsarClient.newConsumer(Schema.BYTES)
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
                 .subscriptionType(SubscriptionType.Shared)
                 .subscribe();
         log.info("Created byte-array consumer; batch receive: {}, timeoutMillis: {}", count, timeoutMillis);
-        return consumerBytes;
+        return bytesConsumer;
     }
 
     /** Returns the GenericRecord (AUTO_CONSUME) consumer, creating it if necessary. Use when using AUTO_CONSUME. */
     public Consumer<GenericRecord> getOrCreateGenericRecordConsumer(long count, long timeoutMillis) throws PulsarClientException {
-        if (consumerGenericRecord != null) {
-            return consumerGenericRecord;
+        if (genericRecordConsumer != null) {
+            return genericRecordConsumer;
         }
         BatchReceivePolicy batchPolicy = BatchReceivePolicy.builder()
                 .maxNumMessages((int) count)
                 .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS)
                 .build();
-        consumerGenericRecord = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
+        genericRecordConsumer = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
                 .subscriptionType(SubscriptionType.Shared)
                 .subscribe();
         log.info("Created AUTO_CONSUME (GenericRecord) consumer; batch receive: {}, timeoutMillis: {}", count, timeoutMillis);
-        return consumerGenericRecord;
+        return genericRecordConsumer;
     }
 
-    /** Acknowledges the given message IDs on the consumer that matches the current config (bytes vs AUTO_CONSUME). */
-    public void acknowledge(List<MessageId> messageIds) throws PulsarClientException {
-        if (messageIds == null || messageIds.isEmpty()) {
-            return;
-        }
-        if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
-            if (consumerGenericRecord != null) {
-                consumerGenericRecord.acknowledge(messageIds);
-            }
-        } else {
-            if (consumerBytes != null) {
-                consumerBytes.acknowledge(messageIds);
-            }
-        }
+    /**
+     * Returns the consumer used for receiving and acknowledgment, creating it if necessary.
+     * Matches useAutoConsumeSchema. Never null.
+     */
+    public Consumer<?> getConsumer() throws PulsarClientException {
+        return pulsarConsumerProperties.isUseAutoConsumeSchema()
+                ? getOrCreateGenericRecordConsumer(0, 0)
+                : getOrCreateBytesConsumer(0, 0);
     }
 
     @PreDestroy
     public void cleanup() {
-        if (consumerBytes != null) {
+        if (bytesConsumer != null) {
             try {
-                consumerBytes.close();
+                bytesConsumer.close();
                 log.info("Byte-array consumer closed.");
             } catch (Exception e) {
                 log.error("Error closing byte-array consumer", e);
             }
-            consumerBytes = null;
+            bytesConsumer = null;
         }
-        if (consumerGenericRecord != null) {
+        if (genericRecordConsumer != null) {
             try {
-                consumerGenericRecord.close();
+                genericRecordConsumer.close();
                 log.info("GenericRecord consumer closed.");
             } catch (Exception e) {
                 log.error("Error closing GenericRecord consumer", e);
             }
-            consumerGenericRecord = null;
+            genericRecordConsumer = null;
         }
         if (pulsarClient != null) {
             try {

@@ -292,10 +292,14 @@ public class PulsarSourceTest {
                 }
             };
 
+            @SuppressWarnings("unchecked")
+            Consumer<byte[]> consumerMock = mock(Consumer.class);
+            doReturn(consumerMock).when(consumerManagerMock).getConsumer();
+
             pulsarSource.ack(ackRequest);
 
-            verify(consumerManagerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
-            // Verify that the messagesToAck map is now empty.
+            verify(consumerManagerMock, times(1)).getConsumer();
+            verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
             assertFalse(messagesToAck.containsKey(ackKey));
         } catch (PulsarClientException e) {
             fail("Unexpected PulsarClientException thrown in testAckSuccessful: " + e.getMessage());
@@ -321,7 +325,7 @@ public class PulsarSourceTest {
 
         pulsarSource.ack(ackRequest);
 
-        verify(consumerManagerMock, never()).acknowledge(any());
+        verify(consumerManagerMock, never()).getConsumer();
     }
 
     /**
@@ -695,65 +699,15 @@ public class PulsarSourceTest {
     }
 
     /**
-     * When dropMessageOnSchemaValidationFailure is true and a message fails validation
-     * (e.g. non-AVRO schema), the message is acked and not sent downstream.
-     */
-    @SuppressWarnings("unchecked")
-    @Test
-    public void readWithAutoConsume_schemaValidationFailure_dropTrue_acksAndDoesNotSend() throws PulsarClientException {
-        // Use AUTO_CONSUME path with drop on schema failure
-        PulsarConsumerProperties dropProps = new PulsarConsumerProperties();
-        dropProps.setUseAutoConsumeSchema(true);
-        dropProps.setDropMessageOnSchemaValidationFailure(true);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", dropProps);
-
-        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
-        messagesToAck.clear();
-
-        // getValue() throws (e.g. invalid schema on decode) -> drop path is exercised
-        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(org.apache.pulsar.client.api.Message.class);
-        when(pulsarMsg.getValue()).thenThrow(new SchemaSerializationException("invalid schema"));
-        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
-        MessageId msgId = mock(MessageId.class);
-        when(msgId.toString()).thenReturn("msg-1");
-        when(pulsarMsg.getMessageId()).thenReturn(msgId);
-        when(pulsarMsg.getProducerName()).thenReturn("producer");
-        when(pulsarMsg.getPublishTime()).thenReturn(0L);
-        when(pulsarMsg.getEventTime()).thenReturn(0L);
-        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
-        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
-
-        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
-        Messages<GenericRecord> batch = mock(Messages.class);
-        when(batch.size()).thenReturn(1);
-        when(batch.iterator()).thenReturn(messageList.iterator());
-
-        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
-        when(consumerGenericMock.batchReceive()).thenReturn(batch);
-        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong())).thenReturn(consumerGenericMock);
-
-        ReadRequest readRequest = mock(ReadRequest.class);
-        when(readRequest.getCount()).thenReturn(10L);
-        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
-        OutputObserver observer = mock(OutputObserver.class);
-
-        pulsarSource.read(readRequest, observer);
-
-        verify(observer, never()).send(any(Message.class));
-        verify(consumerGenericMock, times(1)).acknowledge(pulsarMsg);
-    }
-
-    /**
-     * When dropMessageOnSchemaValidationFailure is false and a message fails validation
+     * When useAutoConsumeSchema is true and a message fails schema validation
      * (e.g. getValue() throws SchemaSerializationException), read() throws RuntimeException.
      */
     @SuppressWarnings("unchecked")
     @Test
-    public void readWithAutoConsume_schemaValidationFailure_dropFalse_throws() throws PulsarClientException {
-        PulsarConsumerProperties noDropProps = new PulsarConsumerProperties();
-        noDropProps.setUseAutoConsumeSchema(true);
-        noDropProps.setDropMessageOnSchemaValidationFailure(false);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", noDropProps);
+    public void readWithAutoConsume_schemaValidationFailure_throws() throws PulsarClientException {
+        PulsarConsumerProperties props = new PulsarConsumerProperties();
+        props.setUseAutoConsumeSchema(true);
+        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
 
         java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
         messagesToAck.clear();
@@ -786,11 +740,10 @@ public class PulsarSourceTest {
 
         try {
             pulsarSource.read(readRequest, observer);
-            fail("Expected RuntimeException when drop is off and schema validation fails");
+            fail("Expected RuntimeException when schema validation fails");
         } catch (RuntimeException e) {
-            assertTrue("Exception message should mention schema validation or drop flag",
-                    e.getMessage() != null && (e.getMessage().contains("Schema validation failure")
-                            || e.getMessage().contains("dropMessageOnSchemaValidationFailure")));
+            assertTrue("Exception message should mention schema validation",
+                    e.getMessage() != null && e.getMessage().contains("Schema validation failure"));
         }
     }
 

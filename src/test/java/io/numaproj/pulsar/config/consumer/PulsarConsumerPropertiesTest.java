@@ -85,28 +85,6 @@ public class PulsarConsumerPropertiesTest {
         assertFalse(properties.isUseAutoConsumeSchema());
     }
 
-    @Test
-    public void consumerProperties_dropMessageOnSchemaValidationFailure_defaultFalse() {
-        PulsarConsumerProperties properties = new PulsarConsumerProperties();
-        assertFalse("dropMessageOnSchemaValidationFailure should default to false", properties.isDropMessageOnSchemaValidationFailure());
-        properties.setDropMessageOnSchemaValidationFailure(true);
-        assertTrue(properties.isDropMessageOnSchemaValidationFailure());
-    }
-
-    /** When useAutoConsumeSchema is false (byte-array consumer), dropMessageOnSchemaValidationFailure cannot be true; init() forces it to false. */
-    @Test
-    public void consumerProperties_whenUseAutoConsumeSchemaFalse_dropForcedToFalse() {
-        PulsarConsumerProperties properties = new PulsarConsumerProperties();
-        properties.setEnv(mockEnv);
-        properties.setConsumerConfig(new HashMap<>());
-        properties.setUseAutoConsumeSchema(false);
-        properties.setDropMessageOnSchemaValidationFailure(true);
-
-        properties.init();
-
-        assertFalse("dropMessageOnSchemaValidationFailure must be false when useAutoConsumeSchema is false", properties.isDropMessageOnSchemaValidationFailure());
-    }
-
     /**
      * Verify that if 'subscriptionName' is specified in the consumerConfig,
      * it is not overwritten by the default value.

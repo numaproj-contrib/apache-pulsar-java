@@ -125,17 +125,7 @@ public class PulsarSource extends Sourcer {
                 if (!isSchemaValidationFailure(e)) {
                     throw new RuntimeException(e);
                 }
-                if (pulsarConsumerProperties.isDropMessageOnSchemaValidationFailure()) {
-                    log.warn("Dropping message (ack as processed) due to schema validation failure [topic: {}, id: {}]: {}",
-                            pMsg.getTopicName(), pMsg.getMessageId(), e.getMessage());
-                    try {
-                        consumer.acknowledge(pMsg);
-                    } catch (PulsarClientException ackEx) {
-                        log.error("Failed to ack dropped message {}", pMsg.getMessageId(), ackEx);
-                    }
-                } else {
-                    throw new RuntimeException("Schema validation failure; set dropMessageOnSchemaValidationFailure=true to drop instead", e);
-                }
+                throw new RuntimeException("Schema validation failure", e);
             }
         }
     }
@@ -162,6 +152,7 @@ public class PulsarSource extends Sourcer {
         return false;
     }
 
+    // TODO : remove this logging later to reduce log noise
     /** Builds a log-friendly string of the decoded record (field names and values). */
     private static String recordToLogString(GenericRecord record) {
         if (record == null) {
@@ -207,7 +198,8 @@ public class PulsarSource extends Sourcer {
                 .toList();
 
         try {
-            pulsarConsumerManager.acknowledge(messageIds);
+            Consumer<?> consumer = pulsarConsumerManager.getConsumer();
+            consumer.acknowledge(messageIds);
             log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
             log.error("Failed to acknowledge Pulsar messages", e);
