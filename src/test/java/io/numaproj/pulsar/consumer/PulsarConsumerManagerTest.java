@@ -126,8 +126,8 @@ public class PulsarConsumerManagerTest {
     @Test
     public void cleanup_whenConsumersAreNull() {
         try {
-            ReflectionTestUtils.setField(manager, "consumerBytes", null);
-            ReflectionTestUtils.setField(manager, "consumerGenericRecord", null);
+            ReflectionTestUtils.setField(manager, "bytesConsumer", null);
+            ReflectionTestUtils.setField(manager, "genericRecordConsumer", null);
             manager.cleanup();
             verify(mockPulsarClient, times(1)).close();
         } catch (PulsarClientException e) {
@@ -164,8 +164,8 @@ public class PulsarConsumerManagerTest {
     @Test
     public void cleanup_clientCloseThrowsException() {
         try {
-            ReflectionTestUtils.setField(manager, "consumerBytes", null);
-            ReflectionTestUtils.setField(manager, "consumerGenericRecord", null);
+            ReflectionTestUtils.setField(manager, "bytesConsumer", null);
+            ReflectionTestUtils.setField(manager, "genericRecordConsumer", null);
 
             // Simulate exception when pulsarClient.close() is invoked
             doThrow(new PulsarClientException("Client close failed")).when(mockPulsarClient).close();
