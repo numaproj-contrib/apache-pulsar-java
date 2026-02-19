@@ -61,7 +61,7 @@ public class PulsarConsumerManagerTest {
     }
 
     @Test
-    public void getOrCreateConsumer_createsNewConsumer() {
+    public void getOrCreateBytesConsumer_createsNewConsumer() {
         try {
             // Set up the chaining calls on the ConsumerBuilder mock
             when(mockPulsarClient.newConsumer(Schema.BYTES)).thenReturn(mockConsumerBuilder);
@@ -70,17 +70,13 @@ public class PulsarConsumerManagerTest {
             when(mockConsumerBuilder.subscriptionType(SubscriptionType.Shared)).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.subscribe()).thenReturn(mockConsumer);
 
-            // Call getOrCreateConsumer for the first time so it creates a new consumer
-            Consumer<byte[]> firstConsumer = manager.getOrCreateConsumer(10L, 1000L);
+            Consumer<byte[]> firstConsumer = manager.getOrCreateBytesConsumer(10L, 1000L);
             assertNotNull("A consumer should be created", firstConsumer);
             assertEquals("The returned consumer should be the mock consumer", mockConsumer, firstConsumer);
 
-            // Call again and verify that it returns the same instance (i.e.,
-            // builder.subscribe() is not called again)
-            Consumer<byte[]> secondConsumer = manager.getOrCreateConsumer(10L, 1000L);
+            Consumer<byte[]> secondConsumer = manager.getOrCreateBytesConsumer(10L, 1000L);
             assertEquals("Should return the same consumer instance", firstConsumer, secondConsumer);
 
-            // Verify that newConsumer(...) and subscribe() are invoked only once
             verify(mockPulsarClient, times(1)).newConsumer(Schema.BYTES);
             verify(mockConsumerBuilder, times(1)).subscribe();
 
@@ -108,15 +104,13 @@ public class PulsarConsumerManagerTest {
     @Test
     public void cleanup_closesConsumerAndClient() {
         try {
-            // Set up the Consumer to be non-null so that cleanup closes it
             when(mockPulsarClient.newConsumer(Schema.BYTES)).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.loadConf(anyMap())).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.batchReceivePolicy(any(BatchReceivePolicy.class))).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.subscriptionType(SubscriptionType.Shared)).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.subscribe()).thenReturn(mockConsumer);
 
-            // Create the consumer via getOrCreateConsumer
-            Consumer<byte[]> createdConsumer = manager.getOrCreateConsumer(5L, 500L);
+            Consumer<byte[]> createdConsumer = manager.getOrCreateBytesConsumer(5L, 500L);
             assertNotNull(createdConsumer);
 
             // Call cleanup and verify that close() is called on both consumer and client
@@ -130,30 +124,27 @@ public class PulsarConsumerManagerTest {
     }
 
     @Test
-    public void cleanup_whenConsumerIsNull() {
+    public void cleanup_whenConsumersAreNull() {
         try {
-            // Set currentConsumer to null explicitly
-            ReflectionTestUtils.setField(manager, "currentConsumer", null);
-
-            // Call cleanup, expecting that the client is closed even if consumer is null
+            ReflectionTestUtils.setField(manager, "consumerBytes", null);
+            ReflectionTestUtils.setField(manager, "consumerGenericRecord", null);
             manager.cleanup();
             verify(mockPulsarClient, times(1)).close();
         } catch (PulsarClientException e) {
-            fail("Unexpected PulsarClientException thrown during test cleanup_whenConsumerIsNull: " + e.getMessage());
+            fail("Unexpected PulsarClientException thrown during test cleanup_whenConsumersAreNull: " + e.getMessage());
         }
     }
 
     @Test
     public void cleanup_consumerCloseThrowsException() {
         try {
-            // Setup: create a consumer and simulate an exception on closing consumer
             when(mockPulsarClient.newConsumer(Schema.BYTES)).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.loadConf(anyMap())).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.batchReceivePolicy(any(BatchReceivePolicy.class))).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.subscriptionType(SubscriptionType.Shared)).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.subscribe()).thenReturn(mockConsumer);
 
-            Consumer<byte[]> createdConsumer = manager.getOrCreateConsumer(3L, 300L);
+            Consumer<byte[]> createdConsumer = manager.getOrCreateBytesConsumer(3L, 300L);
             assertNotNull(createdConsumer);
 
             // Simulate exception when consumer.close() is invoked
@@ -173,8 +164,8 @@ public class PulsarConsumerManagerTest {
     @Test
     public void cleanup_clientCloseThrowsException() {
         try {
-            // Set up consumer as null so that only client.close() is invoked during cleanup
-            ReflectionTestUtils.setField(manager, "currentConsumer", null);
+            ReflectionTestUtils.setField(manager, "consumerBytes", null);
+            ReflectionTestUtils.setField(manager, "consumerGenericRecord", null);
 
             // Simulate exception when pulsarClient.close() is invoked
             doThrow(new PulsarClientException("Client close failed")).when(mockPulsarClient).close();

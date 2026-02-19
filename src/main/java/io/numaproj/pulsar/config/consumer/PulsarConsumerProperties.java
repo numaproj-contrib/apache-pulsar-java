@@ -31,20 +31,25 @@ public class PulsarConsumerProperties {
     /**
      * When true (default), the consumer uses Schema.AUTO_CONSUME so the client validates
      * each message against the topic schema when decoding. When false, uses Schema.BYTES
-     * (no schema check; messages are read as raw bytes). Mirror of producer's useAutoProduceSchema.
+     * (no schema check; messages are read as raw bytes). For the byte-array consumer path,
+     * dropMessageOnSchemaValidationFailure is irrelevant and not used.
      */
     private boolean useAutoConsumeSchema = true;
 
     /**
      * When true, a message that fails schema validation (e.g. wrong Avro schema) is dropped:
-     * the message is ack'd as if processed (removed from subscription) and the consumer continues.
-     * When false (default), validation failure throws and the application fails (current behavior).
-     * Only applies when useAutoConsumeSchema is true.
+     * the message is ack'd as if processed and the consumer continues. When false (default),
+     * validation failure throws. Only applies when useAutoConsumeSchema is true; when false
+     * (byte-array consumer) this flag is ignored and must not be true.
      */
     private boolean dropMessageOnSchemaValidationFailure = false;
 
     @PostConstruct
     public void init() {
+        if (!useAutoConsumeSchema && dropMessageOnSchemaValidationFailure) {
+            log.warn("dropMessageOnSchemaValidationFailure is ignored when useAutoConsumeSchema is false (byte-array consumer); forcing to false.");
+            dropMessageOnSchemaValidationFailure = false;
+        }
         // Pulsar expects topicNames to be type Set<String>. Config accepts a single string
         // (one topic) or comma-separated topics (e.g. "topic1,topic2,topic3").
         String topicNameKey = "topicNames";

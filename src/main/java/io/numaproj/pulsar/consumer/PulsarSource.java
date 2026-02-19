@@ -17,6 +17,7 @@ import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.SchemaSerializationException;
 import org.apache.pulsar.client.api.schema.GenericRecord;
+import org.apache.pulsar.client.api.schema.Field;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.policies.data.TopicStats;
@@ -82,7 +83,7 @@ public class PulsarSource extends Sourcer {
     }
 
     private void readWithBytes(ReadRequest request, OutputObserver observer) throws PulsarClientException {
-        Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
+        Consumer<byte[]> consumer = pulsarConsumerManager.getOrCreateBytesConsumer(request.getCount(), request.getTimeout().toMillis());
         Messages<byte[]> batchMessages = consumer.batchReceive();
 
         if (batchMessages == null || batchMessages.size() == 0) {
@@ -100,7 +101,7 @@ public class PulsarSource extends Sourcer {
     }
 
     private void readWithAutoConsume(ReadRequest request, OutputObserver observer) throws PulsarClientException {
-        Consumer<GenericRecord> consumer = pulsarConsumerManager.getOrCreateConsumer(request.getCount(), request.getTimeout().toMillis());
+        Consumer<GenericRecord> consumer = pulsarConsumerManager.getOrCreateGenericRecordConsumer(request.getCount(), request.getTimeout().toMillis());
         Messages<GenericRecord> batchMessages = consumer.batchReceive();
 
         if (batchMessages == null || batchMessages.size() == 0) {
@@ -111,11 +112,12 @@ public class PulsarSource extends Sourcer {
         for (org.apache.pulsar.client.api.Message<GenericRecord> pMsg : batchMessages) {
 
             try {
-                GenericRecord record = pMsg.getValue();
-                byte[] payloadBytes = GenericRecordToBytes.toBytes(record);
+                GenericRecord record = pMsg.getValue(); 
+                byte[] payloadBytes = pMsg.getData();
 
+                String decoded = recordToLogString(record);
                 // TODO : change to .debug or .trace to reduce log noise
-                log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes", pMsg.getTopicName(), pMsg.getMessageId(), payloadBytes.length);
+                log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes, decoded={}", pMsg.getTopicName(), pMsg.getMessageId(), payloadBytes.length, decoded);
                 sendMessage(pMsg, payloadBytes, observer);
             } catch (Exception e) {
                 if (!isSchemaValidationFailure(e)) {
@@ -158,6 +160,28 @@ public class PulsarSource extends Sourcer {
         return false;
     }
 
+    /** Builds a log-friendly string of the decoded record (field names and values). */
+    private static String recordToLogString(GenericRecord record) {
+        if (record == null) {
+            return "null";
+        }
+        List<Field> fields = record.getFields();
+        if (fields == null || fields.isEmpty()) {
+            return record.getSchemaType() + ":{}";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(record.getSchemaType()).append(":{");
+        for (int i = 0; i < fields.size(); i++) {
+            if (i > 0) sb.append(", ");
+            Field f = fields.get(i);
+            String name = f.getName();
+            Object value = record.getField(f);
+            sb.append(name).append("=").append(value);
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
     @Override
     public void ack(AckRequest request) {
         // Offsets are topicName + messageId (same as messagesToAck key).
@@ -181,8 +205,7 @@ public class PulsarSource extends Sourcer {
                 .toList();
 
         try {
-            Consumer<?> consumer = pulsarConsumerManager.getOrCreateConsumer(0, 0);
-            consumer.acknowledge(messageIds);
+            pulsarConsumerManager.acknowledge(messageIds);
             log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
             log.error("Failed to acknowledge Pulsar messages", e);
