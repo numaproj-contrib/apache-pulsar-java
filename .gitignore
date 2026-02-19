@@ -34,5 +34,8 @@ build/
 ### Local env ###
 .env
 
+### Register-schema scripts (dev/local) ###
+development/scripts/register-schema/
+
 ### Mac OS ###
 .DS_Store

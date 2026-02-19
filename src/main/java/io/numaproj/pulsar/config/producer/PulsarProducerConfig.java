@@ -13,6 +13,9 @@ import org.springframework.core.env.Environment;
 
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.pulsar.common.schema.SchemaInfo;
+
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,8 +28,8 @@ public class PulsarProducerConfig {
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true", matchIfMissing = false)
-    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties, PulsarAdmin pulsarAdmin)
-            throws Exception {
+    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties,
+            PulsarAdmin pulsarAdmin) throws Exception {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
         String producerName = "producerName";
 
@@ -37,7 +40,6 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
-        // Validate that the topic configured in the producer config 
         String topicName = (String) producerConfig.get("topicName");
         if (topicName == null || topicName.trim().isEmpty()) {
             throw new IllegalArgumentException("Topic name must be configured in producer config");
@@ -45,9 +47,25 @@ public class PulsarProducerConfig {
 
         validateTopicExists(pulsarAdmin, topicName);
 
-        return pulsarClient.newProducer(Schema.BYTES)
+        final Schema<byte[]> schema;
+        if (pulsarProducerProperties.isUseAutoProduceSchema()) {
+            schema = Schema.AUTO_PRODUCE_BYTES();
+            ensureAutoProduceBytesSchema(schema);
+        } else {
+            schema = Schema.BYTES;
+            log.info("Producer using Schema.BYTES: no broker-side schema validation.");
+        }
+
+        Producer<byte[]> producer = pulsarClient.newProducer(schema)
                 .loadConf(producerConfig)
                 .create();
+
+        SchemaInfo schemaInfo = schema.getSchemaInfo();
+        log.info("Producer connected; schema initialized: type={}, name={}, schema={}",
+                schemaInfo.getType(), schemaInfo.getName(),
+                schemaInfo.getSchema() != null ? new String(schemaInfo.getSchema(), StandardCharsets.UTF_8) : "null");
+
+        return producer;
     }
 
     private void validateTopicExists(PulsarAdmin pulsarAdmin, String topicName) throws PulsarAdminException {
@@ -76,5 +94,20 @@ public class PulsarProducerConfig {
         
         String errorMsg = String.format("Topic '%s' does not exist. Please create the topic before starting the producer.", topicName);
         throw new IllegalStateException(errorMsg);
+    }
+
+    /**
+     * Verifies we are not using Schema.BYTES when useAutoProduceSchema is true. Ensures
+     * Schema.AUTO_PRODUCE_BYTES() is the one passed to the producer.
+     */
+    private void ensureAutoProduceBytesSchema(Schema<byte[]> schema) {
+        if (schema == Schema.BYTES) {
+            throw new IllegalStateException(
+                "Expected Schema.AUTO_PRODUCE_BYTES() but got Schema.BYTES. Ensure useAutoProduceSchema is true.");
+        }
+        else {
+            // Do not call schema.getSchemaInfo() here: AUTO_PRODUCE_BYTES is not initialized until producer connects.
+            log.info("Schema.AUTO_PRODUCE_BYTES() is the one passed to the producer. schema.getClass().getName()={}", schema.getClass().getName());
+        }
     }
 }
