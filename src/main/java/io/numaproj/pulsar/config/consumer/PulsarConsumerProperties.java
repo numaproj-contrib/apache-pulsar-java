@@ -33,6 +33,8 @@ public class PulsarConsumerProperties {
      * each message against the topic schema when decoding. When false, uses Schema.BYTES
      * (no schema check; messages are read as raw bytes). For the byte-array consumer path,
      * dropMessageOnSchemaValidationFailure is irrelevant and not used.
+     * When the topic has no schema (Pulsar treats it as BYTES), no validation and no decoding
+     * is performed on the message bytes; they are passed through as bytes.
      */
     private boolean useAutoConsumeSchema = true;
 

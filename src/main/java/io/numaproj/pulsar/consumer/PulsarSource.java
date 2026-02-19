@@ -42,7 +42,9 @@ import java.util.Set;
 public class PulsarSource extends Sourcer {
 
     // Map tracking received messages (keyed by topicName + messageId for multi-topic support).
-    // Holds either Message<byte[]> or Message<GenericRecord> depending on useAutoConsumeSchema.
+    // Value is Message<?> because we hold either Message<byte[]> or Message<GenericRecord> depending on
+    // useAutoConsumeSchema. only use the Message interface from the map (getMessageId, getTopicName, etc.
+    // for ack and buildHeaders), never the payload type, so a single map with Message<?> is appropriate;
     private final Map<String, org.apache.pulsar.client.api.Message<?>> messagesToAck = new HashMap<>();
 
     private Server server;
@@ -214,7 +216,7 @@ public class PulsarSource extends Sourcer {
     }
 
     /**
-     * Builds headers from Pulsar message metadata. Works for both Message&lt;byte[]&gt; and Message&lt;GenericRecord&gt;.
+     * Builds headers from Pulsar message metadata. Works for both Message<?> (byte[] or GenericRecord).
      */
     private Map<String, String> buildHeaders(org.apache.pulsar.client.api.Message<?> pulsarMessage) {
         Map<String, String> headers = new HashMap<>();
