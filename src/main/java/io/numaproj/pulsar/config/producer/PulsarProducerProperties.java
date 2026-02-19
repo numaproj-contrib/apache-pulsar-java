@@ -23,4 +23,12 @@ public class PulsarProducerProperties {
      * schema field validation, validate payloads client-side before send.
      */
     private boolean useAutoProduceSchema = true;
+
+    /**
+     * When true, messages that fail schema/serialization validation (e.g. SchemaSerializationException)
+     * are dropped: the sink responds OK so the message is not retried, and the invalid payload is not
+     * sent to Pulsar. When false (default), such messages are reported as failures and may be retried.
+     * Configure in YAML as: spring.pulsar.producer.drop-invalid-messages: true
+     */
+    private boolean dropInvalidMessages = false;
 }
