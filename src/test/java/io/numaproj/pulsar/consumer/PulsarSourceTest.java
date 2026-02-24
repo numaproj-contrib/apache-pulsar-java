@@ -743,10 +743,13 @@ public class PulsarSourceTest {
             pulsarSource.read(readRequest, observer);
             fail("Expected RuntimeException when getValue() throws");
         } catch (RuntimeException e) {
-            assertNotNull("Expected cause (e.g. SchemaSerializationException)", e.getCause());
-            assertTrue("Cause should be schema serialization failure",
-                    e.getCause() instanceof SchemaSerializationException);
-            assertTrue("Cause message", e.getCause().getMessage().contains("invalid schema"));
+            assertNotNull("Expected cause", e.getCause());
+            // read() wraps in RuntimeException, so cause may be our RuntimeException (with SchemaSerializationException) or double-wrapped
+            Throwable cause = e.getCause();
+            Throwable schemaFailure = (cause instanceof SchemaSerializationException) ? cause : cause.getCause();
+            assertNotNull("Expected SchemaSerializationException in cause chain", schemaFailure);
+            assertTrue("Cause should be schema serialization failure", schemaFailure instanceof SchemaSerializationException);
+            assertTrue("Cause message", schemaFailure.getMessage().contains("invalid schema"));
         }
     }
 
