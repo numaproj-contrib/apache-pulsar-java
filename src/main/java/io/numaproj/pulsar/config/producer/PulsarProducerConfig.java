@@ -50,7 +50,6 @@ public class PulsarProducerConfig {
         final Schema<byte[]> schema;
         if (pulsarProducerProperties.isUseAutoProduceSchema()) {
             schema = Schema.AUTO_PRODUCE_BYTES();
-            ensureAutoProduceBytesSchema(schema);
         } else {
             schema = Schema.BYTES;
             log.info("Producer using Schema.BYTES: no broker-side schema validation.");
@@ -94,20 +93,5 @@ public class PulsarProducerConfig {
         
         String errorMsg = String.format("Topic '%s' does not exist. Please create the topic before starting the producer.", topicName);
         throw new IllegalStateException(errorMsg);
-    }
-
-    /**
-     * Verifies we are not using Schema.BYTES when useAutoProduceSchema is true. Ensures
-     * Schema.AUTO_PRODUCE_BYTES() is the one passed to the producer.
-     */
-    private void ensureAutoProduceBytesSchema(Schema<byte[]> schema) {
-        if (schema == Schema.BYTES) {
-            throw new IllegalStateException(
-                "Expected Schema.AUTO_PRODUCE_BYTES() but got Schema.BYTES. Ensure useAutoProduceSchema is true.");
-        }
-        else {
-            // Do not call schema.getSchemaInfo() here: AUTO_PRODUCE_BYTES is not initialized until producer connects.
-            log.info("Schema.AUTO_PRODUCE_BYTES() is the one passed to the producer. schema.getClass().getName()={}", schema.getClass().getName());
-        }
     }
 }
