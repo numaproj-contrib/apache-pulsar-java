@@ -67,8 +67,6 @@ public class PulsarSink extends Sinker {
             final byte[] msg = datum.getValue();
             final String msgId = datum.getId();
 
-            // Won't wait for broker to confirm receipt of msg before continuing
-            // sendSync returns CompletableFuture which will complete when broker ack
             CompletableFuture<Void> future = producer.sendAsync(msg)
                     .thenAccept(messageId -> {
                         log.info("Processed message ID: {}, Content: {}", msgId, new String(msg));
@@ -76,9 +74,9 @@ public class PulsarSink extends Sinker {
                     })
                     .exceptionally(ex -> {
                         Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
-                        if (producerProperties.isDropInvalidMessages() && isSchemaSerializationFailure(cause)) {
+                        if (producerProperties.isDropInvalidMessages() && isSchemaSerializationFailure(cause != null ? cause : ex)) {
                             log.warn("Dropping message ID {} due to schema/serialization error (drop-invalid-messages=true): {}",
-                                    msgId, cause.getMessage());
+                                    msgId, cause != null ? cause.getMessage() : ex.getMessage());
                             responseListBuilder.addResponse(Response.responseOK(msgId));
                         } else {
                             log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
@@ -96,6 +94,10 @@ public class PulsarSink extends Sinker {
         return responseListBuilder.build();
     }
 
+    /**
+     * True if the failure is due to schema/serialization (e.g. invalid Avro, EOF).
+     * Pulsar wraps these in SchemaSerializationException (e.g. around EOFException).
+     */
     private static boolean isSchemaSerializationFailure(Throwable t) {
         for (Throwable c = t; c != null; c = c.getCause()) {
             if (c instanceof SchemaSerializationException) {
