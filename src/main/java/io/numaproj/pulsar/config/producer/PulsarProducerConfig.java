@@ -40,6 +40,7 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
+        // Validate that the topic configured in the producer config exists in the Pulsar cluster
         String topicName = (String) producerConfig.get("topicName");
         if (topicName == null || topicName.trim().isEmpty()) {
             throw new IllegalArgumentException("Topic name must be configured in producer config");

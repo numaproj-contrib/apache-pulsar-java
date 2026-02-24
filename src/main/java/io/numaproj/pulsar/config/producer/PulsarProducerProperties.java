@@ -18,17 +18,14 @@ public class PulsarProducerProperties {
 
     /**
      * When true (default), the producer uses Schema.AUTO_PRODUCE_BYTES so the broker enforces
-     * format compatibility (e.g. payload must be decodable as JSON/Avro). This is not full
-     * field-level validation. When false, uses Schema.BYTES (no format check). For strict
-     * schema field validation, validate payloads client-side before send.
+     * format compatibility based on registered topic schema.
      */
     private boolean useAutoProduceSchema = true;
 
     /**
      * When true, messages that fail schema/serialization validation (e.g. SchemaSerializationException)
      * are dropped: the sink responds OK so the message is not retried, and the invalid payload is not
-     * sent to Pulsar. When false (default), such messages are reported as failures and may be retried.
-     * Configure in YAML as: spring.pulsar.producer.drop-invalid-messages: true
+     * sent to Pulsar. When false (default), such messages are reported as failures downstream and may be retried.
      */
     private boolean dropInvalidMessages = false;
 }

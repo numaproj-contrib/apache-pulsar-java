@@ -15,7 +15,11 @@ data:
             # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}" 
         producer:
           enabled: true
-          producerConfig: 
+          # Use broker schema to validate payloads; when false, uses Schema.BYTES (no validation).
+          use-auto-produce-schema: true
+          # When true, drop messages that fail schema/serialization (respond OK, no retry). When false, report failure.
+          drop-invalid-messages: false
+          producerConfig:
             topicName: "persistent://public/default/test-topic"
         admin: 
           adminConfig: # Accepts the same key-value pair configurations as pulsar client: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
