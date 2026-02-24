@@ -142,7 +142,7 @@ public class PulsarSource extends Sourcer {
 
     /** True if the exception indicates schema deserialization failure. The Pulsar client throws
      * SchemaSerializationException when decoding fails (e.g. schema mismatch, bad payload)
-     * and often wraps underlying IOException from the decoder as the cause. */
+     * and wraps underlying IOException from the decoder as the cause. */
     private static boolean isSchemaValidationFailure(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
             if (t instanceof SchemaSerializationException) {
