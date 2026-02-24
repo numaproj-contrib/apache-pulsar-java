@@ -114,7 +114,7 @@ public class PulsarSource extends Sourcer {
         for (org.apache.pulsar.client.api.Message<GenericRecord> pMsg : batchMessages) {
 
             try {
-                GenericRecord record = pMsg.getValue(); 
+                GenericRecord record = pMsg.getValue(); // This will throw SchemaSerializationException if the message is not valid based on the topic schema 
                 byte[] payloadBytes = pMsg.getData();
 
                 String decoded = recordToLogString(record);
@@ -122,10 +122,10 @@ public class PulsarSource extends Sourcer {
                 log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes, decoded={}", pMsg.getTopicName(), pMsg.getMessageId(), payloadBytes.length, decoded);
                 sendMessage(pMsg, payloadBytes, observer);
             } catch (Exception e) {
-                if (!isSchemaValidationFailure(e)) {
-                    throw new RuntimeException(e);
+                if (isSchemaValidationFailure(e)) {
+                    throw new RuntimeException("Schema validation failure", e);
                 }
-                throw new RuntimeException("Schema validation failure", e);
+                throw new RuntimeException(e);
             }
         }
     }
@@ -140,12 +140,12 @@ public class PulsarSource extends Sourcer {
         messagesToAck.put(topicMessageIdKey, pMsg);
     }
 
-    /** True if the exception indicates message schema validation / deserialization failure (wrong schema, unsupported type, or decode I/O). */
+    /** True if the exception indicates schema deserialization failure. The Pulsar client throws
+     * SchemaSerializationException when decoding fails (e.g. schema mismatch, bad payload)
+     * and often wraps underlying IOException from the decoder as the cause. */
     private static boolean isSchemaValidationFailure(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
-            if (t instanceof SchemaSerializationException
-                    || t instanceof IOException
-                    || t instanceof UnsupportedOperationException) {
+            if (t instanceof SchemaSerializationException) {
                 return true;
             }
         }
@@ -198,8 +198,11 @@ public class PulsarSource extends Sourcer {
                 .toList();
 
         try {
-            Consumer<?> consumer = pulsarConsumerManager.getConsumer();
-            consumer.acknowledge(messageIds);
+            if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
+                pulsarConsumerManager.getOrCreateGenericRecordConsumer(0, 0).acknowledge(messageIds);
+            } else {
+                pulsarConsumerManager.getOrCreateBytesConsumer(0, 0).acknowledge(messageIds);
+            }
             log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
             log.error("Failed to acknowledge Pulsar messages", e);

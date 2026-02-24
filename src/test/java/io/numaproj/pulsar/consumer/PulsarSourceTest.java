@@ -294,11 +294,11 @@ public class PulsarSourceTest {
 
             @SuppressWarnings("unchecked")
             Consumer<byte[]> consumerMock = mock(Consumer.class);
-            doReturn(consumerMock).when(consumerManagerMock).getConsumer();
+            doReturn(consumerMock).when(consumerManagerMock).getOrCreateBytesConsumer(0L, 0L);
 
             pulsarSource.ack(ackRequest);
 
-            verify(consumerManagerMock, times(1)).getConsumer();
+            verify(consumerManagerMock, times(1)).getOrCreateBytesConsumer(0L, 0L);
             verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
             assertFalse(messagesToAck.containsKey(ackKey));
         } catch (PulsarClientException e) {
@@ -325,7 +325,8 @@ public class PulsarSourceTest {
 
         pulsarSource.ack(ackRequest);
 
-        verify(consumerManagerMock, never()).getConsumer();
+        verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+        verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
     }
 
     /**
@@ -740,10 +741,12 @@ public class PulsarSourceTest {
 
         try {
             pulsarSource.read(readRequest, observer);
-            fail("Expected RuntimeException when schema validation fails");
+            fail("Expected RuntimeException when getValue() throws");
         } catch (RuntimeException e) {
-            assertTrue("Exception message should mention schema validation",
-                    e.getMessage() != null && e.getMessage().contains("Schema validation failure"));
+            assertNotNull("Expected cause (e.g. SchemaSerializationException)", e.getCause());
+            assertTrue("Cause should be schema serialization failure",
+                    e.getCause() instanceof SchemaSerializationException);
+            assertTrue("Cause message", e.getCause().getMessage().contains("invalid schema"));
         }
     }
 

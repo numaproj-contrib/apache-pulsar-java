@@ -48,7 +48,7 @@ public class PulsarConsumerManager {
         bytesConsumer = pulsarClient.newConsumer(Schema.BYTES)
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
-                .subscriptionType(SubscriptionType.Shared)
+                .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
                 .subscribe();
         log.info("Created byte-array consumer; batch receive: {}, timeoutMillis: {}", count, timeoutMillis);
         return bytesConsumer;
@@ -66,20 +66,10 @@ public class PulsarConsumerManager {
         genericRecordConsumer = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
                 .batchReceivePolicy(batchPolicy)
-                .subscriptionType(SubscriptionType.Shared)
+                .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
                 .subscribe();
         log.info("Created AUTO_CONSUME (GenericRecord) consumer; batch receive: {}, timeoutMillis: {}", count, timeoutMillis);
         return genericRecordConsumer;
-    }
-
-    /**
-     * Returns the consumer used for receiving and acknowledgment, creating it if necessary.
-     * Matches useAutoConsumeSchema. Never null.
-     */
-    public Consumer<?> getConsumer() throws PulsarClientException {
-        return pulsarConsumerProperties.isUseAutoConsumeSchema()
-                ? getOrCreateGenericRecordConsumer(0, 0)
-                : getOrCreateBytesConsumer(0, 0);
     }
 
     @PreDestroy
