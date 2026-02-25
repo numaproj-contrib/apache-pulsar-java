@@ -15,4 +15,26 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "spring.pulsar.producer")
 public class PulsarProducerProperties {
     private Map<String, Object> producerConfig = new HashMap<>(); // Default to an empty map
+
+    /**
+     * When true (default), the producer uses Schema.AUTO_PRODUCE_BYTES so the broker enforces
+     * format compatibility based on registered topic schema.
+     */
+    private boolean useAutoProduceSchema = true;
+
+    /**
+     * When true, messages that fail schema/serialization validation (e.g. SchemaSerializationException)
+     * are dropped: the sink responds OK so the message is not retried, and the invalid payload is not
+     * sent to Pulsar. When false (default), such messages are reported as failures downstream and may be retried.
+     */
+    private boolean dropInvalidMessages = false;
+
+    public void validateConfig() {
+        if (!useAutoProduceSchema && dropInvalidMessages) {
+            throw new IllegalArgumentException(
+                "Invalid combination: useAutoProduceSchema=false and dropInvalidMessages=true. "
+                    + "dropInvalidMessages only applies when useAutoProduceSchema is true (broker validates schema). "
+                    + "With Schema.BYTES there is no schema validation, so dropInvalidMessages has no effect.");
+        }
+    }
 }

@@ -3,12 +3,14 @@ package io.numaproj.pulsar.numaflow;
 import io.numaproj.numaflow.sinker.Datum;
 import io.numaproj.numaflow.sinker.DatumIterator;
 import io.numaproj.numaflow.sinker.ResponseList;
+import io.numaproj.pulsar.config.producer.PulsarProducerProperties;
 import io.numaproj.pulsar.producer.PulsarSink;
 
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SchemaSerializationException;
 import org.junit.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.Assert.*;
@@ -16,6 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 public class PulsarSinkTest {
 
@@ -52,7 +55,7 @@ public class PulsarSinkTest {
     // Failed to process messages because the thread waiting for the next datum is
     // interrupted; no new messages
     @Test
-    public void processMessages_responseFailure_datumInterupted() throws Exception {
+    public void processMessages_responseFailure_datumInterrupted() throws Exception {
         PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
         DatumIterator mockIterator = mock(DatumIterator.class);
@@ -80,6 +83,9 @@ public class PulsarSinkTest {
         Datum mockDatum = mock(Datum.class);
 
         ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
+        PulsarProducerProperties producerProperties = new PulsarProducerProperties();
+        producerProperties.setDropInvalidMessages(false);
+        ReflectionTestUtils.setField(pulsarSink, "producerProperties", producerProperties);
 
         byte[] testMessage = "test message".getBytes();
 
@@ -131,6 +137,9 @@ public class PulsarSinkTest {
         Datum mockDatum2 = mock(Datum.class);
 
         ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
+        PulsarProducerProperties producerProperties = new PulsarProducerProperties();
+        producerProperties.setDropInvalidMessages(false);
+        ReflectionTestUtils.setField(pulsarSink, "producerProperties", producerProperties);
 
         byte[] testMessage1 = "message part 1".getBytes();
         byte[] testMessage2 = "message part 2".getBytes();
@@ -166,6 +175,36 @@ public class PulsarSinkTest {
         assertFalse(response.getResponses().get(1).getSuccess());
         assertEquals("msg-2", response.getResponses().get(1).getId());
         assertTrue(response.getResponses().get(1).getErr().contains(exceptionMessage));
+    }
+
+    // When future completes with SchemaSerializationException (async) and dropInvalidMessages is true, message is dropped.
+    @Test
+    public void processMessages_dropInvalidMessagesTrue_asyncSchemaSerializationException_dropsMessage() throws Exception {
+        PulsarSink pulsarSink = new PulsarSink();
+        ByteProducer mockProducer = mock(ByteProducer.class);
+        DatumIterator mockIterator = mock(DatumIterator.class);
+        Datum mockDatum = mock(Datum.class);
+
+        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
+        PulsarProducerProperties producerProperties = new PulsarProducerProperties();
+        producerProperties.setDropInvalidMessages(true);
+        ReflectionTestUtils.setField(pulsarSink, "producerProperties", producerProperties);
+
+        byte[] testMessage = "invalid".getBytes();
+        when(mockDatum.getValue()).thenReturn(testMessage);
+        when(mockDatum.getId()).thenReturn("msg-schema");
+        when(mockIterator.next()).thenReturn(mockDatum, (Datum) null);
+
+        CompletableFuture<MessageId> future = new CompletableFuture<>();
+        future.completeExceptionally(new CompletionException(new SchemaSerializationException("Incompatible schema")));
+        when(mockProducer.sendAsync(testMessage)).thenReturn(future);
+
+        ResponseList response = pulsarSink.processMessages(mockIterator);
+
+        verify(mockProducer).sendAsync(testMessage);
+        assertEquals(1, response.getResponses().size());
+        assertTrue("Expected message to be dropped (async schema error)", response.getResponses().get(0).getSuccess());
+        assertEquals("msg-schema", response.getResponses().get(0).getId());
     }
 
 }
