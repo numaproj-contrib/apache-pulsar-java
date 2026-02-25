@@ -28,4 +28,13 @@ public class PulsarProducerProperties {
      * sent to Pulsar. When false (default), such messages are reported as failures downstream and may be retried.
      */
     private boolean dropInvalidMessages = false;
+
+    public void validateConfig() {
+        if (!useAutoProduceSchema && dropInvalidMessages) {
+            throw new IllegalArgumentException(
+                "Invalid combination: useAutoProduceSchema=false and dropInvalidMessages=true. "
+                    + "dropInvalidMessages only applies when useAutoProduceSchema is true (broker validates schema). "
+                    + "With Schema.BYTES there is no schema validation, so dropInvalidMessages has no effect.");
+        }
+    }
 }

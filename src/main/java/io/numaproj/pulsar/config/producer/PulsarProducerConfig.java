@@ -33,6 +33,8 @@ public class PulsarProducerConfig {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
         String producerName = "producerName";
 
+        pulsarProducerProperties.validateConfig();
+
         Map<String, Object> producerConfig = pulsarProducerProperties.getProducerConfig();
         if (producerConfig.containsKey(producerName)) {
             log.warn("User configured a 'producerName' in the config, but this can cause errors if multiple pods spin "

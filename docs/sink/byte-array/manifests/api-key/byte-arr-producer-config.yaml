@@ -17,7 +17,7 @@ data:
           enabled: true
           # Use broker schema to validate payloads; when false, uses Schema.BYTES (no validation).
           use-auto-produce-schema: true
-          # When true, drop messages that fail schema/serialization (respond OK, no retry). When false, report failure.
+          # When true, drop messages that fail schema/serialization and continue publishing.
           drop-invalid-messages: false
           producerConfig:
             topicName: "persistent://public/default/test-topic"

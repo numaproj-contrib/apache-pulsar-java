@@ -78,6 +78,9 @@ public class PulsarSink extends Sinker {
                             log.warn("Dropping message ID {} due to schema/serialization error (drop-invalid-messages=true): {}",
                                     msgId, cause != null ? cause.getMessage() : ex.getMessage());
                             responseListBuilder.addResponse(Response.responseOK(msgId));
+                        } else if (isSchemaSerializationFailure(cause != null ? cause : ex)) {
+                            log.warn("Message ID {} failed schema validation, messages produced do not align with topic schema: {}", msgId, cause != null ? cause.getMessage() : ex.getMessage());
+                            responseListBuilder.addResponse(Response.responseFailure(msgId, cause != null ? cause.getMessage() : ex.getMessage()));
                         } else {
                             log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
                             responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
