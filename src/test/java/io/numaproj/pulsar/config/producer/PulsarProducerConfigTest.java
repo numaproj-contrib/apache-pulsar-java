@@ -218,6 +218,27 @@ public class PulsarProducerConfigTest {
         verify(mockProducerBuilder, never()).create();
     }
 
+    // Test that useAutoProduceSchema=false and dropInvalidMessages=true is rejected
+    @Test
+    public void pulsarProducer_useAutoProduceSchemaFalse_dropInvalidMessagesTrue_throwsException() throws Exception {
+        PulsarProducerProperties properties = new PulsarProducerProperties();
+        properties.setUseAutoProduceSchema(false);
+        properties.setDropInvalidMessages(true);
+        Map<String, Object> producerConfig = new HashMap<>();
+        producerConfig.put("topicName", "persistent://tenant/namespace/test-topic");
+        properties.setProducerConfig(producerConfig);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> spiedConfig.pulsarProducer(mockClient, properties, mockAdmin));
+
+        assertTrue("Message should describe invalid combination",
+                exception.getMessage().contains("useAutoProduceSchema=false and dropInvalidMessages=true"));
+        assertTrue("Message should mention dropInvalidMessages only applies with auto-produce",
+                exception.getMessage().contains("dropInvalidMessages only applies when useAutoProduceSchema is true"));
+        verify(mockProducerBuilder, never()).create();
+    }
+
     // Test for partitioned topic that exists (happy path)
     @Test
     public void pulsarProducer_partitionedTopicExists() throws Exception {
