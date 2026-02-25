@@ -43,7 +43,7 @@ public class PulsarConsumerManager {
         }
         BatchReceivePolicy batchPolicy = BatchReceivePolicy.builder()
                 .maxNumMessages((int) count)
-                .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS)
+                .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS) // We do not expect user to specify a number larger than 2^63 - 1 which will cause an overflow
                 .build();
         bytesConsumer = pulsarClient.newConsumer(Schema.BYTES)
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())
@@ -61,7 +61,7 @@ public class PulsarConsumerManager {
         }
         BatchReceivePolicy batchPolicy = BatchReceivePolicy.builder()
                 .maxNumMessages((int) count)
-                .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS)
+                .timeout((int) timeoutMillis, TimeUnit.MILLISECONDS) // We do not expect user to specify a number larger than 2^63 - 1 which will cause an overflow
                 .build();
         genericRecordConsumer = pulsarClient.newConsumer(Schema.AUTO_CONSUME())
                 .loadConf(pulsarConsumerProperties.getConsumerConfig())

@@ -67,7 +67,7 @@ public class PulsarSourceTest {
             pulsarSource = new PulsarSource();
             consumerManagerMock = mock(PulsarConsumerManager.class);
             consumerMock = mock(Consumer.class);
-             // Inject the mocked PulsarConsumerManager into pulsarSource using
+            // Inject the mocked PulsarConsumerManager into pulsarSource using
             // ReflectionTestUtils.
             ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerManager", consumerManagerMock);
             PulsarConsumerProperties consumerProperties = new PulsarConsumerProperties();
@@ -112,7 +112,8 @@ public class PulsarSourceTest {
 
             // Call read.
             pulsarSource.read(readRequest, observer);
-            // Since messagesToAck is not empty, read returns early and does not call consumer manager.
+            // Since messagesToAck is not empty, read returns early and does not call
+            // consumer manager.
             verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
             verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
             verify(observer, never()).send(any(Message.class));
@@ -177,7 +178,7 @@ public class PulsarSourceTest {
             when(msg2.getMessageId()).thenReturn(msgId2);
             when(msg1.getValue()).thenReturn("Hello".getBytes(StandardCharsets.UTF_8));
             when(msg2.getValue()).thenReturn("World".getBytes(StandardCharsets.UTF_8));
-            
+
             // Stub metadata methods required by buildHeaders()
             when(msg1.getProducerName()).thenReturn("test-producer");
             when(msg2.getProducerName()).thenReturn("test-producer");
@@ -221,7 +222,7 @@ public class PulsarSourceTest {
             verify(observer, times(2)).send(messageCaptor.capture());
             java.util.List<Message> sentMessages = messageCaptor.getAllValues();
             assertEquals(2, sentMessages.size());
-            
+
             // Validate contents of messages using getValue().
             assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
             assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
@@ -252,7 +253,8 @@ public class PulsarSourceTest {
             assertEquals("1.2.3", secondMessage.getHeaders().get("app-version"));
 
             // Confirm messages are tracked for ack.
-            // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic support.
+            // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic
+            // support.
             java.util.Map<String, ?> ackMap = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
                     "messagesToAck");
             assertTrue(ackMap.containsKey("test-topicmsg1"));
@@ -559,7 +561,8 @@ public class PulsarSourceTest {
     }
 
     /**
-     * Tests that getPartitions returns a flat list of indices across multiple topics
+     * Tests that getPartitions returns a flat list of indices across multiple
+     * topics
      * (e.g. topic-a with 3 partitions -> 0,1,2; topic-b with 2 -> 3,4).
      */
     @Test
@@ -635,7 +638,8 @@ public class PulsarSourceTest {
     }
 
     /**
-     * AUTO_CONSUME happy path: payload is getData() (raw message bytes) and sent downstream.
+     * AUTO_CONSUME happy path: payload is getData() (raw message bytes) and sent
+     * downstream.
      */
     @SuppressWarnings("unchecked")
     @Test
@@ -644,7 +648,8 @@ public class PulsarSourceTest {
         props.setUseAutoConsumeSchema(true);
         ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
 
-        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
+                "messagesToAck");
         messagesToAck.clear();
 
         Schema schema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
@@ -657,7 +662,8 @@ public class PulsarSourceTest {
         when(pulsarRecord.getSchemaType()).thenReturn(SchemaType.AVRO);
         when(pulsarRecord.getNativeObject()).thenReturn(avroRecord);
 
-        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(org.apache.pulsar.client.api.Message.class);
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
+                org.apache.pulsar.client.api.Message.class);
         when(pulsarMsg.getValue()).thenReturn(pulsarRecord);
         when(pulsarMsg.getData()).thenReturn(avroPayload);
         when(pulsarMsg.getTopicName()).thenReturn("test-topic");
@@ -677,7 +683,8 @@ public class PulsarSourceTest {
 
         Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
         when(consumerGenericMock.batchReceive()).thenReturn(batch);
-        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong())).thenReturn(consumerGenericMock);
+        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
+                .thenReturn(consumerGenericMock);
 
         ReadRequest readRequest = mock(ReadRequest.class);
         when(readRequest.getCount()).thenReturn(10L);
@@ -701,7 +708,8 @@ public class PulsarSourceTest {
 
     /**
      * When useAutoConsumeSchema is true and a message fails schema validation
-     * (e.g. getValue() throws SchemaSerializationException), read() throws RuntimeException.
+     * (e.g. getValue() throws SchemaSerializationException), read() throws
+     * RuntimeException.
      */
     @SuppressWarnings("unchecked")
     @Test
@@ -710,10 +718,12 @@ public class PulsarSourceTest {
         props.setUseAutoConsumeSchema(true);
         ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
 
-        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource, "messagesToAck");
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
+                "messagesToAck");
         messagesToAck.clear();
 
-        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(org.apache.pulsar.client.api.Message.class);
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
+                org.apache.pulsar.client.api.Message.class);
         when(pulsarMsg.getValue()).thenThrow(new SchemaSerializationException("invalid schema"));
         when(pulsarMsg.getTopicName()).thenReturn("test-topic");
         MessageId msgId = mock(MessageId.class);
@@ -732,7 +742,8 @@ public class PulsarSourceTest {
 
         Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
         when(consumerGenericMock.batchReceive()).thenReturn(batch);
-        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong())).thenReturn(consumerGenericMock);
+        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
+                .thenReturn(consumerGenericMock);
 
         ReadRequest readRequest = mock(ReadRequest.class);
         when(readRequest.getCount()).thenReturn(10L);
@@ -744,11 +755,13 @@ public class PulsarSourceTest {
             fail("Expected RuntimeException when getValue() throws");
         } catch (RuntimeException e) {
             assertNotNull("Expected cause", e.getCause());
-            // read() wraps in RuntimeException, so cause may be our RuntimeException (with SchemaSerializationException) or double-wrapped
+            // read() wraps in RuntimeException, so cause may be our RuntimeException (with
+            // SchemaSerializationException) or double-wrapped
             Throwable cause = e.getCause();
             Throwable schemaFailure = (cause instanceof SchemaSerializationException) ? cause : cause.getCause();
             assertNotNull("Expected SchemaSerializationException in cause chain", schemaFailure);
-            assertTrue("Cause should be schema serialization failure", schemaFailure instanceof SchemaSerializationException);
+            assertTrue("Cause should be schema serialization failure",
+                    schemaFailure instanceof SchemaSerializationException);
             assertTrue("Cause message", schemaFailure.getMessage().contains("invalid schema"));
         }
     }
