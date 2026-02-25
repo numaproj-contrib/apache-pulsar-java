@@ -1,6 +1,6 @@
 # Register schema and publish messages
 
-Scripts to register schemas on Pulsar topics and publish test messages. All connection settings come from a `.env` file.
+Scripts to register schemas on Pulsar topics and publish test messages for schema valdation testing. All connection settings come from a `.env` file.
 
 ## Prerequisites
 
@@ -70,6 +70,8 @@ Uploads a schema to a topic and turns on schema validation for that topic’s na
 **Script:** `publish-messages.sh`
 
 Sends messages to a topic by running an encoder script once per message and POSTing the binary output to the Pulsar admin REST API.
+
+**Why encoding?** When a topic has an Avro schema, the broker expects the message body to be **Avro binary** (the same format a real Avro producer would send). You cannot POST raw JSON or plain text and have it accepted as a valid Avro message. The encoder scripts produce that binary so the curl request body is in the correct format. Without them you would need a full Pulsar producer client (e.g. Java or Python with the Pulsar client) to serialize messages for you.
 
 **Usage:**
 
