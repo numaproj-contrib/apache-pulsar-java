@@ -1,14 +1,13 @@
 # Register schema and publish messages
 
-Scripts to register schemas on Pulsar topics and publish test messages for schema valdation testing. All connection settings come from a `.env` file.
+Scripts to register schemas on Pulsar topics and publish test messages for schema validation testing. All connection settings come from a `.env` file.
 
 ## Prerequisites
 
 - **pulsarctl** – for schema registration (e.g. `brew install pulsarctl`)
-- **Python 3** – for encoder scripts used by `publish-messages.sh`
+- **Python 3** – for the generic Avro encoder used by `publish-messages.sh`
 - **curl** – used by the publish script to POST messages
-
-Optional: `pip install avro` for canonical Avro encoding in `avro_encode_name_only.py` (script has a fallback if the library is missing).
+- **pip install avro** – required by `encode_avro_generic.py` for encoding
 
 ## Setup
 
@@ -69,39 +68,42 @@ Uploads a schema to a topic and turns on schema validation for that topic’s na
 
 **Script:** `publish-messages.sh`
 
-Sends messages to a topic by running an encoder script once per message and POSTing the binary output to the Pulsar admin REST API.
+Sends messages to a topic by running a **generic Avro encoder** once per message (using the schema file you pass) and POSTing the binary output to the Pulsar admin REST API.
 
-**Why encoding?** When a topic has an Avro schema, the broker expects the message body to be **Avro binary** (the same format a real Avro producer would send). You cannot POST raw JSON or plain text and have it accepted as a valid Avro message. The encoder scripts produce that binary so the curl request body is in the correct format. Without them you would need a full Pulsar producer client (e.g. Java or Python with the Pulsar client) to serialize messages for you.
+**Why encoding?** When a topic has an Avro schema, the broker expects the message body to be **Avro binary** (the same format a real Avro producer would send). You cannot POST raw JSON or plain text and have it accepted as a valid Avro message. The generic encoder produces that binary from your schema (and optional record data) so the curl request body is in the correct format.
 
 **Usage:**
 
 ```bash
-./publish-messages.sh <encoder-script> [topic] [num-messages]
+./publish-messages.sh <schema-file> [topic] [num-messages] [data-file]
 ```
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `encoder-script` | Yes | Script that writes one message (binary) to stdout (e.g. `avro_encode_full.py`). Path can be relative to this directory or absolute. |
+| `schema-file` | Yes | Path to the Avro schema (JSON or Pulsar format). Same files you use with `register-schema.sh`. Relative to this directory or absolute. |
 | `topic` | No | Full topic name. If omitted, uses `PULSAR_TOPIC` from `.env`. |
 | `num-messages` | No | Number of messages to send. Default: 15 or `NUM_MESSAGES` from `.env`. |
-
-The encoder is invoked with **no arguments**; it writes one message (binary) to stdout. Message content is hardcoded inside the encoder script.
+| `data-file` | No | JSON file with one record matching the schema. If omitted, the encoder generates default values from the schema (e.g. empty strings, zeros). |
 
 **Examples:**
 
 ```bash
-# Default topic and 15 messages
-./publish-messages.sh avro_encode_full.py
-./publish-messages.sh avro_encode_name_only.py
+# Default topic and 15 messages (encoder uses default record from schema)
+./publish-messages.sh schema-test-topic-avro.json
+./publish-messages.sh schema-test-topic-avro-name-only.json
 
 # Override topic and count
-./publish-messages.sh avro_encode_name_only.py persistent://tenant/ns/my-topic 10
+./publish-messages.sh schema-test-topic-avro-name-only.json persistent://tenant/ns/my-topic 10
+
+# Use a custom JSON record for each message
+./publish-messages.sh schema-test-topic-avro.json persistent://tenant/ns/my-topic 5 my-record.json
 ```
 
-**Included encoder scripts:**
+**Generic encoder:** `encode_avro_generic.py`
 
-- **`avro_encode_full.py`** – Encodes a record with `name` and `topic` (matches `schema-test-topic-avro.json`). No arguments; hardcoded body (`test-message`, `test-topic`).
-- **`avro_encode_name_only.py`** – Encodes a record with only `name`. No arguments; hardcoded body (`test-message`). Use with the name-only schema, or to send messages that do *not* match the full schema (e.g. to test broker rejection or consumer handling).
+- Works with **any** Avro record schema. You pass the schema file path (and optionally a JSON record).
+- Accepts raw Avro schema JSON or Pulsar format (`{"type":"AVRO","schema":"..."}`).
+- Without a data file: builds a default record from the schema (strings → `""`, numbers → `0`, etc.) so you can publish without writing record JSON.
 
 ---
 
@@ -111,29 +113,28 @@ The encoder is invoked with **no arguments**; it writes one message (binary) to 
 
 ```bash
 ./register-schema.sh schema-test-topic-avro.json
-./publish-messages.sh avro_encode_full.py
+./publish-messages.sh schema-test-topic-avro.json
 ```
 
 **Register name-only schema and publish matching messages:**
 
 ```bash
 ./register-schema.sh schema-test-topic-avro-name-only.json
-./publish-messages.sh avro_encode_name_only.py
+./publish-messages.sh schema-test-topic-avro-name-only.json
 ```
 
-**Test schema validation (broker should reject):**
+**Test schema validation :**
 
-Register the full schema, then publish name-only messages. This should lead to a java io exception when you try to consume from that topic because the messages in the topic do not match the schema.
-
+Register the full schema, then publish name-only messages (wrong schema). This should lead to a java io exception when you try to consume from that topic because the messages in the topic do not match the schema.
 ```bash
 ./register-schema.sh schema-test-topic-avro.json
-./publish-messages.sh avro_encode_name_only.py
+./publish-messages.sh schema-test-topic-avro-name-only.json
 # Expect "rejected" for each message
 ```
 
 ---
 
-## Adding your own schema or encoder
+## Adding your own schema
 
-- **Schema:** Create a JSON schema file (see existing `schema-*.json` for format) and pass it to `register-schema.sh`.
-- **Encoder:** Implement a script that takes no arguments and writes a single binary message to stdout. Message content can be hardcoded. Pass the script path to `publish-messages.sh`.
+- Create a schema file (see existing `schema-*.json` for format) and pass it to `register-schema.sh`.
+- Use the **same schema file** with `publish-messages.sh` to publish messages. The generic encoder works with any Avro record schema. Optionally pass a JSON data file so each message uses your record instead of default values.

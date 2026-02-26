@@ -2,15 +2,17 @@
 # Publish messages to a Pulsar topic by invoking an encoder script per message and POSTing the output.
 # All connection config from .env: PULSAR_ADMIN_URL, PULSAR_TOPIC, PULSAR_AUTH_TOKEN.
 #
-# Usage: publish-messages.sh <encoder-script> [topic] [num-messages]
-#   encoder-script   Path to script that writes one message (binary) to stdout. Called once per message.
-#   topic            Full topic (persistent://tenant/namespace/name). Optional; uses PULSAR_TOPIC from .env.
-#   num-messages     How many messages to send. Optional; default 15 (or NUM_MESSAGES from .env).
+# Usage: publish-messages.sh <schema-file> [topic] [num-messages] [data-file]
 #
-# Encoder is invoked with no arguments; it writes one message (binary) to stdout.
+# First argument: path to schema file (Avro JSON or Pulsar format). Used by the generic encoder.
+# topic         Optional. Full topic (persistent://tenant/namespace/name). Default: PULSAR_TOPIC from .env.
+# num-messages  Optional. How many messages to send. Default: 15 or NUM_MESSAGES from .env.
+# data-file     Optional. JSON file with one record matching the schema. If omitted, encoder uses defaults.
+#
 # Examples:
-#   publish-messages.sh avro_encode_full.py
-#   publish-messages.sh avro_encode_name_only.py persistent://tenant/ns/my-topic 10
+#   publish-messages.sh schema-test-topic-avro.json
+#   publish-messages.sh schema-test-topic-avro-name-only.json persistent://tenant/ns/my-topic 10
+#   publish-messages.sh schema-test-topic-avro.json persistent://tenant/ns/my-topic 5 record.json
 
 set -e
 
@@ -31,17 +33,24 @@ if [[ -z "${PULSAR_AUTH_TOKEN:-}" ]]; then
 fi
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: $(basename "$0") <encoder-script> [topic] [num-messages]" >&2
-  echo "  encoder-script   Script that writes one message to stdout (e.g. avro_encode_full.py)." >&2
-  echo "  topic            Optional. Default: PULSAR_TOPIC from .env." >&2
-  echo "  num-messages     Optional. Default: 15 or NUM_MESSAGES from .env." >&2
+  echo "Usage: $(basename "$0") <schema-file> [topic] [num-messages] [data-file]" >&2
+  echo "  schema-file   Path to Avro schema (JSON or Pulsar format)." >&2
+  echo "  topic         Optional. Default: PULSAR_TOPIC from .env." >&2
+  echo "  num-messages  Optional. Default: 15 or NUM_MESSAGES from .env." >&2
+  echo "  data-file     Optional. JSON record matching the schema. If omitted, encoder uses defaults." >&2
   exit 1
 fi
 
-ENCODER_SCRIPT="$1"
-if [[ "$ENCODER_SCRIPT" != /* ]]; then
-  ENCODER_SCRIPT="${SCRIPT_DIR}/${ENCODER_SCRIPT}"
+SCHEMA_FILE="$1"
+if [[ "$SCHEMA_FILE" != /* ]]; then
+  SCHEMA_FILE="${SCRIPT_DIR}/${SCHEMA_FILE}"
 fi
+if [[ ! -f "$SCHEMA_FILE" ]]; then
+  echo "Error: Schema file not found: $SCHEMA_FILE" >&2
+  exit 1
+fi
+
+ENCODER_SCRIPT="${SCRIPT_DIR}/encode_avro_generic.py"
 if [[ ! -f "$ENCODER_SCRIPT" ]]; then
   echo "Error: Encoder script not found: $ENCODER_SCRIPT" >&2
   exit 1
@@ -58,6 +67,7 @@ else
 fi
 
 NUM_MESSAGES="${3:-${NUM_MESSAGES:-15}}"
+DATA_FILE="${4:-}"
 
 # Parse persistent://tenant/namespace/topic-name
 if [[ ! "$TOPIC" =~ ^persistent://([^/]+)/([^/]+)/([^/]+)$ ]]; then
@@ -71,7 +81,7 @@ TOPIC_NAME="${BASH_REMATCH[3]}"
 BASE_URL="${PULSAR_ADMIN_URL%/}"
 URL="${BASE_URL}/admin/rest/topics/v1/persistent/${TENANT}/${NAMESPACE}/${TOPIC_NAME}/message"
 
-echo "Publishing $NUM_MESSAGES messages to $TOPIC via $ENCODER_SCRIPT ..."
+echo "Publishing $NUM_MESSAGES messages to $TOPIC (schema: $SCHEMA_FILE) ..."
 echo ""
 
 TMP=$(mktemp)
@@ -80,7 +90,11 @@ trap 'rm -f "$TMP"' EXIT
 success=0
 rejected=0
 for i in $(seq 1 "$NUM_MESSAGES"); do
-  python3 "$ENCODER_SCRIPT" > "$TMP" || { echo "Error: Failed to encode message." >&2; exit 1; }
+  if [[ -n "$DATA_FILE" ]]; then
+    python3 "$ENCODER_SCRIPT" "$SCHEMA_FILE" "$DATA_FILE" > "$TMP" || { echo "Error: Failed to encode message." >&2; exit 1; }
+  else
+    python3 "$ENCODER_SCRIPT" "$SCHEMA_FILE" > "$TMP" || { echo "Error: Failed to encode message." >&2; exit 1; }
+  fi
   code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 -X POST "$URL" \
     -H "Authorization: Bearer ${PULSAR_AUTH_TOKEN}" \
     -H "Accept: application/json" \
