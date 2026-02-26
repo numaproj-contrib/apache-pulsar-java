@@ -13,6 +13,9 @@ import org.springframework.core.env.Environment;
 
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.pulsar.common.schema.SchemaInfo;
+
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,10 +28,12 @@ public class PulsarProducerConfig {
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true", matchIfMissing = false)
-    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties, PulsarAdmin pulsarAdmin)
-            throws Exception {
+    public Producer<byte[]> pulsarProducer(PulsarClient pulsarClient, PulsarProducerProperties pulsarProducerProperties,
+            PulsarAdmin pulsarAdmin) throws Exception {
         String podName = env.getProperty("NUMAFLOW_POD", "pod-" + UUID.randomUUID());
         String producerName = "producerName";
+
+        pulsarProducerProperties.validateConfig();
 
         Map<String, Object> producerConfig = pulsarProducerProperties.getProducerConfig();
         if (producerConfig.containsKey(producerName)) {
@@ -37,7 +42,7 @@ public class PulsarProducerConfig {
         }
         producerConfig.put(producerName, podName);
 
-        // Validate that the topic configured in the producer config 
+        // Validate that the topic configured in the producer config exists in the Pulsar cluster
         String topicName = (String) producerConfig.get("topicName");
         if (topicName == null || topicName.trim().isEmpty()) {
             throw new IllegalArgumentException("Topic name must be configured in producer config");
@@ -45,9 +50,24 @@ public class PulsarProducerConfig {
 
         validateTopicExists(pulsarAdmin, topicName);
 
-        return pulsarClient.newProducer(Schema.BYTES)
+        final Schema<byte[]> schema;
+        if (pulsarProducerProperties.isUseAutoProduceSchema()) {
+            schema = Schema.AUTO_PRODUCE_BYTES();
+        } else {
+            schema = Schema.BYTES;
+            log.info("Producer using Schema.BYTES: no broker-side schema validation.");
+        }
+
+        Producer<byte[]> producer = pulsarClient.newProducer(schema)
                 .loadConf(producerConfig)
                 .create();
+
+        SchemaInfo schemaInfo = schema.getSchemaInfo();
+        log.info("Producer connected; schema initialized: type={}, name={}, schema={}",
+                schemaInfo.getType(), schemaInfo.getName(),
+                schemaInfo.getSchema() != null ? new String(schemaInfo.getSchema(), StandardCharsets.UTF_8) : "null");
+
+        return producer;
     }
 
     private void validateTopicExists(PulsarAdmin pulsarAdmin, String topicName) throws PulsarAdminException {

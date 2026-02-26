@@ -6,10 +6,12 @@ import io.numaproj.numaflow.sinker.Response;
 import io.numaproj.numaflow.sinker.ResponseList;
 import io.numaproj.numaflow.sinker.Server;
 import io.numaproj.numaflow.sinker.Sinker;
+import io.numaproj.pulsar.config.producer.PulsarProducerProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SchemaSerializationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @Component
@@ -30,6 +33,9 @@ public class PulsarSink extends Sinker {
 
     @Autowired
     private PulsarClient pulsarClient;
+
+    @Autowired
+    private PulsarProducerProperties producerProperties;
 
     private Server server;
 
@@ -61,16 +67,24 @@ public class PulsarSink extends Sinker {
             final byte[] msg = datum.getValue();
             final String msgId = datum.getId();
 
-            // Won't wait for broker to confirm receipt of msg before continuing
-            // sendSync returns CompletableFuture which will complete when broker ack
             CompletableFuture<Void> future = producer.sendAsync(msg)
                     .thenAccept(messageId -> {
                         log.info("Processed message ID: {}, Content: {}", msgId, new String(msg));
                         responseListBuilder.addResponse(Response.responseOK(msgId));
                     })
                     .exceptionally(ex -> {
-                        log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
-                        responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
+                        Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
+                        if (producerProperties.isDropInvalidMessages() && isSchemaSerializationFailure(cause != null ? cause : ex)) {
+                            log.warn("Dropping message ID {} due to schema/serialization error (drop-invalid-messages=true): {}",
+                                    msgId, cause != null ? cause.getMessage() : ex.getMessage());
+                            responseListBuilder.addResponse(Response.responseOK(msgId));
+                        } else if (isSchemaSerializationFailure(cause != null ? cause : ex)) {
+                            log.warn("Message ID {} failed schema validation, messages produced do not align with topic schema: {}", msgId, cause != null ? cause.getMessage() : ex.getMessage());
+                            responseListBuilder.addResponse(Response.responseFailure(msgId, cause != null ? cause.getMessage() : ex.getMessage()));
+                        } else {
+                            log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
+                            responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
+                        }
                         return null;
                     });
 
@@ -81,6 +95,19 @@ public class PulsarSink extends Sinker {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
         return responseListBuilder.build();
+    }
+
+    /**
+     * True if the failure is due to schema/serialization (e.g. invalid Avro, EOF).
+     * Pulsar wraps these in SchemaSerializationException (e.g. around EOFException).
+     */
+    private static boolean isSchemaSerializationFailure(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            if (c instanceof SchemaSerializationException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @PreDestroy

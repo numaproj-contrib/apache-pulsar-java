@@ -77,6 +77,14 @@ public class PulsarConsumerPropertiesTest {
         );
     }
 
+    @Test
+    public void consumerProperties_useAutoConsumeSchema_defaultTrue() {
+        PulsarConsumerProperties properties = new PulsarConsumerProperties();
+        assertTrue("useAutoConsumeSchema should default to true", properties.isUseAutoConsumeSchema());
+        properties.setUseAutoConsumeSchema(false);
+        assertFalse(properties.isUseAutoConsumeSchema());
+    }
+
     /**
      * Verify that if 'subscriptionName' is specified in the consumerConfig,
      * it is not overwritten by the default value.

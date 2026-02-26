@@ -15,6 +15,15 @@ import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Messages;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SchemaSerializationException;
+import org.apache.pulsar.client.api.schema.GenericRecord;
+import org.apache.pulsar.common.schema.SchemaType;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.EncoderFactory;
 import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
 import org.apache.pulsar.common.policies.data.PartitionedTopicStats;
 import org.apache.pulsar.common.policies.data.SubscriptionStats;
@@ -26,6 +35,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -60,6 +70,9 @@ public class PulsarSourceTest {
             // Inject the mocked PulsarConsumerManager into pulsarSource using
             // ReflectionTestUtils.
             ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerManager", consumerManagerMock);
+            PulsarConsumerProperties consumerProperties = new PulsarConsumerProperties();
+            consumerProperties.setUseAutoConsumeSchema(false); // tests use byte[] consumer path
+            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", consumerProperties);
         } catch (Exception e) {
             fail("Setup failed with exception: " + e.getMessage());
         }
@@ -99,9 +112,10 @@ public class PulsarSourceTest {
 
             // Call read.
             pulsarSource.read(readRequest, observer);
-            // Since messagesToAck is not empty, read should return early and not call
-            // consumerManager.getOrCreateConsumer.
-            verify(consumerManagerMock, never()).getOrCreateConsumer(anyLong(), anyLong());
+            // Since messagesToAck is not empty, read returns early and does not call
+            // consumer manager.
+            verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+            verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
             verify(observer, never()).send(any(Message.class));
         } catch (PulsarClientException e) {
             fail("Unexpected PulsarClientException thrown in testReadWhenMessagesToAckNotEmpty: " + e.getMessage());
@@ -120,8 +134,7 @@ public class PulsarSourceTest {
                     .getField(pulsarSource, "messagesToAck");
             messagesToAck.clear();
 
-            // Stub the consumerManager to return the consumerMock.
-            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn(consumerMock);
+            when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
             // Simulate batchReceive returning null.
             when(consumerMock.batchReceive()).thenReturn(null);
 
@@ -165,7 +178,7 @@ public class PulsarSourceTest {
             when(msg2.getMessageId()).thenReturn(msgId2);
             when(msg1.getValue()).thenReturn("Hello".getBytes(StandardCharsets.UTF_8));
             when(msg2.getValue()).thenReturn("World".getBytes(StandardCharsets.UTF_8));
-            
+
             // Stub metadata methods required by buildHeaders()
             when(msg1.getProducerName()).thenReturn("test-producer");
             when(msg2.getProducerName()).thenReturn("test-producer");
@@ -193,8 +206,7 @@ public class PulsarSourceTest {
             java.util.List<org.apache.pulsar.client.api.Message<byte[]>> messageList = Arrays.asList(msg1, msg2);
             when(messages.iterator()).thenReturn(messageList.iterator());
 
-            // Stub consumerManager and consumer behavior.
-            when(consumerManagerMock.getOrCreateConsumer(10L, 1000L)).thenReturn(consumerMock);
+            when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
             when(consumerMock.batchReceive()).thenReturn(messages);
 
             // Create a fake ReadRequest and OutputObserver.
@@ -210,7 +222,7 @@ public class PulsarSourceTest {
             verify(observer, times(2)).send(messageCaptor.capture());
             java.util.List<Message> sentMessages = messageCaptor.getAllValues();
             assertEquals(2, sentMessages.size());
-            
+
             // Validate contents of messages using getValue().
             assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
             assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
@@ -241,7 +253,8 @@ public class PulsarSourceTest {
             assertEquals("1.2.3", secondMessage.getHeaders().get("app-version"));
 
             // Confirm messages are tracked for ack.
-            // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic support.
+            // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic
+            // support.
             java.util.Map<String, ?> ackMap = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
                     "messagesToAck");
             assertTrue(ackMap.containsKey("test-topicmsg1"));
@@ -273,9 +286,6 @@ public class PulsarSourceTest {
             messagesToAck.clear();
             messagesToAck.put(ackKey, msg);
 
-            // Stub consumerManager to return consumerMock for the ack call.
-            when(consumerManagerMock.getOrCreateConsumer(0, 0)).thenReturn(consumerMock);
-
             // Create a fake AckRequest with an offset corresponding to topicName+messageId.
             AckRequest ackRequest = new AckRequest() {
                 @Override
@@ -284,11 +294,14 @@ public class PulsarSourceTest {
                 }
             };
 
+            @SuppressWarnings("unchecked")
+            Consumer<byte[]> consumerMock = mock(Consumer.class);
+            doReturn(consumerMock).when(consumerManagerMock).getOrCreateBytesConsumer(0L, 0L);
+
             pulsarSource.ack(ackRequest);
 
-            // Verify that consumer.acknowledge is called with a list containing the message ID.
+            verify(consumerManagerMock, times(1)).getOrCreateBytesConsumer(0L, 0L);
             verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
-            // Verify that the messagesToAck map is now empty.
             assertFalse(messagesToAck.containsKey(ackKey));
         } catch (PulsarClientException e) {
             fail("Unexpected PulsarClientException thrown in testAckSuccessful: " + e.getMessage());
@@ -314,12 +327,8 @@ public class PulsarSourceTest {
 
         pulsarSource.ack(ackRequest);
 
-        // Verify that consumerManager.getOrCreateConsumer is never called.
-        try {
-            verify(consumerManagerMock, never()).getOrCreateConsumer(anyLong(), anyLong());
-        } catch (PulsarClientException e) {
-            fail("Unexpected exception during verification in testAckNoMatchingMessage: " + e.getMessage());
-        }
+        verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+        verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
     }
 
     /**
@@ -552,7 +561,8 @@ public class PulsarSourceTest {
     }
 
     /**
-     * Tests that getPartitions returns a flat list of indices across multiple topics
+     * Tests that getPartitions returns a flat list of indices across multiple
+     * topics
      * (e.g. topic-a with 3 partitions -> 0,1,2; topic-b with 2 -> 3,4).
      */
     @Test
@@ -609,6 +619,150 @@ public class PulsarSourceTest {
             List<Integer> result = pulsarSource.getPartitions();
             assertEquals(List.of(42), result);
             mockedSourcer.verify(Sourcer::defaultPartitions);
+        }
+    }
+
+    private static final String AVRO_SCHEMA_JSON = ""
+            + "{\"type\":\"record\",\"name\":\"TestMessage\",\"fields\":["
+            + "{\"name\":\"name\",\"type\":\"string\"},"
+            + "{\"name\":\"topic\",\"type\":\"string\"}"
+            + "]}";
+
+    private static byte[] encodeAvro(Schema schema, org.apache.avro.generic.GenericRecord record) throws Exception {
+        GenericDatumWriter<org.apache.avro.generic.GenericRecord> writer = new GenericDatumWriter<>(schema);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        org.apache.avro.io.BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
+        writer.write(record, encoder);
+        encoder.flush();
+        return out.toByteArray();
+    }
+
+    /**
+     * AUTO_CONSUME happy path: payload is getData() (raw message bytes) and sent
+     * downstream.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_validAvroMessage_sendsToObserver() throws Exception {
+        PulsarConsumerProperties props = new PulsarConsumerProperties();
+        props.setUseAutoConsumeSchema(true);
+        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
+
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
+                "messagesToAck");
+        messagesToAck.clear();
+
+        Schema schema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
+        GenericData.Record avroRecord = new GenericData.Record(schema);
+        avroRecord.put("name", "hello");
+        avroRecord.put("topic", "world");
+        byte[] avroPayload = encodeAvro(schema, avroRecord);
+
+        GenericRecord pulsarRecord = mock(GenericRecord.class);
+        when(pulsarRecord.getSchemaType()).thenReturn(SchemaType.AVRO);
+        when(pulsarRecord.getNativeObject()).thenReturn(avroRecord);
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
+                org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenReturn(pulsarRecord);
+        when(pulsarMsg.getData()).thenReturn(avroPayload);
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(1000L);
+        when(pulsarMsg.getEventTime()).thenReturn(1000L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
+                .thenReturn(consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        pulsarSource.read(readRequest, observer);
+
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        verify(observer, times(1)).send(messageCaptor.capture());
+        Message sent = messageCaptor.getValue();
+        assertNotNull(sent.getValue());
+        assertTrue("payload should be non-empty Avro bytes", sent.getValue().length > 0);
+
+        GenericDatumReader<org.apache.avro.generic.GenericRecord> reader = new GenericDatumReader<>(schema);
+        org.apache.avro.generic.GenericRecord decoded = reader.read(null,
+                DecoderFactory.get().binaryDecoder(sent.getValue(), null));
+        assertEquals("hello", decoded.get("name").toString());
+        assertEquals("world", decoded.get("topic").toString());
+    }
+
+    /**
+     * When useAutoConsumeSchema is true and a message fails schema validation
+     * (e.g. getValue() throws SchemaSerializationException), read() throws
+     * RuntimeException.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_schemaValidationFailure_throws() throws PulsarClientException {
+        PulsarConsumerProperties props = new PulsarConsumerProperties();
+        props.setUseAutoConsumeSchema(true);
+        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
+
+        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
+                "messagesToAck");
+        messagesToAck.clear();
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
+                org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenThrow(new SchemaSerializationException("invalid schema"));
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(0L);
+        when(pulsarMsg.getEventTime()).thenReturn(0L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
+                .thenReturn(consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        try {
+            pulsarSource.read(readRequest, observer);
+            fail("Expected RuntimeException when getValue() throws");
+        } catch (RuntimeException e) {
+            assertNotNull("Expected cause", e.getCause());
+            // read() wraps in RuntimeException, so cause may be our RuntimeException (with
+            // SchemaSerializationException) or double-wrapped
+            Throwable cause = e.getCause();
+            Throwable schemaFailure = (cause instanceof SchemaSerializationException) ? cause : cause.getCause();
+            assertNotNull("Expected SchemaSerializationException in cause chain", schemaFailure);
+            assertTrue("Cause should be schema serialization failure",
+                    schemaFailure instanceof SchemaSerializationException);
+            assertTrue("Cause message", schemaFailure.getMessage().contains("invalid schema"));
         }
     }
 
