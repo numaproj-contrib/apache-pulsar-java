@@ -1,0 +1,1 @@
+{"type":"AVRO","schema":"{\"type\":\"record\",\"name\":\"NameOnlyMessage\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"}]}","properties":{}}

@@ -1,0 +1,5 @@
+{
+  "type": "AVRO",
+  "schema": "{\"type\":\"record\",\"name\":\"TestMessage\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"topic\",\"type\":\"string\"}]}",
+  "properties": {}
+}
