@@ -7,6 +7,7 @@ import io.numaproj.pulsar.config.producer.PulsarProducerConfig;
 import io.numaproj.pulsar.consumer.PulsarConsumerManager;
 import io.numaproj.pulsar.consumer.PulsarSource;
 import io.numaproj.pulsar.producer.PulsarSink;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Producer;
 
@@ -47,7 +48,7 @@ public class PulsarApplication {
         config.getConsumerProperties().init();
 
         PulsarClient pulsarClient = PulsarClientConfig.create(config.getClientProperties());
-        org.apache.pulsar.client.admin.PulsarAdmin pulsarAdmin = PulsarAdminConfig.create(config.getAdminProperties());
+        PulsarAdmin pulsarAdmin = PulsarAdminConfig.create(config.getAdminProperties());
         PulsarConsumerManager consumerManager = new PulsarConsumerManager(config.getConsumerProperties(), pulsarClient);
         PulsarSource source = new PulsarSource(consumerManager, pulsarAdmin, config.getConsumerProperties());
 
@@ -61,7 +62,7 @@ public class PulsarApplication {
         config.getProducerProperties().validateConfig();
 
         PulsarClient pulsarClient = PulsarClientConfig.create(config.getClientProperties());
-        org.apache.pulsar.client.admin.PulsarAdmin pulsarAdmin = PulsarAdminConfig.create(config.getAdminProperties());
+        PulsarAdmin pulsarAdmin = PulsarAdminConfig.create(config.getAdminProperties());
         Producer<byte[]> producer = PulsarProducerConfig.create(pulsarClient, config.getProducerProperties(),
                 pulsarAdmin);
         PulsarSink sink = new PulsarSink(producer, pulsarClient, config.getProducerProperties());

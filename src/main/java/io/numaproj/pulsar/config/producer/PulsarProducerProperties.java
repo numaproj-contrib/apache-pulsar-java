@@ -13,8 +13,6 @@ public class PulsarProducerProperties {
     // enables the producer to be created
     private boolean enabled = false;
 
-    @Getter
-    @Setter
     private Map<String, Object> producerConfig = new HashMap<>(); // Default to an empty map
 
     /**

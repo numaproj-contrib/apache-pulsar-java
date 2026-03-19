@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 
 public final class PulsarConfigLoader {
 
-    // that line defines a regex used to find placeholders like ${VAR} or ${VAR:default} in config strings so they can be replaced
+    // Pattern defines a regex used to find placeholders like ${VAR} or ${VAR:default} in config strings so they can be replaced
     // (e.g. authParams: "${PULSAR_AUTH_TOKEN}").
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}:]+)(?::([^}]*))?}");
 

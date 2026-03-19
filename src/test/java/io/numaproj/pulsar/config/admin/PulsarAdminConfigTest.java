@@ -36,8 +36,8 @@ public class PulsarAdminConfigTest {
         when(mockAdminProperties.getAdminConfig()).thenReturn(config);
 
         try {
-            PulsarAdmin Admin = PulsarAdminConfig.create(mockAdminProperties);
-            assertNotNull(Admin);
+            PulsarAdmin admin = PulsarAdminConfig.create(mockAdminProperties);
+            assertNotNull(admin);
             verify(mockAdminProperties).getAdminConfig();
         } catch (PulsarClientException e) { // PulsarClientException could be thrown by PulsarAdmin.builder()
             fail("Exception should not have been thrown: " + e.getMessage());
