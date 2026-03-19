@@ -1,5 +1,6 @@
 package io.numaproj.pulsar.config.consumer;
 
+import io.numaproj.pulsar.config.EnvLookup;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,9 @@ public class PulsarConsumerProperties {
     private boolean enabled = false;
 
     private Map<String, Object> consumerConfig = new HashMap<>(); // Default to an empty map
+
+    /** Defaults to OS env; may be replaced in tests. */
+    private EnvLookup envLookup = EnvLookup.system();
 
     /**
      * When true (default), the consumer uses Schema.AUTO_CONSUME so the client validates
@@ -53,8 +57,8 @@ public class PulsarConsumerProperties {
         }
 
         // Get the pipeline and vertex names from the environment variables to use as a default for the subscription name
-        String pipelineName = System.getenv("NUMAFLOW_PIPELINE_NAME");
-        String vertexName = System.getenv("NUMAFLOW_VERTEX_NAME");
+        String pipelineName = envLookup.get("NUMAFLOW_PIPELINE_NAME");
+        String vertexName = envLookup.get("NUMAFLOW_VERTEX_NAME");
         String defaultSubscriptionName = String.join("-", pipelineName != null ? pipelineName : "pipeline",
                 vertexName != null ? vertexName : "vertex", "sub");
 

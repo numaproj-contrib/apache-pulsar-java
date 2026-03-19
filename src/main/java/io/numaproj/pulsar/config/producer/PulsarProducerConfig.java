@@ -1,5 +1,6 @@
 package io.numaproj.pulsar.config.producer;
 
+import io.numaproj.pulsar.config.EnvLookup;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
@@ -25,7 +26,14 @@ public final class PulsarProducerConfig {
     public static Producer<byte[]> create(PulsarClient pulsarClient,
             PulsarProducerProperties pulsarProducerProperties,
             PulsarAdmin pulsarAdmin) throws Exception {
-        String podName = Optional.ofNullable(System.getenv("NUMAFLOW_POD"))
+        return create(pulsarClient, pulsarProducerProperties, pulsarAdmin, EnvLookup.system());
+    }
+
+    public static Producer<byte[]> create(PulsarClient pulsarClient,
+            PulsarProducerProperties pulsarProducerProperties,
+            PulsarAdmin pulsarAdmin,
+            EnvLookup envLookup) throws Exception {
+        String podName = Optional.ofNullable(envLookup.get("NUMAFLOW_POD"))
                 .filter(s -> !s.isBlank())
                 .orElseGet(() -> "pod-" + UUID.randomUUID());
         String producerNameKey = "producerName";

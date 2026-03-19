@@ -122,6 +122,7 @@
                     </dependency>
                 </dependencies>
                 <configuration>
+                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
                     <includes>
                         <include>**/*.java</include>
                     </includes>

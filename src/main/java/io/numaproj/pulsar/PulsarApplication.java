@@ -10,6 +10,7 @@ import io.numaproj.pulsar.producer.PulsarSink;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Producer;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -28,12 +29,25 @@ public class PulsarApplication {
         }
     }
 
-    // gets the config path as defined in the pipeline YAML file
+    // Resolves --config=file:... from the pipeline. Accepts file:/path, file:///path, and tolerates an extra colon
+    // after "file:" (file::/path) which would otherwise become the invalid path ":/path".
     private static Path getConfigPath(String[] args) {
         for (String arg : args) {
-            if (arg != null && arg.startsWith("--config=file:")) {
-                String path = arg.substring("--config=file:".length()).trim();
-                return Paths.get(path);
+            if (arg == null || !arg.startsWith("--config=")) {
+                continue;
+            }
+            String value = arg.substring("--config=".length()).trim();
+            if (!value.startsWith("file:")) {
+                continue;
+            }
+            try {
+                return Paths.get(URI.create(value));
+            } catch (IllegalArgumentException ignored) {
+                // URI not usable for Paths.get (e.g. opaque file::/path)
+            }
+            String remainder = value.substring("file:".length()).replaceFirst("^:+", "");
+            if (!remainder.isEmpty()) {
+                return Paths.get(remainder);
             }
         }
         throw new IllegalArgumentException(

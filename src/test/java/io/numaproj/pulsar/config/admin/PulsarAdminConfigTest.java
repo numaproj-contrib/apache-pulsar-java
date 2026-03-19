@@ -22,24 +22,21 @@ public class PulsarAdminConfigTest {
     @Mock
     private PulsarAdminProperties mockAdminProperties;
 
-    private PulsarAdminConfig pulsarAdminConfig;
-
     @Before
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        pulsarAdminConfig = new PulsarAdminConfig();
     }
 
     // Test to create PulsarAdmin bean with valid configuration properties
     @Test
-    public void pulsarAdmin_validConfig() {
+    public void pulsarAdmin_validConfig() throws Exception {
         Map<String, Object> config = new HashMap<>();
         // URL must include the protocol (http://)
         config.put("serviceUrl", "http://test:1234");
         when(mockAdminProperties.getAdminConfig()).thenReturn(config);
 
         try {
-            PulsarAdmin Admin = pulsarAdminConfig.pulsarAdmin(mockAdminProperties);
+            PulsarAdmin Admin = PulsarAdminConfig.create(mockAdminProperties);
             assertNotNull(Admin);
             verify(mockAdminProperties).getAdminConfig();
         } catch (PulsarClientException e) { // PulsarClientException could be thrown by PulsarAdmin.builder()
@@ -55,7 +52,7 @@ public class PulsarAdminConfigTest {
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
-                () -> pulsarAdminConfig.pulsarAdmin(mockAdminProperties));
+                () -> PulsarAdminConfig.create(mockAdminProperties));
 
         assertTrue("Error message should indicate admin config is required",
                 exception.getMessage().contains("Pulsar admin configuration is required"));
