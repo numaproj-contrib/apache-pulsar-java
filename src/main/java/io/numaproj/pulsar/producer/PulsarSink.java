@@ -12,34 +12,27 @@ import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.SchemaSerializationException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 @Slf4j
-@Component
-@ConditionalOnProperty(prefix = "spring.pulsar.producer", name = "enabled", havingValue = "true")
 public class PulsarSink extends Sinker {
 
-    @Autowired
-    private Producer<byte[]> producer;
-
-    @Autowired
-    private PulsarClient pulsarClient;
-
-    @Autowired
-    private PulsarProducerProperties producerProperties;
+    private final Producer<byte[]> producer;
+    private final PulsarClient pulsarClient;
+    private final PulsarProducerProperties producerProperties;
 
     private Server server;
 
-    @PostConstruct // starts server automatically when the spring context initializes
+    public PulsarSink(Producer<byte[]> producer, PulsarClient pulsarClient, PulsarProducerProperties producerProperties) {
+        this.producer = producer;
+        this.pulsarClient = pulsarClient;
+        this.producerProperties = producerProperties;
+    }
+
     public void startServer() throws Exception {
         server = new Server(this);
         server.start();
@@ -110,7 +103,6 @@ public class PulsarSink extends Sinker {
         return false;
     }
 
-    @PreDestroy
     public void cleanup() {
         try {
             if (producer != null) {

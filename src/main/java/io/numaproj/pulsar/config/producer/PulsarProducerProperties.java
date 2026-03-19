@@ -3,17 +3,18 @@ package io.numaproj.pulsar.config.producer;
 import lombok.Getter;
 import lombok.Setter;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
-
 import java.util.HashMap;
 import java.util.Map;
 
 @Getter
 @Setter
-@Configuration
-@ConfigurationProperties(prefix = "spring.pulsar.producer")
 public class PulsarProducerProperties {
+
+    // enables the producer to be created
+    private boolean enabled = false;
+
+    @Getter
+    @Setter
     private Map<String, Object> producerConfig = new HashMap<>(); // Default to an empty map
 
     /**
@@ -23,18 +24,18 @@ public class PulsarProducerProperties {
     private boolean useAutoProduceSchema = true;
 
     /**
-     * When true, messages that fail schema/serialization validation (e.g. SchemaSerializationException)
-     * are dropped: the sink responds OK so the message is not retried, and the invalid payload is not
-     * sent to Pulsar. When false (default), such messages are reported as failures downstream and may be retried.
+     * When true, messages that fail schema/serialization validation (e.g. SchemaSerializationException) are dropped: 
+     * the sink responds OK so the message is not retried, and the invalid payload is not sent to Pulsar. 
+     * When false (default), such messages are reported as failures downstream and may be retried.
      */
     private boolean dropInvalidMessages = false;
 
     public void validateConfig() {
         if (!useAutoProduceSchema && dropInvalidMessages) {
             throw new IllegalArgumentException(
-                "Invalid combination: useAutoProduceSchema=false and dropInvalidMessages=true. "
-                    + "dropInvalidMessages only applies when useAutoProduceSchema is true (broker validates schema). "
-                    + "With Schema.BYTES there is no schema validation, so dropInvalidMessages has no effect.");
+                    "Invalid combination: useAutoProduceSchema=false and dropInvalidMessages=true. "
+                            + "dropInvalidMessages only applies when useAutoProduceSchema is true (broker validates schema). "
+                            + "With Schema.BYTES there is no schema validation, so dropInvalidMessages has no effect.");
         }
     }
 }

@@ -8,13 +8,8 @@ import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.SubscriptionType;
 import org.apache.pulsar.client.api.schema.GenericRecord;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
-
 import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 
-import javax.annotation.PreDestroy;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,15 +18,15 @@ import java.util.concurrent.TimeUnit;
  * matching the configured schema is created and used; the other remains null.
  */
 @Slf4j
-@Component
-@ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class PulsarConsumerManager {
 
-    @Autowired
-    private PulsarConsumerProperties pulsarConsumerProperties;
+    private final PulsarConsumerProperties pulsarConsumerProperties;
+    private final PulsarClient pulsarClient;
 
-    @Autowired
-    private PulsarClient pulsarClient;
+    public PulsarConsumerManager(PulsarConsumerProperties pulsarConsumerProperties, PulsarClient pulsarClient) {
+        this.pulsarConsumerProperties = pulsarConsumerProperties;
+        this.pulsarClient = pulsarClient;
+    }
 
     private Consumer<byte[]> bytesConsumer;
     private Consumer<GenericRecord> genericRecordConsumer;
@@ -72,7 +67,6 @@ public class PulsarConsumerManager {
         return genericRecordConsumer;
     }
 
-    @PreDestroy
     public void cleanup() {
         if (bytesConsumer != null) {
             try {
