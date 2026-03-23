@@ -1,0 +1,280 @@
+{
+  "dashboard": {
+    "annotations": { "list": [] },
+    "description": "MonoVertex metrics (source → optional transform → sink)",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+        "id": 1,
+        "panels": [],
+        "title": "Traffic Metrics",
+        "type": "row"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "no. of messages per second", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1, "scaleDistribution": { "type": "linear" } },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 80}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+        "id": 2,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" }, "expr": "rate(monovtx_read_total{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[30s])", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "Inbound Messages (TPS)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "no. of messages per second", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+        "id": 4,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" }, "expr": "rate(monovtx_sink_write_total{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[30s])", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "Outbound Messages (TPS)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "no. of messages per second", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+        "id": 5,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" }, "expr": "rate(monovtx_ack_total{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[30s])", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "Ack'ed Messages (TPS)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "messages per batch", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+        "id": 13,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" }, "expr": "monovtx_read_batch_size{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "Read batch size",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "pending messages", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+        "id": 14,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" }, "expr": "monovtx_pending_raw{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "Pending (raw)",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+        "id": 6,
+        "panels": [],
+        "title": "Latency Metrics",
+        "type": "row"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "Seconds", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": [
+            {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "displayName", "value": "P90"}]},
+            {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "displayName", "value": "P95"}]},
+            {"matcher": {"id": "byFrameRefID", "options": "C"}, "properties": [{"id": "displayName", "value": "P99"}]}
+          ]
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+        "id": 7,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [
+          { "expr": "histogram_quantile(0.9, rate(monovtx_processing_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "A" },
+          { "expr": "histogram_quantile(0.95, rate(monovtx_processing_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "B" },
+          { "expr": "histogram_quantile(0.99, rate(monovtx_processing_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "C" }
+        ],
+        "title": "E2E Processing Time",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "Seconds", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": [
+            {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "displayName", "value": "P90"}]},
+            {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "displayName", "value": "P95"}]},
+            {"matcher": {"id": "byFrameRefID", "options": "C"}, "properties": [{"id": "displayName", "value": "P99"}]}
+          ]
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+        "id": 8,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [
+          { "expr": "histogram_quantile(0.9, rate(monovtx_read_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "A" },
+          { "expr": "histogram_quantile(0.95, rate(monovtx_read_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "B" },
+          { "expr": "histogram_quantile(0.99, rate(monovtx_read_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "C" }
+        ],
+        "title": "Read latency",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "Seconds", "drawStyle": "line", "fillOpacity": 0, "lineWidth": 1 },
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": [
+            {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "displayName", "value": "P90"}]},
+            {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "displayName", "value": "P95"}]},
+            {"matcher": {"id": "byFrameRefID", "options": "C"}, "properties": [{"id": "displayName", "value": "P99"}]}
+          ]
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+        "id": 9,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [
+          { "expr": "histogram_quantile(0.9, rate(monovtx_ack_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "A" },
+          { "expr": "histogram_quantile(0.95, rate(monovtx_ack_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "B" },
+          { "expr": "histogram_quantile(0.99, rate(monovtx_ack_time_bucket{namespace=~\"$namespace\", mvtx_name=~\"$mvtx_name\"}[$__rate_interval])) / 1000000", "refId": "C" }
+        ],
+        "title": "Ack latency",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+        "id": 10,
+        "panels": [],
+        "title": "Resource Metrics",
+        "type": "row"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "MiB", "drawStyle": "line", "fillOpacity": 10, "gradientMode": "opacity" },
+            "unit": "mebibytes",
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+        "id": 11,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$mvtx_name.+\", pod!~\".*-(daemon).*\"}) by (pod) / 1024 / 1024", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "Memory utilization",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": { "axisLabel": "milliCPUs", "drawStyle": "line", "fillOpacity": 10, "gradientMode": "opacity" },
+            "unit": "short",
+            "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}] }
+          },
+          "overrides": []
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+        "id": 12,
+        "options": { "legend": { "calcs": ["mean"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+        "targets": [{ "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$mvtx_name.+\", pod!~\".*-(daemon).*\"}[$__rate_interval])) by (pod) * 1000", "legendFormat": "{{pod}}", "refId": "A" }],
+        "title": "CPU utilization",
+        "type": "timeseries"
+      }
+    ],
+    "refresh": false,
+    "schemaVersion": 39,
+    "tags": [],
+    "templating": {
+      "list": [
+        {
+          "current": { "selected": false, "text": "default", "value": "default" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+          "definition": "label_values(monovtx_read_total, namespace)",
+          "hide": 0,
+          "includeAll": false,
+          "multi": false,
+          "name": "namespace",
+          "options": [],
+          "query": { "query": "label_values(monovtx_read_total, namespace)", "refId": "StandardVariableQuery" },
+          "refresh": 1,
+          "skipUrlSync": false,
+          "sort": 0,
+          "type": "query"
+        },
+        {
+          "current": { "selected": false, "text": "", "value": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus-datasource-uid-placeholder" },
+          "definition": "label_values(monovtx_read_total{namespace=~\"$namespace\"}, mvtx_name)",
+          "hide": 0,
+          "includeAll": false,
+          "multi": false,
+          "name": "mvtx_name",
+          "options": [],
+          "query": { "query": "label_values(monovtx_read_total{namespace=~\"$namespace\"}, mvtx_name)", "refId": "StandardVariableQuery" },
+          "refresh": 1,
+          "skipUrlSync": false,
+          "sort": 0,
+          "type": "query"
+        }
+      ]
+    },
+    "time": { "from": "now-5m", "to": "now" },
+    "timepicker": {},
+    "timezone": "",
+    "title": "perfman-dashboard-monovertex",
+    "uid": null,
+    "version": 1,
+    "weekStart": ""
+  },
+  "folderId": 0,
+  "overwrite": false
+}
