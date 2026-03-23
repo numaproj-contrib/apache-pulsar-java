@@ -33,7 +33,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
@@ -60,21 +59,30 @@ public class PulsarSourceTest {
     private PulsarSource pulsarSource;
     private PulsarConsumerManager consumerManagerMock;
     private Consumer<byte[]> consumerMock;
+    private PulsarAdmin mockPulsarAdmin;
 
     @Before
     public void setUp() {
         try {
-            pulsarSource = new PulsarSource();
             consumerManagerMock = mock(PulsarConsumerManager.class);
             consumerMock = mock(Consumer.class);
-            // Inject the mocked PulsarConsumerManager into pulsarSource using
-            // ReflectionTestUtils.
-            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerManager", consumerManagerMock);
+            mockPulsarAdmin = mock(PulsarAdmin.class);
             PulsarConsumerProperties consumerProperties = new PulsarConsumerProperties();
-            consumerProperties.setUseAutoConsumeSchema(false); // tests use byte[] consumer path
-            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", consumerProperties);
+            consumerProperties.setUseAutoConsumeSchema(false);
+            pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, consumerProperties);
         } catch (Exception e) {
             fail("Setup failed with exception: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, org.apache.pulsar.client.api.Message<?>> messagesToAckMap(PulsarSource source) {
+        try {
+            Field f = PulsarSource.class.getDeclaredField("messagesToAck");
+            f.setAccessible(true);
+            return (Map<String, org.apache.pulsar.client.api.Message<?>>) f.get(source);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -95,8 +103,8 @@ public class PulsarSourceTest {
             // We simulate that there is already one message waiting for ack.
             String dummyMsgId = "dummyMsgId";
             @SuppressWarnings("unchecked")
-            java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) ReflectionTestUtils
-                    .getField(pulsarSource, "messagesToAck");
+            java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                    (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
             // Create a dummy Pulsar message and add it to the map.
             @SuppressWarnings("unchecked")
             org.apache.pulsar.client.api.Message<byte[]> dummyMessage = mock(
@@ -129,10 +137,7 @@ public class PulsarSourceTest {
     public void readWhenNoMessagesReceived() {
         try {
             // Reset the messagesToAck map to ensure it is empty.
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils
-                    .getField(pulsarSource, "messagesToAck");
-            messagesToAck.clear();
+            messagesToAckMap(pulsarSource).clear();
 
             when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
             // Simulate batchReceive returning null.
@@ -160,10 +165,7 @@ public class PulsarSourceTest {
     @Test
     public void readWhenMessagesReceived() {
         try {
-            // Clear messagesToAck
-            java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils
-                    .getField(pulsarSource, "messagesToAck");
-            messagesToAck.clear();
+            messagesToAckMap(pulsarSource).clear();
 
             // Setup a fake batch of messages
             org.apache.pulsar.client.api.Message<byte[]> msg1 = mock(org.apache.pulsar.client.api.Message.class);
@@ -255,8 +257,7 @@ public class PulsarSourceTest {
             // Confirm messages are tracked for ack.
             // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic
             // support.
-            java.util.Map<String, ?> ackMap = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
-                    "messagesToAck");
+            java.util.Map<String, ?> ackMap = messagesToAckMap(pulsarSource);
             assertTrue(ackMap.containsKey("test-topicmsg1"));
             assertTrue(ackMap.containsKey("test-topicmsg2"));
         } catch (PulsarClientException e) {
@@ -281,8 +282,8 @@ public class PulsarSourceTest {
             // Key is topicName + messageId for multi-topic support.
             String ackKey = "test-topicackMsg";
             @SuppressWarnings("unchecked")
-            java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) ReflectionTestUtils
-                    .getField(pulsarSource, "messagesToAck");
+            java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                    (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
             messagesToAck.clear();
             messagesToAck.put(ackKey, msg);
 
@@ -314,8 +315,9 @@ public class PulsarSourceTest {
     @Test
     public void ackNoMatchingMessage() throws PulsarClientException {
         // Ensure messagesToAck is empty.
-        java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck = (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) ReflectionTestUtils
-                .getField(pulsarSource, "messagesToAck");
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
         messagesToAck.clear();
 
         AckRequest ackRequest = new AckRequest() {
@@ -368,25 +370,16 @@ public class PulsarSourceTest {
             when(partitionedStats.getSubscriptions()).thenReturn((Map) castedSubscriptions);
             when(subscriptionStats.getMsgBacklog()).thenReturn(100L);
 
-            // Use reflection to set private fields
-            Field pulsarConsumerPropertiesField = PulsarSource.class.getDeclaredField("pulsarConsumerProperties");
-            pulsarConsumerPropertiesField.setAccessible(true);
-            pulsarConsumerPropertiesField.set(pulsarSource, mockProperties);
+            PulsarConsumerManager mgr = mock(PulsarConsumerManager.class);
+            PulsarSource source = new PulsarSource(mgr, mockAdmin, mockProperties);
+            long result = source.getPending();
 
-            Field pulsarAdminField = PulsarSource.class.getDeclaredField("pulsarAdmin");
-            pulsarAdminField.setAccessible(true);
-            pulsarAdminField.set(pulsarSource, mockAdmin);
-
-            // Act
-            long result = pulsarSource.getPending();
-
-            // Assert
             assertEquals(100L, result);
             verify(mockTopics).getPartitionedTopicMetadata(anyString());
             verify(mockTopics).getPartitionedStats(anyString(), eq(false));
             verify(subscriptionStats).getMsgBacklog();
 
-        } catch (PulsarAdminException | NoSuchFieldException | IllegalAccessException e) {
+        } catch (PulsarAdminException e) {
             fail("Unexpected exception in getPendingPartitionedTopic: " + e.getMessage());
         }
 
@@ -423,11 +416,9 @@ public class PulsarSourceTest {
             when(mockTopicStats.getSubscriptions()).thenReturn((Map) subscriptions);
             when(mockSubStats.getMsgBacklog()).thenReturn(100L);
 
-            PulsarSource pulsarSource = new PulsarSource();
-            ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockPulsarAdmin);
-            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
+            PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), mockPulsarAdmin, mockProperties);
 
-            long result = pulsarSource.getPending();
+            long result = localSource.getPending();
 
             assertEquals(100L, result);
             verify(mockTopics).getPartitionedTopicMetadata("test-topic");
@@ -443,7 +434,7 @@ public class PulsarSourceTest {
      * Tests that getPending sums backlog across multiple topics.
      */
     @Test
-    public void getPendingMultipleTopics() throws PulsarAdminException, NoSuchFieldException, IllegalAccessException {
+    public void getPendingMultipleTopics() throws PulsarAdminException {
         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
         Topics mockTopics = mock(Topics.class);
 
@@ -481,10 +472,8 @@ public class PulsarSourceTest {
         when(topicStats.getSubscriptions()).thenReturn((Map) subMapB);
         when(mockTopics.getStats("topic-b")).thenReturn(topicStats);
 
-        ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
-
-        long result = pulsarSource.getPending();
+        PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+        long result = source.getPending();
 
         assertEquals(150L, result);
         verify(mockTopics).getPartitionedTopicMetadata("topic-a");
@@ -515,11 +504,8 @@ public class PulsarSourceTest {
         try {
             when(mockTopics.getPartitionedTopicMetadata(topicName)).thenReturn(metadata);
 
-            // Use reflection to set private fields
-            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
-            ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
-
-            List<Integer> result = pulsarSource.getPartitions();
+            PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+            List<Integer> result = source.getPartitions();
 
             assertEquals(3, result.size());
             assertEquals(List.of(0, 1, 2), result);
@@ -554,8 +540,8 @@ public class PulsarSourceTest {
         consumerConfig.put("topicNames", Set.of("test-topic"));
         when(pulsarConsumerProperties.getConsumerConfig()).thenReturn(consumerConfig);
 
-        PulsarSource pulsarSource = new PulsarSource();
-        List<Integer> partitions = pulsarSource.getPartitions();
+        PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), pulsarAdmin, pulsarConsumerProperties);
+        List<Integer> partitions = localSource.getPartitions();
 
         assertEquals(List.of(0), partitions);
     }
@@ -585,10 +571,8 @@ public class PulsarSourceTest {
         when(mockTopics.getPartitionedTopicMetadata("topic-a")).thenReturn(metadataA);
         when(mockTopics.getPartitionedTopicMetadata("topic-b")).thenReturn(metadataB);
 
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
-
-        List<Integer> result = pulsarSource.getPartitions();
+        PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+        List<Integer> result = source.getPartitions();
 
         assertEquals(5, result.size());
         assertEquals(List.of(0, 1, 2, 3, 4), result);
@@ -612,11 +596,8 @@ public class PulsarSourceTest {
         try (MockedStatic<Sourcer> mockedSourcer = mockStatic(Sourcer.class)) {
             mockedSourcer.when(Sourcer::defaultPartitions).thenReturn(List.of(42));
 
-            // Use reflection to set private fields
-            ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", mockProperties);
-            ReflectionTestUtils.setField(pulsarSource, "pulsarAdmin", mockAdmin);
-
-            List<Integer> result = pulsarSource.getPartitions();
+            PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+            List<Integer> result = source.getPartitions();
             assertEquals(List.of(42), result);
             mockedSourcer.verify(Sourcer::defaultPartitions);
         }
@@ -646,11 +627,8 @@ public class PulsarSourceTest {
     public void readWithAutoConsume_validAvroMessage_sendsToObserver() throws Exception {
         PulsarConsumerProperties props = new PulsarConsumerProperties();
         props.setUseAutoConsumeSchema(true);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
-
-        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
-                "messagesToAck");
-        messagesToAck.clear();
+        pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, props);
+        messagesToAckMap(pulsarSource).clear();
 
         Schema schema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
         GenericData.Record avroRecord = new GenericData.Record(schema);
@@ -716,11 +694,8 @@ public class PulsarSourceTest {
     public void readWithAutoConsume_schemaValidationFailure_throws() throws PulsarClientException {
         PulsarConsumerProperties props = new PulsarConsumerProperties();
         props.setUseAutoConsumeSchema(true);
-        ReflectionTestUtils.setField(pulsarSource, "pulsarConsumerProperties", props);
-
-        java.util.Map<String, ?> messagesToAck = (java.util.Map<String, ?>) ReflectionTestUtils.getField(pulsarSource,
-                "messagesToAck");
-        messagesToAck.clear();
+        pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, props);
+        messagesToAckMap(pulsarSource).clear();
 
         org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
                 org.apache.pulsar.client.api.Message.class);

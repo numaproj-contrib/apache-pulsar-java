@@ -11,7 +11,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 
@@ -33,22 +32,17 @@ public class PulsarConsumerManagerTest {
 
     @Before
     public void setUp() {
-        // Create a simple consumer properties object with a dummy config
         consumerProperties = new PulsarConsumerProperties();
-        consumerProperties.setUseAutoConsumeSchema(false); // use Schema.BYTES path so mocks apply
+        consumerProperties.setUseAutoConsumeSchema(false);
         Map<String, Object> config = new HashMap<>();
         config.put("dummyKey", "dummyValue");
         consumerProperties.setConsumerConfig(config);
 
-        // Instantiate the manager and inject dependencies using ReflectionTestUtils
-        manager = new PulsarConsumerManager();
-        ReflectionTestUtils.setField(manager, "pulsarConsumerProperties", consumerProperties);
-
-        // Create mocks for PulsarClient and the ConsumerBuilder chain
         mockPulsarClient = mock(PulsarClient.class);
         mockConsumerBuilder = mock(ConsumerBuilder.class);
         mockConsumer = mock(Consumer.class);
-        ReflectionTestUtils.setField(manager, "pulsarClient", mockPulsarClient);
+
+        manager = new PulsarConsumerManager(consumerProperties, mockPulsarClient);
     }
 
     @After
@@ -63,7 +57,6 @@ public class PulsarConsumerManagerTest {
     @Test
     public void getOrCreateBytesConsumer_createsNewConsumer() {
         try {
-            // Set up the chaining calls on the ConsumerBuilder mock
             when(mockPulsarClient.newConsumer(Schema.BYTES)).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.loadConf(anyMap())).thenReturn(mockConsumerBuilder);
             when(mockConsumerBuilder.batchReceivePolicy(any(BatchReceivePolicy.class))).thenReturn(mockConsumerBuilder);
@@ -80,8 +73,6 @@ public class PulsarConsumerManagerTest {
             verify(mockPulsarClient, times(1)).newConsumer(Schema.BYTES);
             verify(mockConsumerBuilder, times(1)).subscribe();
 
-            // Capture loaded configuration to verify that consumerProperties configuration
-            // is passed
             ArgumentCaptor<Map> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(mockConsumerBuilder).loadConf(configCaptor.capture());
             Map loadedConfig = configCaptor.getValue();
@@ -92,7 +83,6 @@ public class PulsarConsumerManagerTest {
             BatchReceivePolicy builtPolicy = batchPolicyCaptor.getValue();
             assertNotNull("BatchReceivePolicy should be set", builtPolicy);
 
-            // Validate maxNumMessages and timeoutMillis configurations
             assertEquals("BatchReceivePolicy should have maxNumMessages set to 10", 10,
                     builtPolicy.getMaxNumMessages());
             assertEquals("BatchReceivePolicy should have timeout set to 1000ms", 1000, builtPolicy.getTimeoutMs());
@@ -113,7 +103,6 @@ public class PulsarConsumerManagerTest {
             Consumer<byte[]> createdConsumer = manager.getOrCreateBytesConsumer(5L, 500L);
             assertNotNull(createdConsumer);
 
-            // Call cleanup and verify that close() is called on both consumer and client
             manager.cleanup();
             verify(createdConsumer, times(1)).close();
             verify(mockPulsarClient, times(1)).close();
@@ -126,8 +115,6 @@ public class PulsarConsumerManagerTest {
     @Test
     public void cleanup_whenConsumersAreNull() {
         try {
-            ReflectionTestUtils.setField(manager, "bytesConsumer", null);
-            ReflectionTestUtils.setField(manager, "genericRecordConsumer", null);
             manager.cleanup();
             verify(mockPulsarClient, times(1)).close();
         } catch (PulsarClientException e) {
@@ -147,11 +134,8 @@ public class PulsarConsumerManagerTest {
             Consumer<byte[]> createdConsumer = manager.getOrCreateBytesConsumer(3L, 300L);
             assertNotNull(createdConsumer);
 
-            // Simulate exception when consumer.close() is invoked
             doThrow(new PulsarClientException("Consumer close failed")).when(createdConsumer).close();
 
-            // Call cleanup; should catch the exception and still proceed to close the
-            // client
             manager.cleanup();
             verify(createdConsumer, times(1)).close();
             verify(mockPulsarClient, times(1)).close();
@@ -164,13 +148,8 @@ public class PulsarConsumerManagerTest {
     @Test
     public void cleanup_clientCloseThrowsException() {
         try {
-            ReflectionTestUtils.setField(manager, "bytesConsumer", null);
-            ReflectionTestUtils.setField(manager, "genericRecordConsumer", null);
-
-            // Simulate exception when pulsarClient.close() is invoked
             doThrow(new PulsarClientException("Client close failed")).when(mockPulsarClient).close();
 
-            // Call cleanup; should catch the exception
             manager.cleanup();
             verify(mockPulsarClient, times(1)).close();
         } catch (PulsarClientException e) {
@@ -178,5 +157,4 @@ public class PulsarConsumerManagerTest {
                     + e.getMessage());
         }
     }
-
 }

@@ -3,28 +3,28 @@ kind: Pipeline
 metadata:
   name: raw-consumer-pipeline
 spec:
-  limits: 
+  limits:
     readBatchSize: 1 # Change if you want a different batch size
   vertices:
     - name: in
       scale:
         min: 1
-      volumes: 
+      volumes:
         - name: pulsar-config-volume
           configMap:
-            name: pulsar-config 
+            name: pulsar-config
             items:
               - key: application.yml
                 path: application.yml
       source:
-        udsource: 
+        udsource:
           container:
             image: apache-pulsar-java:v0.3.0
-            args: [ "--spring.config.location=file:/conf/application.yml" ]
+            args: ["--config=file:/conf/application.yml"]
             imagePullPolicy: Never
             envFrom:
               - secretRef:
-                  name: pulsar-consumer-auth-secret  # All secret keys injected as env vars
+                  name: pulsar-consumer-auth-secret # All secret keys injected as env vars
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf
