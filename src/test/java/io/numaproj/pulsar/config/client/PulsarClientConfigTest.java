@@ -20,23 +20,20 @@ public class PulsarClientConfigTest {
     @Mock
     private PulsarClientProperties mockClientProperties;
 
-    private PulsarClientConfig pulsarClientConfig;
-
     @Before
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        pulsarClientConfig = new PulsarClientConfig();
     }
 
     // Test to create PulsarClient bean with valid configuration properties
     @Test
-    public void pulsarClient_validConfig() {
+    public void pulsarClient_validConfig() throws Exception {
         Map<String, Object> config = new HashMap<>();
         // URL must include the protocol (pulsar:// or pulsar+ssl://)
         config.put("serviceUrl", "pulsar://test:1234");
         when(mockClientProperties.getClientConfig()).thenReturn(config);
         try {
-            PulsarClient client = pulsarClientConfig.pulsarClient(mockClientProperties);
+            PulsarClient client = PulsarClientConfig.create(mockClientProperties);
             assertNotNull(client);
             verify(mockClientProperties).getClientConfig();
 

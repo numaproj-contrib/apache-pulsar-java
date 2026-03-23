@@ -1,0 +1,19 @@
+# Mirrors real pipeline-style structure: client, admin, consumer, producer under pulsar.
+pulsar:
+  client:
+    clientConfig:
+      serviceUrl: pulsar://broker:6650
+  admin:
+    adminConfig:
+      serviceUrl: http://broker:8080
+  consumer:
+    enabled: true
+    useAutoConsumeSchema: false
+    consumerConfig:
+      topicNames: my-topic
+  producer:
+    enabled: false
+    useAutoProduceSchema: true
+    dropInvalidMessages: false
+    producerConfig:
+      topicName: persistent://tn/ns/t1

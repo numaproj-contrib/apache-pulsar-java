@@ -1,0 +1,7 @@
+# Test-only fixture for PulsarConfigLoaderTest.load_fromPath_readsFile.
+# PulsarConfigLoader.loadConfig(Path) opens this file on disk then delegates to the same logic as loadConfig(InputStream).
+# This file only proves that path-based loading works; serviceUrl is an arbitrary value to assert on.
+pulsar:
+  client:
+    clientConfig:
+      serviceUrl: pulsar://file-test:6650
