@@ -6,10 +6,11 @@ spec:
   vertices:
     - name: in
       source:
+        # important: keep these rpu, duration, valueBlob values same as sample
         generator:
           rpu: 10000
           duration: 1s
-          valueBlob: "anVzdCBhIHN0cmluZw=="  # this a string payload not avro, and it says just a string
+          valueBlob: "anVzdCBhIHN0cmluZw=="  # this a string payload and it says just a string
     - name: out
       volumes:
         - name: pulsar-config-volume
