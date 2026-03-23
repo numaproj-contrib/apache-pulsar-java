@@ -86,3 +86,5 @@ kubectl apply -f development/performance-testing/monovertex_sample.yaml
 (Use your path; fix namespace with `-n` if needed.)
 
 Wait until pods are ready. The dashboard should show **read batch size**, **e2e latency**, and related forwarder metrics for that MonoVertex.
+
+To test a new consumer image, simply build another image, tag it differently, update **`spec.source.udsource.container.image`** in the MonoVertex YAML, and redeploy.
