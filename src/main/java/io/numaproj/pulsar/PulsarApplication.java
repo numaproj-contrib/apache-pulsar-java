@@ -85,6 +85,7 @@ public class PulsarApplication {
                     closePulsarClient(pulsarClient);
                 }
             }
+            log.info("Consumer run cleanup finished (after server stopped, startup failure, or alongside JVM shutdown).");
         }
     }
 
@@ -125,6 +126,7 @@ public class PulsarApplication {
             if (sink == null) {
                 closePulsarClient(pulsarClient);
             }
+            log.info("Producer run cleanup finished (after server stopped, startup failure, or alongside JVM shutdown).");
         }
     }
 
