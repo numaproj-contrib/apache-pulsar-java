@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,6 +82,16 @@ public class PulsarSourceTest {
             Field f = PulsarSource.class.getDeclaredField("messagesToAck");
             f.setAccessible(true);
             return (Map<String, org.apache.pulsar.client.api.Message<?>>) f.get(source);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static AtomicBoolean shuttingDownFlag(PulsarSource source) {
+        try {
+            Field f = PulsarSource.class.getDeclaredField("shuttingDown");
+            f.setAccessible(true);
+            return (AtomicBoolean) f.get(source);
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
@@ -331,6 +342,84 @@ public class PulsarSourceTest {
 
         verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
         verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
+    }
+
+    @Test
+    public void readWhenShuttingDown() throws Exception {
+        shuttingDownFlag(pulsarSource).set(true);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        OutputObserver observer = mock(OutputObserver.class);
+
+        pulsarSource.read(readRequest, observer);
+
+        verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+        verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
+        verify(observer, never()).send(any(Message.class));
+    }
+
+    @Test
+    public void ackWhenShuttingDownClearsPendingMessages() throws Exception {
+        shuttingDownFlag(pulsarSource).set(true);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
+        messagesToAck.clear();
+
+        org.apache.pulsar.client.api.Message<byte[]> msg = mock(org.apache.pulsar.client.api.Message.class);
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("ackMsg");
+        when(msg.getMessageId()).thenReturn(msgId);
+        messagesToAck.put("test-topicackMsg", msg);
+
+        AckRequest ackRequest = new AckRequest() {
+            @Override
+            public java.util.List<Offset> getOffsets() {
+                return Collections.singletonList(new Offset("test-topicackMsg".getBytes(StandardCharsets.UTF_8)));
+            }
+        };
+
+        pulsarSource.ack(ackRequest);
+
+        assertTrue(messagesToAck.isEmpty());
+        verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+        verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
+    }
+
+    @Test
+    public void getPendingWhenShuttingDownReturnsZero() {
+        shuttingDownFlag(pulsarSource).set(true);
+
+        long result = pulsarSource.getPending();
+
+        assertEquals(0L, result);
+        verifyNoInteractions(mockPulsarAdmin);
+    }
+
+    @Test
+    public void getPartitionsWhenShuttingDownFallsBackToDefaultPartitions() {
+        shuttingDownFlag(pulsarSource).set(true);
+
+        try (MockedStatic<Sourcer> mockedSourcer = mockStatic(Sourcer.class)) {
+            mockedSourcer.when(Sourcer::defaultPartitions).thenReturn(List.of(7));
+
+            List<Integer> result = pulsarSource.getPartitions();
+
+            assertEquals(List.of(7), result);
+            mockedSourcer.verify(Sourcer::defaultPartitions);
+        }
+
+        verifyNoInteractions(mockPulsarAdmin);
+    }
+
+    @Test
+    public void cleanupIsIdempotent() {
+        pulsarSource.cleanup();
+        pulsarSource.cleanup();
+
+        verify(consumerManagerMock, times(1)).cleanup();
+        verify(mockPulsarAdmin, times(1)).close();
     }
 
     /**

@@ -109,8 +109,38 @@ public class PulsarSinkTest {
 
         pulsarSink.cleanup();
 
+        verify(mockProducer).flush();
         verify(mockProducer).close();
         verify(mockPulsarClient).close();
+    }
+
+    @Test
+    public void producer_cleanup_idempotent() throws Exception {
+        ByteProducer mockProducer = mock(ByteProducer.class);
+        PulsarClient mockPulsarClient = mock(PulsarClient.class);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mockPulsarClient, new PulsarProducerProperties());
+
+        pulsarSink.cleanup();
+        pulsarSink.cleanup();
+
+        verify(mockProducer, times(1)).flush();
+        verify(mockProducer, times(1)).close();
+        verify(mockPulsarClient, times(1)).close();
+    }
+
+    @Test
+    public void processMessages_whenShuttingDown_skipsNewBatch() throws Exception {
+        ByteProducer mockProducer = mock(ByteProducer.class);
+        PulsarClient mockPulsarClient = mock(PulsarClient.class);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mockPulsarClient, new PulsarProducerProperties());
+        DatumIterator mockIterator = mock(DatumIterator.class);
+
+        pulsarSink.cleanup();
+        ResponseList response = pulsarSink.processMessages(mockIterator);
+
+        assertTrue(response.getResponses().isEmpty());
+        verifyNoInteractions(mockIterator);
+        verify(mockProducer, never()).sendAsync(any());
     }
 
     @Test

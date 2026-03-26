@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class PulsarSource extends Sourcer {
@@ -43,6 +44,7 @@ public class PulsarSource extends Sourcer {
     private final PulsarConsumerManager pulsarConsumerManager;
     private final PulsarAdmin pulsarAdmin;
     private final PulsarConsumerProperties pulsarConsumerProperties;
+    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
     private Server server;
 
@@ -60,6 +62,12 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
+        if (shuttingDown.get()) {
+            // Let in-flight shutdown finish without pulling more data from Pulsar.
+            log.info("Source is shutting down, skipping read");
+            return;
+        }
+
         if (!messagesToAck.isEmpty()) {
             log.trace("messagesToAck not empty: {}", messagesToAck);
             return;
@@ -170,6 +178,13 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public void ack(AckRequest request) {
+        if (shuttingDown.get()) {
+            // Do not ack during teardown; unacked messages can be redelivered after restart.
+            log.info("Source is shutting down, skipping ack for {} offsets", request.getOffsets().size());
+            messagesToAck.clear();
+            return;
+        }
+
         // Offsets are topicName + messageId (same as messagesToAck key).
         Map<String, Offset> requestOffsetMap = new HashMap<>();
         request.getOffsets().forEach(offset -> {
@@ -236,6 +251,10 @@ public class PulsarSource extends Sourcer {
 
     @Override
     public long getPending() {
+        if (shuttingDown.get()) {
+            return 0;
+        }
+
         try {
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
             String subscriptionName = (String) pulsarConsumerProperties.getConsumerConfig().get("subscriptionName");
@@ -284,6 +303,10 @@ public class PulsarSource extends Sourcer {
      */
     @Override
     public List<Integer> getPartitions() {
+        if (shuttingDown.get()) {
+            return defaultPartitions();
+        }
+
         try {
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
             List<Integer> partitionIndexes = new ArrayList<>();
@@ -308,6 +331,28 @@ public class PulsarSource extends Sourcer {
         } catch (Exception e) {
             log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();
+        }
+    }
+
+    public void cleanup() {
+        if (!shuttingDown.compareAndSet(false, true)) {
+            return;
+        }
+
+        // Drop local ack bookkeeping so no later callback can try to ack against closing consumers.
+        messagesToAck.clear();
+
+        try {
+            pulsarConsumerManager.cleanup();
+        } catch (Exception e) {
+            log.error("Error while cleaning up Pulsar consumers", e);
+        }
+
+        try {
+            pulsarAdmin.close();
+            log.info("Pulsar admin closed.");
+        } catch (Exception e) {
+            log.error("Error while closing Pulsar admin", e);
         }
     }
 
