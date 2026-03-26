@@ -10,7 +10,9 @@ Before the numbered steps, have these in place (names below match **`monovertex_
 
 - **ConfigMap** (e.g. `consumer-config`) — Provide an **`application.yml`** entry with the consumer configuration, and mount it at **`/conf/application.yml`** via the MonoVertex volume. **Baselines:** keep consumer **receiver queue `500`** so it matches MonoVertex **`readBatchSize: 500`**.
 
-- **Secret** (e.g. `consumer-secret-cloud`) — Contains the credentials needed for the consumer and producer to authenticate with Pulsar. See `docs/get-started` for the secret template.
+  > **Config format changed after Spring removal:** Images after spring rm use a plain `pulsar` root key in `application.yml` (e.g. `pulsar.client.clientConfig`). Older images built before Spring was removed expect the `spring.pulsar` root key (e.g. `spring.pulsar.client.clientConfig`). If the pod fails with config-related errors, check which format your image expects and update `application.yml` accordingly. See `development/testing/` for example configs in the current (post-Spring) format.
+
+- **Secret** (e.g. `pulsar-secret-cloud`) — Contains the credentials needed to authenticate with Pulsar. If the consumer and producer use the same API key, a single Secret is enough—just reference the same name in both the MonoVertex and producer pipeline manifests. See `docs/get-started` for the secret template.
 
 - **Container image** — Build the **apache-pulsar-java** container image and tag it to match **`spec.source.udsource.container.image`** in your MonoVertex YAML. **Baselines:** keep **`resources.requests`** at **100m / 128Mi** on the MonoVertex unless you intentionally change capacity.
 
@@ -28,7 +30,7 @@ Before the numbered steps, have these in place (names below match **`monovertex_
 
 ## Files in this folder
 
-`monovertex_sample.yaml` and `producer_sample.yaml` are included as reference manifests for the consumer MonoVertex and producer pipeline.
+`monovertex_sample.yaml` and `producer_sample.yaml` are **reference templates** — do not edit them directly. Instead, copy them to create your own manifests (e.g. `my-consumer-mvtx.yaml`, `my-producer-pipeline.yaml`) and adjust the image tag, ConfigMap/Secret names, topic, etc. to match your setup. This keeps the samples stable for future comparisons.
 
 - **`monovertex_sample.yaml`** — Consumer MonoVertex (UD source + `log` sink).
 - **`producer_sample.yaml`** — Reference pipeline (generator → UD sink); use generator specs for comparable load generation.
