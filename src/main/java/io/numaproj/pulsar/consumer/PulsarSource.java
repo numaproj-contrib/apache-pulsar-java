@@ -43,7 +43,6 @@ public class PulsarSource extends Sourcer {
     private final PulsarConsumerManager pulsarConsumerManager;
     private final PulsarAdmin pulsarAdmin;
     private final PulsarConsumerProperties pulsarConsumerProperties;
-
     private Server server;
 
     public PulsarSource(PulsarConsumerManager pulsarConsumerManager, PulsarAdmin pulsarAdmin, PulsarConsumerProperties pulsarConsumerProperties) {
@@ -308,6 +307,21 @@ public class PulsarSource extends Sourcer {
         } catch (Exception e) {
             log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();
+        }
+    }
+
+    public void cleanup() {
+        try {
+            pulsarConsumerManager.cleanup();
+        } catch (Exception e) {
+            log.error("Error while cleaning up Pulsar consumers", e);
+        }
+
+        try {
+            pulsarAdmin.close();
+            log.info("Pulsar admin closed.");
+        } catch (Exception e) {
+            log.error("Error while closing Pulsar admin", e);
         }
     }
 

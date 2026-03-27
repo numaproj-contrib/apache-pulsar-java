@@ -109,6 +109,7 @@ public class PulsarSinkTest {
 
         pulsarSink.cleanup();
 
+        verify(mockProducer).flush();
         verify(mockProducer).close();
         verify(mockPulsarClient).close();
     }

@@ -25,6 +25,7 @@ public class PulsarSink extends Sinker {
     private final PulsarClient pulsarClient;
     private final PulsarProducerProperties producerProperties;
 
+
     private Server server;
 
     public PulsarSink(Producer<byte[]> producer, PulsarClient pulsarClient, PulsarProducerProperties producerProperties) {
@@ -104,6 +105,16 @@ public class PulsarSink extends Sinker {
     }
 
     public void cleanup() {
+        try {
+            if (producer != null) {
+                // Push buffered records before closing so shutdown does not drop already accepted messages.
+                producer.flush();
+                log.info("Producer flushed.");
+            }
+        } catch (PulsarClientException e) {
+            log.warn("Error while flushing producer during shutdown.", e);
+        }
+
         try {
             if (producer != null) {
                 producer.close();
