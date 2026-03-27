@@ -12,7 +12,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.SchemaSerializationException;
 import org.junit.Test;
-import org.springframework.test.util.ReflectionTestUtils;
+
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -22,19 +22,18 @@ import java.util.concurrent.CompletionException;
 
 public class PulsarSinkTest {
 
-    // Helper interface to represent Producer<byte[]> without type issues
     private interface ByteProducer extends Producer<byte[]> {
     }
 
-    // Successfully process and send messages to Pulsar from DatumIterator
     @Test
     public void processMessages_responseSuccess() throws Exception {
-        PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
+        PulsarClient mockClient = mock(PulsarClient.class);
+        PulsarProducerProperties props = new PulsarProducerProperties();
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mockClient, props);
+
         DatumIterator mockIterator = mock(DatumIterator.class);
         Datum mockDatum = mock(Datum.class);
-
-        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
 
         byte[] testMessage = "test message".getBytes();
         when(mockDatum.getValue()).thenReturn(testMessage);
@@ -52,15 +51,12 @@ public class PulsarSinkTest {
         assertEquals("msg-1", response.getResponses().get(0).getId());
     }
 
-    // Failed to process messages because the thread waiting for the next datum is
-    // interrupted; no new messages
     @Test
     public void processMessages_responseFailure_datumInterrupted() throws Exception {
-        PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
-        DatumIterator mockIterator = mock(DatumIterator.class);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mock(PulsarClient.class), new PulsarProducerProperties());
 
-        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
+        DatumIterator mockIterator = mock(DatumIterator.class);
 
         when(mockIterator.next())
                 .thenThrow(new InterruptedException())
@@ -73,19 +69,15 @@ public class PulsarSinkTest {
         assertTrue(Thread.currentThread().isInterrupted());
     }
 
-    // Verifies when sending a message fails, the processMessages method calls
-    // responseListBuilder.addResponse with a failure response
     @Test
     public void processMessages_responseFailure_addResponse() throws Exception {
-        PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
-        DatumIterator mockIterator = mock(DatumIterator.class);
-        Datum mockDatum = mock(Datum.class);
-
-        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
         PulsarProducerProperties producerProperties = new PulsarProducerProperties();
         producerProperties.setDropInvalidMessages(false);
-        ReflectionTestUtils.setField(pulsarSink, "producerProperties", producerProperties);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mock(PulsarClient.class), producerProperties);
+
+        DatumIterator mockIterator = mock(DatumIterator.class);
+        Datum mockDatum = mock(Datum.class);
 
         byte[] testMessage = "test message".getBytes();
 
@@ -109,37 +101,29 @@ public class PulsarSinkTest {
         assertTrue(response.getResponses().get(0).getErr().contains(exceptionMessage));
     }
 
-    // Ensure proper resource cleanup on shutdown
     @Test
     public void producer_cleanup() throws Exception {
-        // Arrange
-        PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
         PulsarClient mockPulsarClient = mock(PulsarClient.class);
-
-        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
-        ReflectionTestUtils.setField(pulsarSink, "pulsarClient", mockPulsarClient);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mockPulsarClient, new PulsarProducerProperties());
 
         pulsarSink.cleanup();
 
+        verify(mockProducer).flush();
         verify(mockProducer).close();
         verify(mockPulsarClient).close();
     }
 
-    // Part of the stream succeeds, part fails
     @Test
     public void processMessages_responsePartialSuccess() throws Exception {
-        // Arrange
-        PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
+        PulsarProducerProperties producerProperties = new PulsarProducerProperties();
+        producerProperties.setDropInvalidMessages(false);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mock(PulsarClient.class), producerProperties);
+
         DatumIterator mockIterator = mock(DatumIterator.class);
         Datum mockDatum1 = mock(Datum.class);
         Datum mockDatum2 = mock(Datum.class);
-
-        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
-        PulsarProducerProperties producerProperties = new PulsarProducerProperties();
-        producerProperties.setDropInvalidMessages(false);
-        ReflectionTestUtils.setField(pulsarSink, "producerProperties", producerProperties);
 
         byte[] testMessage1 = "message part 1".getBytes();
         byte[] testMessage2 = "message part 2".getBytes();
@@ -151,10 +135,8 @@ public class PulsarSinkTest {
 
         when(mockIterator.next()).thenReturn(mockDatum1, mockDatum2, (Datum) null);
 
-        // First message completes successfully
         CompletableFuture<MessageId> successFuture = CompletableFuture.completedFuture(mock(MessageId.class));
 
-        // Second message fails
         String exceptionMessage = "Sending failed due to network error";
         CompletableFuture<MessageId> failureFuture = new CompletableFuture<>();
         failureFuture.completeExceptionally(new PulsarClientException(exceptionMessage));
@@ -162,10 +144,8 @@ public class PulsarSinkTest {
         when(mockProducer.sendAsync(testMessage1)).thenReturn(successFuture);
         when(mockProducer.sendAsync(testMessage2)).thenReturn(failureFuture);
 
-        // Act
         ResponseList response = pulsarSink.processMessages(mockIterator);
 
-        // Assert
         verify(mockProducer).sendAsync(testMessage1);
         verify(mockProducer).sendAsync(testMessage2);
 
@@ -177,18 +157,15 @@ public class PulsarSinkTest {
         assertTrue(response.getResponses().get(1).getErr().contains(exceptionMessage));
     }
 
-    // When future completes with SchemaSerializationException (async) and dropInvalidMessages is true, message is dropped.
     @Test
     public void processMessages_dropInvalidMessagesTrue_asyncSchemaSerializationException_dropsMessage() throws Exception {
-        PulsarSink pulsarSink = new PulsarSink();
         ByteProducer mockProducer = mock(ByteProducer.class);
-        DatumIterator mockIterator = mock(DatumIterator.class);
-        Datum mockDatum = mock(Datum.class);
-
-        ReflectionTestUtils.setField(pulsarSink, "producer", mockProducer);
         PulsarProducerProperties producerProperties = new PulsarProducerProperties();
         producerProperties.setDropInvalidMessages(true);
-        ReflectionTestUtils.setField(pulsarSink, "producerProperties", producerProperties);
+        PulsarSink pulsarSink = new PulsarSink(mockProducer, mock(PulsarClient.class), producerProperties);
+
+        DatumIterator mockIterator = mock(DatumIterator.class);
+        Datum mockDatum = mock(Datum.class);
 
         byte[] testMessage = "invalid".getBytes();
         when(mockDatum.getValue()).thenReturn(testMessage);
@@ -206,5 +183,4 @@ public class PulsarSinkTest {
         assertTrue("Expected message to be dropped (async schema error)", response.getResponses().get(0).getSuccess());
         assertEquals("msg-schema", response.getResponses().get(0).getId());
     }
-
 }

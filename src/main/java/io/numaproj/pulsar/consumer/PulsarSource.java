@@ -22,12 +22,7 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.policies.data.TopicStats;
 import org.apache.pulsar.common.policies.data.SubscriptionStats;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,8 +32,6 @@ import java.util.Map;
 import java.util.Set;
 
 @Slf4j
-@Component
-@ConditionalOnProperty(prefix = "spring.pulsar.consumer", name = "enabled", havingValue = "true")
 public class PulsarSource extends Sourcer {
 
     // Map tracking received messages (keyed by topicName + messageId for multi-topic support).
@@ -47,18 +40,17 @@ public class PulsarSource extends Sourcer {
     // for ack and buildHeaders), never the payload type, so a single map with Message<?> is appropriate;
     private final Map<String, org.apache.pulsar.client.api.Message<?>> messagesToAck = new HashMap<>();
 
+    private final PulsarConsumerManager pulsarConsumerManager;
+    private final PulsarAdmin pulsarAdmin;
+    private final PulsarConsumerProperties pulsarConsumerProperties;
     private Server server;
 
-    @Autowired
-    private PulsarConsumerManager pulsarConsumerManager;
+    public PulsarSource(PulsarConsumerManager pulsarConsumerManager, PulsarAdmin pulsarAdmin, PulsarConsumerProperties pulsarConsumerProperties) {
+        this.pulsarConsumerManager = pulsarConsumerManager;
+        this.pulsarAdmin = pulsarAdmin;
+        this.pulsarConsumerProperties = pulsarConsumerProperties;
+    }
 
-    @Autowired
-    private PulsarAdmin pulsarAdmin;
-
-    @Autowired
-    PulsarConsumerProperties pulsarConsumerProperties;
-
-    @PostConstruct
     public void startServer() throws Exception {
         server = new Server(this);
         server.start();
@@ -315,6 +307,21 @@ public class PulsarSource extends Sourcer {
         } catch (Exception e) {
             log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();
+        }
+    }
+
+    public void cleanup() {
+        try {
+            pulsarConsumerManager.cleanup();
+        } catch (Exception e) {
+            log.error("Error while cleaning up Pulsar consumers", e);
+        }
+
+        try {
+            pulsarAdmin.close();
+            log.info("Pulsar admin closed.");
+        } catch (Exception e) {
+            log.error("Error while closing Pulsar admin", e);
         }
     }
 
