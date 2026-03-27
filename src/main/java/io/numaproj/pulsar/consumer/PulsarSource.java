@@ -43,8 +43,6 @@ public class PulsarSource extends Sourcer {
     private final PulsarConsumerManager pulsarConsumerManager;
     private final PulsarAdmin pulsarAdmin;
     private final PulsarConsumerProperties pulsarConsumerProperties;
-
-
     private Server server;
 
     public PulsarSource(PulsarConsumerManager pulsarConsumerManager, PulsarAdmin pulsarAdmin, PulsarConsumerProperties pulsarConsumerProperties) {
