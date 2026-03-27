@@ -64,12 +64,16 @@ public class PulsarApplication {
                     new PulsarConsumerManager(config.getConsumerProperties(), pulsarClient);
             source = new PulsarSource(consumerManager, pulsarAdmin, config.getConsumerProperties());
 
-            // On SIGTERM the SDK's hook drains the gRPC server, but the JVM halts before our
-            // finally block can close Pulsar resources. This hook waits for the drain to finish
-            // (via the latch) then closes resources while the JVM is still alive.
+            // On SIGTERM the SDK's hook drains the gRPC server, but the JVM halts before the
+            // finally block can close Pulsar resources. Putting a shutdown hook here waits for the drain to finish
+            // (via the latch) then closes resources, preventing the JVM from terminating/halting until the resources are closed 
             PulsarSource hookSource = source;
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
+                    // Timer starts when JVM enters shutdown mode.
+                    // Both hooks run concurrently — this hook blocks on the latch, waiting for the SDK's hook to drain the gRPC server 
+                    // (which takes up to 30 seconds). The extra 5 seconds accounts for delays associated with
+                    // main thread reaching countDown() after awaitTermination() returns.
                     serverStopped.await(35, TimeUnit.SECONDS);
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
