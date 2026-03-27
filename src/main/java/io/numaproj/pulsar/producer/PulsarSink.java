@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class PulsarSink extends Sinker {
@@ -25,7 +24,7 @@ public class PulsarSink extends Sinker {
     private final Producer<byte[]> producer;
     private final PulsarClient pulsarClient;
     private final PulsarProducerProperties producerProperties;
-    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
+
 
     private Server server;
 
@@ -43,12 +42,6 @@ public class PulsarSink extends Sinker {
 
     @Override
     public ResponseList processMessages(DatumIterator datumIterator) {
-        if (shuttingDown.get()) {
-            // Refuse new work once shutdown starts; the framework can retry after restart if needed.
-            log.info("Sink is shutting down, skipping new batch");
-            return ResponseList.newBuilder().build();
-        }
-
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -58,10 +51,6 @@ public class PulsarSink extends Sinker {
                 datum = datumIterator.next();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                if (shuttingDown.get()) {
-                    log.info("Interrupted while shutting down sink");
-                    break;
-                }
                 continue;
             }
             // null means the iterator is closed, so we break
@@ -116,10 +105,6 @@ public class PulsarSink extends Sinker {
     }
 
     public void cleanup() {
-        if (!shuttingDown.compareAndSet(false, true)) {
-            return;
-        }
-
         try {
             if (producer != null) {
                 // Push buffered records before closing so shutdown does not drop already accepted messages.

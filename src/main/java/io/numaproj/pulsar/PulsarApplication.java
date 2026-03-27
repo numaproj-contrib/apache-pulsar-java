@@ -14,6 +14,8 @@ import org.apache.pulsar.client.api.Producer;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class PulsarApplication {
@@ -53,7 +55,7 @@ public class PulsarApplication {
         PulsarAdmin pulsarAdmin = null;
         PulsarConsumerManager consumerManager = null;
         PulsarSource source = null;
-        Thread shutdownHook = null;
+        CountDownLatch serverStopped = new CountDownLatch(1);
 
         try {
             pulsarClient = PulsarClientConfig.create(config.getClientProperties());
@@ -62,30 +64,41 @@ public class PulsarApplication {
                     new PulsarConsumerManager(config.getConsumerProperties(), pulsarClient);
             source = new PulsarSource(consumerManager, pulsarAdmin, config.getConsumerProperties());
 
-            // JVM shutdown: runs when the process exits (e.g. SIGTERM on pod stop, SIGINT, System.exit).
-            PulsarSource finalSource = source;
-            shutdownHook = new Thread(finalSource::cleanup, "pulsar-source-shutdown");
-            Runtime.getRuntime().addShutdownHook(shutdownHook);
+            // On SIGTERM the SDK's hook drains the gRPC server, but the JVM halts before our
+            // finally block can close Pulsar resources. This hook waits for the drain to finish
+            // (via the latch) then closes resources while the JVM is still alive.
+            PulsarSource hookSource = source;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    serverStopped.await(35, TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                hookSource.cleanup();
+                log.info("Consumer cleanup finished (shutdown hook).");
+            }, "pulsar-source-shutdown"));
 
+            // Blocks until gRPC server terminates (SIGTERM causes graceful drain, letting
+            // in-flight ack() calls complete before returning).
             source.startServer();
         } finally {
-            // If the server exits normally or startup fails, run the same cleanup path we use on JVM shutdown.
-            removeShutdownHook(shutdownHook);
-            if (source != null) {
-                // Normal path: the source owns the consumer manager and admin client lifecycle.
-                source.cleanup();
-            } else {
-                // Construction may fail partway through; close only the resources that were actually created.
+            serverStopped.countDown();
+
+            // When source is fully constructed the shutdown hook is registered and owns cleanup
+            // for every exit path (SIGTERM and normal JVM exit both trigger hooks).
+            // only clean up here for partial-construction failures where the hook was never registered:
+            //   - consumerManager != null: source construction failed.
+            //     consumerManager owns consumers + client; admin must be closed separately.
+            //   - both null: earliest failure. Close client and admin individually.
+            if (source == null) {
                 if (consumerManager != null) {
-                    // The source was never created, but the manager can still close its consumers and Pulsar client.
                     consumerManager.cleanup();
                 } else {
-                    // Earliest failure path: fall back to individually closing whichever low-level clients exist.
-                    closePulsarAdmin(pulsarAdmin);
                     closePulsarClient(pulsarClient);
                 }
+                closePulsarAdmin(pulsarAdmin);
+                log.info("Consumer cleanup finished.");
             }
-            log.info("Consumer run cleanup finished (after server stopped, startup failure, or alongside JVM shutdown).");
         }
     }
 
@@ -95,7 +108,8 @@ public class PulsarApplication {
         PulsarClient pulsarClient = null;
         PulsarSink sink = null;
         PulsarAdmin pulsarAdmin = null;
-        Thread shutdownHook = null;
+
+        CountDownLatch serverStopped = new CountDownLatch(1);
 
         try {
             pulsarClient = PulsarClientConfig.create(config.getClientProperties());
@@ -104,48 +118,38 @@ public class PulsarApplication {
                     pulsarClient,
                     config.getProducerProperties(),
                     pulsarAdmin);
+
+            // Admin is only needed for topic validation during producer creation.
+            // Close it immediately so we don't hold an idle connection for the process lifetime.
+            closePulsarAdmin(pulsarAdmin);
+            pulsarAdmin = null;
+
             sink = new PulsarSink(producer, pulsarClient, config.getProducerProperties());
 
-            // JVM shutdown: runs when the process exits (e.g. SIGTERM on pod stop, SIGINT, System.exit).
-            PulsarSink finalSink = sink;
-            PulsarAdmin finalPulsarAdmin = pulsarAdmin;
-            shutdownHook = new Thread(() -> {
-                finalSink.cleanup();
-                closePulsarAdmin(finalPulsarAdmin);
-            }, "pulsar-sink-shutdown");
-            Runtime.getRuntime().addShutdownHook(shutdownHook);
+            PulsarSink hookSink = sink;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    serverStopped.await(35, TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                hookSink.cleanup();
+                log.info("Producer cleanup finished (shutdown hook).");
+            }, "pulsar-sink-shutdown"));
 
+            // Blocks until gRPC server terminates.
             sink.startServer();
         } finally {
-            // Mirror shutdown-hook cleanup on normal exit and on partial startup failure.
-            removeShutdownHook(shutdownHook);
-            if (sink != null) {
-                sink.cleanup();
-            }
-            closePulsarAdmin(pulsarAdmin);
+            serverStopped.countDown();
+
+            // When sink is fully constructed the shutdown hook owns cleanup for every exit path.
+            // only clean up here for partial-construction failures where the hook was never
+            // registered. 
             if (sink == null) {
                 closePulsarClient(pulsarClient);
+                closePulsarAdmin(pulsarAdmin);
+                log.info("Producer cleanup finished.");
             }
-            log.info("Producer run cleanup finished (after server stopped, startup failure, or alongside JVM shutdown).");
-        }
-    }
-
-    private static void removeShutdownHook(Thread shutdownHook) {
-        if (shutdownHook == null) {
-            return;
-        }
-
-        try {
-            // Prevent the hook from firing after we've already cleaned up in the current thread.
-            Runtime.getRuntime().removeShutdownHook(shutdownHook);
-        } catch (IllegalStateException e) {
-            // Once JVM shutdown has started, Runtime disallows unregistering hooks. Typical when SIGTERM
-            // arrives (e.g. Kubernetes pod delete) while main is still exiting after awaitTermination().
-            log.info(
-                    "Skipping shutdown hook unregister: JVM shutdown already in progress. "
-                            + "This is expected under process termination; cleanup still runs here or on the hook. "
-                            + "Duplicate work is avoided by idempotent cleanup.");
-            log.debug("removeShutdownHook: Shutdown in progress (expected)", e);
         }
     }
 
