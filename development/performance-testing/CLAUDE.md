@@ -1,6 +1,10 @@
 # Performance Testing — Consumer MonoVertex
 
-When asked to performance test the apache-pulsar-java consumer, follow these steps. Refer to `development/performance-testing/README.md` for full details and baseline parameters.
+When the user asks for help with performance testing, start by presenting this overview so they understand what they're about to do:
+
+> **What this does:** This workflow benchmarks the **apache-pulsar-java consumer** running as a Numaflow MonoVertex on a local Kubernetes cluster. A generator-based producer pipeline pushes messages to a Pulsar topic, and the consumer MonoVertex reads from it. Metrics (read batch size, e2e latency, pending messages) are visualized in a Grafana dashboard via `numaflow-perfman`. The goal is to compare consumer performance across different image builds while keeping all other variables (replicas, batch size, resources, load) constant.
+
+Then proceed with the steps below. Refer to `development/performance-testing/README.md` for full details and baseline parameters.
 
 ## Prerequisites
 
@@ -29,11 +33,16 @@ Place all generated YAML files (ConfigMaps, Secrets, MonoVertex specs, producer 
 
 ### 1. Build the image
 
-Jib is bound to the `package` phase in `pom.xml`, so `mvn clean package` builds the Docker image automatically. Use `-Djib.to.image` to set the tag:
+First, check if the image tag the user provided already exists locally:
+```bash
+docker images apache-pulsar-java:<tag>
+```
+If the image already exists, skip the build and proceed to step 2. If it does not exist, ask the user whether to build from the current repo or provide a different image. To build:
 
 ```bash
 mvn clean package -Djib.to.image=apache-pulsar-java:<tag>
 ```
+Jib is bound to the `package` phase in `pom.xml`, so this builds the Docker image automatically.
 
 Update `spec.source.udsource.container.image` in your MonoVertex YAML to match the tag.
 
@@ -57,12 +66,20 @@ kubectl apply -f development/performance-testing/running-configs/<secret>.yaml
 
 ### 3. Pre-fill the topic
 
-Deploy the producer pipeline to write messages:
+Display this disclaimer to the user before proceeding (use bold and red text if the output format supports it, e.g. `<span style="color:red">` in HTML or `**bold**` in markdown):
+
+> **⚠️ WARNING: Publishing messages to a managed Pulsar cluster (e.g. StreamNative) may incur costs based on message volume and storage. Confirm you want to proceed before continuing.**
+
+After displaying the warning, ask the following questions **one at a time** (wait for the answer before asking the next):
+
+1. First, ask: "Do you want to proceed with publishing messages to your Pulsar topic?" — wait for confirmation before continuing.
+2. Then ask: "What producer publish rate do you want in messages per second? The default is 10,000 per second." — update the producer pipeline's `spec.vertices[0].source.generator.rpu` if they choose a different rate. If they say "default" or similar, keep `rpu: 10000`.
+3. After the producer has been deployed and is running, ask: "The producer is now publishing messages. Do you want to wait until ~1,000,000 messages have accumulated before deploying the consumer? (Recommended for steady metrics — otherwise the consumer may drain the topic too quickly to get useful graphs.)"
+
+Deploy the producer pipeline:
 ```bash
 kubectl apply -f development/performance-testing/running-configs/<producer-pipeline>.yaml
 ```
-
-Ask the user whether to wait for ~1,000,000 messages (recommended for steady metrics) or skip ahead and deploy the consumer immediately. If skipping, the consumer may drain the topic quickly and metrics will only be visible briefly.
 
 ### 4. Set up metrics (one-time)
 
@@ -105,19 +122,28 @@ kubectl apply -f development/performance-testing/running-configs/<monovertex>.ya
 ```
 Keep baseline parameters identical for fair comparison.
 
-**B) Tear down** — remove all test resources and metrics stack from the cluster:
+**B) Tear down** — remove test resources from the cluster. Ask the user which level of cleanup they want:
+
+**B1) Cluster resources only** — delete workloads and configs from Kubernetes:
 ```bash
-# Delete test workloads and configs
 kubectl delete -f development/performance-testing/running-configs/<monovertex>.yaml
 kubectl delete -f development/performance-testing/running-configs/<producer-pipeline>.yaml
 kubectl delete -f development/performance-testing/running-configs/<consumer-config>.yaml
 kubectl delete -f development/performance-testing/running-configs/<producer-config>.yaml
 kubectl delete -f development/performance-testing/running-configs/<secret>.yaml
+```
 
-# Tear down perfman metrics stack (Prometheus, Grafana, ServiceMonitors)
+**B2) Cluster resources + perfman metrics stack** (Prometheus, Grafana, ServiceMonitors):
+```bash
+# Everything from B1, plus:
 <perfman-path>/dist/perfman clean
 ```
-Ask the user whether to also tear down the perfman stack or keep it for future runs.
+
+**B3) Full cleanup** — all of the above plus delete the generated config files from disk:
+```bash
+# Everything from B1/B2, plus:
+rm -rf development/performance-testing/running-configs/
+```
 
 ## Baseline parameters (do not change for fair comparison)
 
