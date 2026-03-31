@@ -3,7 +3,7 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ "main", "feat/automated-cicd" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -29,6 +29,7 @@ jobs:
       run: mvn package -DskipTests
 
     - name: Build and push image to Quay.io
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         mvn package -DskipTests \
           -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ github.sha }} \
