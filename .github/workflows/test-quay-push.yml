@@ -1,15 +1,11 @@
-
-name: Java CI with Maven
+name: Test Quay.io Push
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "feat/automated-cicd" ]
 
 jobs:
-  build:
-
+  push-image:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,19 +16,10 @@ jobs:
         java-version: '23'
         distribution: 'temurin'
         cache: maven
-    - name: Build with Maven, run unit tests
-      # skips building the image, not needed for code correctness tests
-      run: mvn clean install -Djib.skip=true
-
-    - name: Build Docker image
-      # verifies that the image built successfully
-      run: mvn package -DskipTests
 
     - name: Build and push image to Quay.io
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
-        mvn package -DskipTests \
-          -Djib.goal=build \
+        mvn clean package -DskipTests \
           -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ github.sha }} \
           -Djib.to.tags=latest \
           -Djib.to.auth.username=${{ secrets.QUAY_USERNAME }} \
