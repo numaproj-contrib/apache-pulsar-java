@@ -1,5 +1,4 @@
 name: Test Quay.io Push
-# test edit
 on:
   push:
     branches: [ "feat/automated-cicd" ]
