@@ -20,6 +20,7 @@ jobs:
     - name: Build and push image to Quay.io
       run: |
         mvn clean package -DskipTests \
+          -Djib.from.image=amazoncorretto:23 \
           -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ github.sha }} \
           -Djib.to.tags=latest \
           -Djib.to.auth.username=${{ secrets.QUAY_USERNAME }} \
