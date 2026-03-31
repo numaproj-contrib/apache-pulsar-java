@@ -131,7 +131,21 @@
             <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.5.1</version>
+                <configuration>
+                    <from>
+                        <image>amazoncorretto:23</image>
+                    </from>
+                    <container>
+                        <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+                        <mainClass>io.numaproj.pulsar.PulsarApplication</mainClass>
+                    </container>
+                    <to>
+                        <image>
+                            apache-pulsar-java:v0.3.0
+                        </image>
+                    </to>
+                </configuration>
                 <executions>
                     <execution>
                         <id>image-build</id>
@@ -139,20 +153,6 @@
                         <goals>
                             <goal>dockerBuild</goal>
                         </goals>
-                        <configuration>
-                            <from>
-                                <image>amazoncorretto:23</image>
-                            </from>
-                            <container>
-                                <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
-                                <mainClass>io.numaproj.pulsar.PulsarApplication</mainClass>
-                            </container>
-                            <to>
-                                <image>
-                                    apache-pulsar-java:v0.3.0
-                                </image>
-                            </to>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
