@@ -3,7 +3,7 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feat/automated-cicd" ]
   pull_request:
     branches: [ "main" ]
 
@@ -29,11 +29,10 @@ jobs:
       run: mvn package -DskipTests
 
     - name: Build and push image to Quay.io
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         mvn package -DskipTests \
           -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ github.sha }} \
           -Djib.to.tags=latest \
-          -Djib.to.auth.username=${{ secrets.QUAY_USERNAME }} \
-          -Djib.to.auth.password=${{ secrets.QUAY_PASSWORD }} \
+          -Djib.to.auth.username=${{ secrets.QUAYIO_USERNAME }} \
+          -Djib.to.auth.password=${{ secrets.QUAYIO_PASSWORD }} \
           jib:build
