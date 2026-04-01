@@ -27,7 +27,9 @@ Releases are automated using [Release Please](https://github.com/googleapis/rele
    - Builds the Java application
    - Pushes the container image to Quay.io as `quay.io/numaio/numaflow-java/pulsar-java:<version>`
 
-#### Commit message format
+#### PR title format
+
+This repo uses **squash merging**, so the PR title becomes the commit message on `main`. If you want your PR to trigger a version bump and release, the PR title must follow the previously mentioned conventional format:
 
 | Prefix | Example | Version bump |
 |---|---|---|
