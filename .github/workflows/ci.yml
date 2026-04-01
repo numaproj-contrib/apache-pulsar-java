@@ -9,9 +9,7 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 23
@@ -21,19 +19,4 @@ jobs:
         distribution: 'temurin'
         cache: maven
     - name: Build with Maven, run unit tests
-      # skips building the image, not needed for code correctness tests
-      run: mvn clean install -Djib.skip=true
-
-    - name: Build Docker image
-      # verifies that the image built successfully
-      run: mvn package -DskipTests
-
-    - name: Build and push image to Quay.io
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: |
-        mvn package -DskipTests \
-          -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ github.sha }} \
-          -Djib.to.tags=latest \
-          -Djib.to.auth.username=${{ secrets.QUAYIO_USERNAME }} \
-          -Djib.to.auth.password=${{ secrets.QUAYIO_PASSWORD }} \
-          jib:build
+      run: mvn clean install 
