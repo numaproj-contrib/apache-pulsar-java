@@ -16,7 +16,6 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           release-type: maven
-          include-v-in-tag: true
           target-branch: feat/automated-cicd
 
   push-image:
