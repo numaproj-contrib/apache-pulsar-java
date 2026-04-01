@@ -4,7 +4,7 @@
 
     <groupId>io.numaproj.pulsar</groupId>
     <artifactId>apache-pulsar-java</artifactId>
-    <version>0.4.2</version>
+    <version>0.5.0</version>
     <name>apache-pulsar-java</name>
     <packaging>jar</packaging>
 
