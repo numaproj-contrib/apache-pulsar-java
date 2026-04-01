@@ -5,7 +5,8 @@
     ".": {
       "release-type": "maven",
       "include-v-in-tag": true,
-      "skip-snapshot": true
+      "skip-snapshot": true,
+      "release-as": "0.4.1"
     }
   }
 }
