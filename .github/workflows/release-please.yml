@@ -1,6 +1,5 @@
 name: Release Please
 
-# test run edit
 on:
   push:
     branches: [feat/automated-cicd]
