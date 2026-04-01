@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.1](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.4.0...v0.4.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* back to manifest to avoid snapshot ([b43597f](https://github.com/numaproj-contrib/apache-pulsar-java/commit/b43597f8755d8589bf82da738ed578857264864c))
+* fixed wrong parameters ([c7fadbb](https://github.com/numaproj-contrib/apache-pulsar-java/commit/c7fadbb0d6f554f09c8342addcdb61bb5d2810d6))
+* release-please simple mode ([834fc19](https://github.com/numaproj-contrib/apache-pulsar-java/commit/834fc1998fec7301b059a19545cd6f126867e802))
+* rm unnecessary field ([2259cd2](https://github.com/numaproj-contrib/apache-pulsar-java/commit/2259cd23befa545752576637efc56348b9fee497))
+* test run ([15d81b8](https://github.com/numaproj-contrib/apache-pulsar-java/commit/15d81b8e877a31d7489fcd5a208090bf54305a7a))
+
 ## [0.4.0](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.3.0...v0.4.0) (2026-03-31)
 
 
