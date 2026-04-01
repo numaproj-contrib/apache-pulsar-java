@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.5.0](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.4.0...v0.5.0) (2026-04-01)
+
+
+### Features
+
+* merge into main test ([cc5796c](https://github.com/numaproj-contrib/apache-pulsar-java/commit/cc5796cdd859724f65acd59c104b9d9c80235825))
+* test run 2 ([cfd36e3](https://github.com/numaproj-contrib/apache-pulsar-java/commit/cfd36e31670f33cd6b1ba8d29b02600f7b94ec0b))
+
+
+### Bug Fixes
+
+* alter release manifest back to og ([130b3d0](https://github.com/numaproj-contrib/apache-pulsar-java/commit/130b3d09730d706cf410941f590ca1d96d08412b))
+* back to manifest to avoid snapshot ([b43597f](https://github.com/numaproj-contrib/apache-pulsar-java/commit/b43597f8755d8589bf82da738ed578857264864c))
+* change title pattern ([bfd9d89](https://github.com/numaproj-contrib/apache-pulsar-java/commit/bfd9d8936c0ddd0e1f9c78ff43963648353c2a59))
+* fixed wrong parameters ([c7fadbb](https://github.com/numaproj-contrib/apache-pulsar-java/commit/c7fadbb0d6f554f09c8342addcdb61bb5d2810d6))
+* image tag ([119ad23](https://github.com/numaproj-contrib/apache-pulsar-java/commit/119ad235f8af2caa1e2afddc6cf23dda3711fd07))
+* lock release as ([9516160](https://github.com/numaproj-contrib/apache-pulsar-java/commit/9516160b15ea852f9d76a617363b40a5bf59133c))
+* release-please simple mode ([834fc19](https://github.com/numaproj-contrib/apache-pulsar-java/commit/834fc1998fec7301b059a19545cd6f126867e802))
+* remove release lock ([688ba99](https://github.com/numaproj-contrib/apache-pulsar-java/commit/688ba99738ec6a6580f9c31ce70f9b7f52507ed4))
+* rm unnecessary field ([2259cd2](https://github.com/numaproj-contrib/apache-pulsar-java/commit/2259cd23befa545752576637efc56348b9fee497))
+* test run ([020fd76](https://github.com/numaproj-contrib/apache-pulsar-java/commit/020fd76aa9691d1cd590e65bc50def89349adc04))
+* test run ([15d81b8](https://github.com/numaproj-contrib/apache-pulsar-java/commit/15d81b8e877a31d7489fcd5a208090bf54305a7a))
+* test run 1 ([60fb63c](https://github.com/numaproj-contrib/apache-pulsar-java/commit/60fb63c1c0c9717c3364b902df36bf374cdff9c5))
+* try accessing tag thru release please stage ([bdffcc1](https://github.com/numaproj-contrib/apache-pulsar-java/commit/bdffcc1d1ed60355cbce3a5dee6d3cce59075985))
+* use release please tag ([dd621a9](https://github.com/numaproj-contrib/apache-pulsar-java/commit/dd621a975aa10fdd690abc8b5db38a4d860da243))
+
 ## [0.4.0](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.3.0...v0.4.0) (2026-04-01)
 
 
