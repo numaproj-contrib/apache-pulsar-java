@@ -3,6 +3,13 @@
 ## [0.4.1](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.4.1...v0.4.1) (2026-04-01)
 
 
+### Bug Fixes
+
+* image tag ([119ad23](https://github.com/numaproj-contrib/apache-pulsar-java/commit/119ad235f8af2caa1e2afddc6cf23dda3711fd07))
+
+## [0.4.1](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.4.1...v0.4.1) (2026-04-01)
+
+
 ### Features
 
 * add a working logger sink to kickstart the project ([#1](https://github.com/numaproj-contrib/apache-pulsar-java/issues/1)) ([b3ecf05](https://github.com/numaproj-contrib/apache-pulsar-java/commit/b3ecf053b371f55c1433d9d703ec928571b0a07b))
