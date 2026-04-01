@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.5.1...v0.5.2) (2026-04-01)
+
+
+### Bug Fixes
+
+* test run ([020fd76](https://github.com/numaproj-contrib/apache-pulsar-java/commit/020fd76aa9691d1cd590e65bc50def89349adc04))
+* use release please tag ([dd621a9](https://github.com/numaproj-contrib/apache-pulsar-java/commit/dd621a975aa10fdd690abc8b5db38a4d860da243))
+
 ## [0.5.1](https://github.com/numaproj-contrib/apache-pulsar-java/compare/v0.5.0...v0.5.1) (2026-04-01)
 
 
