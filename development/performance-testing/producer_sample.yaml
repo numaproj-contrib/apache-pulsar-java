@@ -1,0 +1,36 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: producer-pipeline
+spec:
+  vertices:
+    - name: in
+      source:
+        # important: keep these rpu, duration, valueBlob values same as sample
+        generator:
+          rpu: 10000
+          duration: 1s
+          valueBlob: "anVzdCBhIHN0cmluZw=="  # this a string payload and it says just a string
+    - name: out
+      volumes:
+        - name: pulsar-config-volume
+          configMap:
+            name: producer-config
+            items:
+              - key: application.yml
+                path: application.yml
+      sink:
+        udsink:
+          container:
+            image: apache-pulsar-java:v0.3.0
+            args: [ "--config=file:/conf/application.yml" ]
+            imagePullPolicy: Never
+            envFrom:
+              - secretRef:
+                  name: producer-secret-cloud
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+  edges:
+    - from: in
+      to: out
