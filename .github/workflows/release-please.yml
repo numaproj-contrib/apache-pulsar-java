@@ -2,7 +2,7 @@ name: Release Please
 
 on:
   push:
-    branches: [feat/automated-cicd]
+    branches: [main]
 
 jobs:
   release-please:
@@ -15,7 +15,6 @@ jobs:
         id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          target-branch: feat/automated-cicd
 
   push-image:
     needs: release-please
