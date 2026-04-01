@@ -1,5 +1,5 @@
 name: Release Please
-# test run
+
 on:
   push:
     branches: [feat/automated-cicd]
@@ -16,10 +16,6 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           target-branch: feat/automated-cicd
-      - name: Debug outputs
-        run: |
-          echo "releases_created: ${{ steps.release.outputs.releases_created }}"
-          echo "tag_name: ${{ steps.release.outputs.tag_name }}"
 
   push-image:
     needs: release-please
@@ -34,14 +30,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Get version from pom.xml
-        id: version
-        run: echo "tag=v$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> "$GITHUB_OUTPUT"
-
       - name: Build and push image to Quay.io
         run: |
           mvn clean package -DskipTests \
-            -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ steps.version.outputs.tag }} \
+            -Djib.to.image=quay.io/numaio/numaflow-java/pulsar-java:${{ needs.release-please.outputs.tag_name }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.QUAYIO_USERNAME }} \
             -Djib.to.auth.password=${{ secrets.QUAYIO_PASSWORD }} \
