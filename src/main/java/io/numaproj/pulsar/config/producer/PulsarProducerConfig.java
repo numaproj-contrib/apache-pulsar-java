@@ -93,7 +93,7 @@ public final class PulsarProducerConfig {
 
         // Check if topic exists (exact match for non-partitioned, or starts with topic-partition- for partitioned)
         boolean topicExists = topics.stream()
-            .anyMatch(t -> t.equals(topicName) || t.startsWith(topicName + "-partition-"));
+                .anyMatch(t -> t.equals(topicName) || t.startsWith(topicName + "-partition-"));
 
         if (topicExists) {
             return;
