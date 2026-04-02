@@ -14,6 +14,22 @@ mvn clean install
 
 All tests must pass before a PR can be merged.
 
+### Building a local Docker image
+
+The [Jib](https://github.com/GoogleContainerTools/jib) Maven plugin is bound to the `package` phase, so a standard Maven build produces a Docker image automatically:
+
+```bash
+mvn clean package
+```
+
+By default this tags the image as `apache-pulsar-java:v${project.version}` (e.g. `apache-pulsar-java:v1.0.0`). To use a custom tag:
+
+```bash
+mvn clean package -Djib.to.image=apache-pulsar-java:<tag>
+```
+
+Use `-Djib.skip=true` to skip the image build if you only want to compile and run tests.
+
 ### Release (`release-please.yml`)
 
 Releases are automated using [Release Please](https://github.com/googleapis/release-please). The workflow runs on every push to `main` and manages versioning, changelogs, and image publishing.
