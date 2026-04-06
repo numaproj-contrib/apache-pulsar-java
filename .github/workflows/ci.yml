@@ -56,5 +56,5 @@ jobs:
         token: ${{ secrets.CODE_COVERAGE_TOKEN }}
         min-coverage-overall: 50
         min-coverage-changed-files: 50
-        title: Code Coverage
+        title: "Code Coverage\n\n*Percentage of source code lines executed by unit tests.*"
         update-comment: true
