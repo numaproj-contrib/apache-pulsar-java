@@ -58,3 +58,5 @@ jobs:
         min-coverage-changed-files: 50
         title: "Code Coverage\n\n*Percentage of source code lines executed by unit tests.*"
         update-comment: true
+        pass-emoji: ':white_check_mark:'
+        fail-emoji: ':x:'
