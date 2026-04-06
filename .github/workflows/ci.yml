@@ -54,7 +54,7 @@ jobs:
       uses: madrapps/jacoco-report@v1.7.2
       with:
         paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
-        token: ${{ secrets.CODE_COVERAGE_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         min-coverage-overall: 50
         min-coverage-changed-files: 50
         title: "Code Coverage\n\n*Percentage of source code lines executed by unit tests.*"
