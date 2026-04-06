@@ -135,8 +135,6 @@
                 <configuration>
                     <excludes>
                         <exclude>io/numaproj/pulsar/PulsarApplication.class</exclude>
-                        <exclude>io/numaproj/pulsar/config/client/PulsarClientConfig.class</exclude>
-                        <exclude>io/numaproj/pulsar/config/admin/PulsarAdminConfig.class</exclude>
                     </excludes>
                 </configuration>
                 <executions>
