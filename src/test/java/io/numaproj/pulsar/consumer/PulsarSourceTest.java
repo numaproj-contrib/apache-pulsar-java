@@ -1,744 +1,744 @@
-// package io.numaproj.pulsar.consumer;
-
-// import io.numaproj.numaflow.sourcer.AckRequest;
-// import io.numaproj.numaflow.sourcer.Message;
-// import io.numaproj.numaflow.sourcer.Offset;
-// import io.numaproj.numaflow.sourcer.ReadRequest;
-// import io.numaproj.numaflow.sourcer.Sourcer;
-// import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
-// import io.numaproj.numaflow.sourcer.OutputObserver;
-
-// import org.apache.pulsar.client.admin.PulsarAdmin;
-// import org.apache.pulsar.client.admin.PulsarAdminException;
-// import org.apache.pulsar.client.admin.Topics;
-// import org.apache.pulsar.client.api.Consumer;
-// import org.apache.pulsar.client.api.MessageId;
-// import org.apache.pulsar.client.api.Messages;
-// import org.apache.pulsar.client.api.PulsarClientException;
-// import org.apache.pulsar.client.api.SchemaSerializationException;
-// import org.apache.pulsar.client.api.schema.GenericRecord;
-// import org.apache.pulsar.common.schema.SchemaType;
-// import org.apache.avro.Schema;
-// import org.apache.avro.generic.GenericData;
-// import org.apache.avro.generic.GenericDatumReader;
-// import org.apache.avro.generic.GenericDatumWriter;
-// import org.apache.avro.io.DecoderFactory;
-// import org.apache.avro.io.EncoderFactory;
-// import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
-// import org.apache.pulsar.common.policies.data.PartitionedTopicStats;
-// import org.apache.pulsar.common.policies.data.SubscriptionStats;
-// import org.apache.pulsar.common.policies.data.TopicStats;
-// import org.junit.After;
-// import org.junit.Before;
-// import org.junit.Test;
-// import org.mockito.ArgumentCaptor;
-// import org.mockito.MockedStatic;
-
-// import java.io.ByteArrayOutputStream;
-// import java.lang.reflect.Field;
-// import java.nio.charset.StandardCharsets;
-// import java.time.Duration;
-// import java.util.Arrays;
-// import java.util.Collections;
-// import java.util.HashMap;
-// import java.util.HashSet;
-// import java.util.List;
-// import java.util.Map;
-// import java.util.Set;
-
-// import static org.junit.Assert.*;
-// import static org.mockito.ArgumentMatchers.any;
-// import static org.mockito.ArgumentMatchers.anyBoolean;
-// import static org.mockito.ArgumentMatchers.anyLong;
-// import static org.mockito.ArgumentMatchers.anyString;
-// import static org.mockito.ArgumentMatchers.eq;
-// import static org.mockito.Mockito.*;
-
-// public class PulsarSourceTest {
-
-//     private PulsarSource pulsarSource;
-//     private PulsarConsumerManager consumerManagerMock;
-//     private Consumer<byte[]> consumerMock;
-//     private PulsarAdmin mockPulsarAdmin;
-
-//     @Before
-//     public void setUp() {
-//         try {
-//             consumerManagerMock = mock(PulsarConsumerManager.class);
-//             consumerMock = mock(Consumer.class);
-//             mockPulsarAdmin = mock(PulsarAdmin.class);
-//             PulsarConsumerProperties consumerProperties = new PulsarConsumerProperties();
-//             consumerProperties.setUseAutoConsumeSchema(false);
-//             pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, consumerProperties);
-//         } catch (Exception e) {
-//             fail("Setup failed with exception: " + e.getMessage());
-//         }
-//     }
-
-//     @SuppressWarnings("unchecked")
-//     private static Map<String, org.apache.pulsar.client.api.Message<?>> messagesToAckMap(PulsarSource source) {
-//         try {
-//             Field f = PulsarSource.class.getDeclaredField("messagesToAck");
-//             f.setAccessible(true);
-//             return (Map<String, org.apache.pulsar.client.api.Message<?>>) f.get(source);
-//         } catch (ReflectiveOperationException e) {
-//             throw new RuntimeException(e);
-//         }
-//     }
-
-//     @After
-//     public void tearDown() {
-//         pulsarSource = null;
-//         consumerManagerMock = null;
-//         consumerMock = null;
-//     }
-
-//     /**
-//      * Test that when messagesToAck is not empty, the read method returns early.
-//      */
-//     @Test
-//     public void readWhenMessagesToAckNotEmpty() {
-//         try {
-//             // Prepopulate the messagesToAck map using reflection access.
-//             // We simulate that there is already one message waiting for ack.
-//             String dummyMsgId = "dummyMsgId";
-//             @SuppressWarnings("unchecked")
-//             java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
-//                     (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
-//             // Create a dummy Pulsar message and add it to the map.
-//             @SuppressWarnings("unchecked")
-//             org.apache.pulsar.client.api.Message<byte[]> dummyMessage = mock(
-//                     org.apache.pulsar.client.api.Message.class);
-//             when(dummyMessage.getMessageId()).thenReturn(mock(MessageId.class));
-//             messagesToAck.put(dummyMsgId, dummyMessage);
-
-//             // Create mocks for ReadRequest and OutputObserver.
-//             ReadRequest readRequest = mock(ReadRequest.class);
-//             when(readRequest.getCount()).thenReturn(10L);
-//             when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
-//             OutputObserver observer = mock(OutputObserver.class);
-
-//             // Call read.
-//             pulsarSource.read(readRequest, observer);
-//             // Since messagesToAck is not empty, read returns early and does not call
-//             // consumer manager.
-//             verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
-//             verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
-//             verify(observer, never()).send(any(Message.class));
-//         } catch (PulsarClientException e) {
-//             fail("Unexpected PulsarClientException thrown in testReadWhenMessagesToAckNotEmpty: " + e.getMessage());
-//         }
-//     }
-
-//     /**
-//      * Test the normal behavior of read when batchReceive returns no messages.
-//      */
-//     @Test
-//     public void readWhenNoMessagesReceived() {
-//         try {
-//             // Reset the messagesToAck map to ensure it is empty.
-//             messagesToAckMap(pulsarSource).clear();
-
-//             when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
-//             // Simulate batchReceive returning null.
-//             when(consumerMock.batchReceive()).thenReturn(null);
-
-//             ReadRequest readRequest = mock(ReadRequest.class);
-//             when(readRequest.getCount()).thenReturn(10L);
-//             when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
-
-//             OutputObserver observer = mock(OutputObserver.class);
-
-//             pulsarSource.read(readRequest, observer);
-
-//             // Verify that observer.send is never called.
-//             verify(observer, never()).send(any(Message.class));
-//         } catch (PulsarClientException e) {
-//             fail("Unexpected PulsarClientException thrown in testReadWhenNoMessagesReceived: " + e.getMessage());
-//         }
-//     }
-
-//     /**
-//      * Test the normal behavior of read when batchReceive returns some messages.
-//      */
-//     @SuppressWarnings("unchecked")
-//     @Test
-//     public void readWhenMessagesReceived() {
-//         try {
-//             messagesToAckMap(pulsarSource).clear();
-
-//             // Setup a fake batch of messages
-//             org.apache.pulsar.client.api.Message<byte[]> msg1 = mock(org.apache.pulsar.client.api.Message.class);
-//             org.apache.pulsar.client.api.Message<byte[]> msg2 = mock(org.apache.pulsar.client.api.Message.class);
-
-//             // Stub message ids and values.
-//             MessageId msgId1 = mock(MessageId.class);
-//             MessageId msgId2 = mock(MessageId.class);
-//             when(msgId1.toString()).thenReturn("msg1");
-//             when(msgId2.toString()).thenReturn("msg2");
-//             when(msg1.getMessageId()).thenReturn(msgId1);
-//             when(msg2.getMessageId()).thenReturn(msgId2);
-//             when(msg1.getValue()).thenReturn("Hello".getBytes(StandardCharsets.UTF_8));
-//             when(msg2.getValue()).thenReturn("World".getBytes(StandardCharsets.UTF_8));
-
-//             // Stub metadata methods required by buildHeaders()
-//             when(msg1.getProducerName()).thenReturn("test-producer");
-//             when(msg2.getProducerName()).thenReturn("test-producer");
-//             when(msg1.getTopicName()).thenReturn("test-topic");
-//             when(msg2.getTopicName()).thenReturn("test-topic");
-//             when(msg1.getPublishTime()).thenReturn(1000L);
-//             when(msg2.getPublishTime()).thenReturn(2000L);
-//             when(msg1.getEventTime()).thenReturn(1000L);
-//             when(msg2.getEventTime()).thenReturn(2000L);
-//             when(msg1.getRedeliveryCount()).thenReturn(0);
-//             when(msg2.getRedeliveryCount()).thenReturn(0);
-//             when(msg1.getProperties()).thenReturn(Collections.emptyMap());
-//             when(msg2.getProperties()).thenReturn(Collections.emptyMap());
-
-//             // Add custom properties to msg2
-//             Map<String, String> customProps = new HashMap<>();
-//             customProps.put("custom-key-1", "custom-value-1");
-//             customProps.put("custom-key-2", "custom-value-2");
-//             customProps.put("app-version", "1.2.3");
-//             when(msg2.getProperties()).thenReturn(customProps);
-
-//             // Create a fake Messages<byte[]> object
-//             Messages<byte[]> messages = mock(Messages.class);
-//             when(messages.size()).thenReturn(2);
-//             java.util.List<org.apache.pulsar.client.api.Message<byte[]>> messageList = Arrays.asList(msg1, msg2);
-//             when(messages.iterator()).thenReturn(messageList.iterator());
-
-//             when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
-//             when(consumerMock.batchReceive()).thenReturn(messages);
-
-//             // Create a fake ReadRequest and OutputObserver.
-//             ReadRequest readRequest = mock(ReadRequest.class);
-//             when(readRequest.getCount()).thenReturn(10L);
-//             when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
-//             OutputObserver observer = mock(OutputObserver.class);
-
-//             pulsarSource.read(readRequest, observer);
-
-//             // Verify that observer.send is called for each received message.
-//             ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
-//             verify(observer, times(2)).send(messageCaptor.capture());
-//             java.util.List<Message> sentMessages = messageCaptor.getAllValues();
-//             assertEquals(2, sentMessages.size());
-
-//             // Validate contents of messages using getValue().
-//             assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
-//             assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
-
-//             // Verify headers are correctly populated for first message
-//             Message firstMessage = sentMessages.get(0);
-//             assertNotNull("Headers should not be null", firstMessage.getHeaders());
-//             assertEquals("test-producer", firstMessage.getHeaders().get("x-pulsar-producer-name"));
-//             assertEquals("msg1", firstMessage.getHeaders().get("x-pulsar-message-id"));
-//             assertEquals("test-topic", firstMessage.getHeaders().get("x-pulsar-topic-name"));
-//             assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-publish-time"));
-//             assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-event-time"));
-//             assertEquals("0", firstMessage.getHeaders().get("x-pulsar-redelivery-count"));
-
-//             // Verify headers are correctly populated for second message
-//             Message secondMessage = sentMessages.get(1);
-//             assertNotNull("Headers should not be null", secondMessage.getHeaders());
-//             assertEquals("test-producer", secondMessage.getHeaders().get("x-pulsar-producer-name"));
-//             assertEquals("msg2", secondMessage.getHeaders().get("x-pulsar-message-id"));
-//             assertEquals("test-topic", secondMessage.getHeaders().get("x-pulsar-topic-name"));
-//             assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-publish-time"));
-//             assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-event-time"));
-//             assertEquals("0", secondMessage.getHeaders().get("x-pulsar-redelivery-count"));
-
-//             // Verify custom properties are included in headers
-//             assertEquals("custom-value-1", secondMessage.getHeaders().get("custom-key-1"));
-//             assertEquals("custom-value-2", secondMessage.getHeaders().get("custom-key-2"));
-//             assertEquals("1.2.3", secondMessage.getHeaders().get("app-version"));
-
-//             // Confirm messages are tracked for ack.
-//             // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic
-//             // support.
-//             java.util.Map<String, ?> ackMap = messagesToAckMap(pulsarSource);
-//             assertTrue(ackMap.containsKey("test-topicmsg1"));
-//             assertTrue(ackMap.containsKey("test-topicmsg2"));
-//         } catch (PulsarClientException e) {
-//             fail("Unexpected PulsarClientException thrown in testReadWhenMessagesReceived: " + e.getMessage());
-//         }
-//     }
-
-//     /**
-//      * Test the ack method when there is a message to be acknowledged.
-//      */
-//     @Test
-//     public void ackSuccessful() {
-//         try {
-//             // Create a dummy message to acknowledge.
-//             org.apache.pulsar.client.api.Message<byte[]> msg = mock(org.apache.pulsar.client.api.Message.class);
-//             MessageId msgId = mock(MessageId.class);
-//             when(msgId.toString()).thenReturn("ackMsg");
-//             when(msg.getMessageId()).thenReturn(msgId);
-//             when(msg.getValue()).thenReturn("AckPayload".getBytes(StandardCharsets.UTF_8));
-
-//             // Insert the dummy message into the messagesToAck map.
-//             // Key is topicName + messageId for multi-topic support.
-//             String ackKey = "test-topicackMsg";
-//             @SuppressWarnings("unchecked")
-//             java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
-//                     (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
-//             messagesToAck.clear();
-//             messagesToAck.put(ackKey, msg);
-
-//             // Create a fake AckRequest with an offset corresponding to topicName+messageId.
-//             AckRequest ackRequest = new AckRequest() {
-//                 @Override
-//                 public java.util.List<Offset> getOffsets() {
-//                     return Collections.singletonList(new Offset(ackKey.getBytes(StandardCharsets.UTF_8)));
-//                 }
-//             };
-
-//             @SuppressWarnings("unchecked")
-//             Consumer<byte[]> consumerMock = mock(Consumer.class);
-//             doReturn(consumerMock).when(consumerManagerMock).getOrCreateBytesConsumer(0L, 0L);
-
-//             pulsarSource.ack(ackRequest);
-
-//             verify(consumerManagerMock, times(1)).getOrCreateBytesConsumer(0L, 0L);
-//             verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
-//             assertFalse(messagesToAck.containsKey(ackKey));
-//         } catch (PulsarClientException e) {
-//             fail("Unexpected PulsarClientException thrown in testAckSuccessful: " + e.getMessage());
-//         }
-//     }
-
-//     /**
-//      * Test the ack method when the offset does not exist in messagesToAck.
-//      */
-//     @Test
-//     public void ackNoMatchingMessage() throws PulsarClientException {
-//         // Ensure messagesToAck is empty.
-//         @SuppressWarnings("unchecked")
-//         java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
-//                 (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
-//         messagesToAck.clear();
-
-//         AckRequest ackRequest = new AckRequest() {
-//             @Override
-//             public java.util.List<Offset> getOffsets() {
-//                 return Collections.singletonList(new Offset("nonExistentMsg".getBytes(StandardCharsets.UTF_8)));
-//             }
-//         };
-
-//         pulsarSource.ack(ackRequest);
-
-//         verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
-//         verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
-//     }
-
-//     /**
-//      * Tests that the correct backlog is returned for partitioned topics with
-//      * subscription at partitioned level.
-//      */
-//     @Test
-//     public void getPendingPartitionedTopic() {
-//         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
-//         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
-//         Topics mockTopics = mock(Topics.class);
-
-//         Set<String> topicNames = new HashSet<>();
-//         topicNames.add("persistent://tenant/namespace/topic");
-//         String subscriptionName = "test-subscription";
-
-//         Map<String, Object> consumerConfig = new HashMap<>();
-//         consumerConfig.put("topicNames", topicNames);
-//         consumerConfig.put("subscriptionName", subscriptionName);
-
-//         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
-//         metadata.partitions = 3;
-
-//         PartitionedTopicStats partitionedStats = mock(PartitionedTopicStats.class);
-//         Map<String, SubscriptionStats> subscriptions = new HashMap<>();
-//         SubscriptionStats subscriptionStats = mock(SubscriptionStats.class);
-//         subscriptions.put(subscriptionName, subscriptionStats);
-
-//         // Configure mocks
-//         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
-//         when(mockAdmin.topics()).thenReturn(mockTopics);
-//         try {
-//             when(mockTopics.getPartitionedTopicMetadata(anyString())).thenReturn(metadata);
-//             when(mockTopics.getPartitionedStats(anyString(), anyBoolean())).thenReturn(partitionedStats);
-//             @SuppressWarnings("unchecked")
-//             Map<String, SubscriptionStats> castedSubscriptions = (Map<String, SubscriptionStats>) (Map<?, ?>) subscriptions;
-//             when(partitionedStats.getSubscriptions()).thenReturn((Map) castedSubscriptions);
-//             when(subscriptionStats.getMsgBacklog()).thenReturn(100L);
-
-//             PulsarConsumerManager mgr = mock(PulsarConsumerManager.class);
-//             PulsarSource source = new PulsarSource(mgr, mockAdmin, mockProperties);
-//             long result = source.getPending();
-
-//             assertEquals(100L, result);
-//             verify(mockTopics).getPartitionedTopicMetadata(anyString());
-//             verify(mockTopics).getPartitionedStats(anyString(), eq(false));
-//             verify(subscriptionStats).getMsgBacklog();
-
-//         } catch (PulsarAdminException e) {
-//             fail("Unexpected exception in getPendingPartitionedTopic: " + e.getMessage());
-//         }
-
-//     }
-
-//     // Returns backlog count for a non-partitioned topic
-//     @Test
-//     public void getPendingNonPartitionedTopic() {
-//         PulsarAdmin mockPulsarAdmin = mock(PulsarAdmin.class);
-//         Topics mockTopics = mock(Topics.class);
-//         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
-
-//         Map<String, Object> consumerConfig = new HashMap<>();
-//         Set<String> topicNames = new HashSet<>();
-//         topicNames.add("test-topic");
-//         consumerConfig.put("topicNames", topicNames);
-//         consumerConfig.put("subscriptionName", "test-subscription");
-
-//         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
-//         when(mockPulsarAdmin.topics()).thenReturn(mockTopics);
-
-//         // Mock partitioned topic metadata with 0 partitions (non-partitioned)
-//         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
-//         metadata.partitions = 0;
-//         try {
-//             when(mockTopics.getPartitionedTopicMetadata("test-topic")).thenReturn(metadata);
-
-//             TopicStats mockTopicStats = mock(TopicStats.class);
-//             SubscriptionStats mockSubStats = mock(SubscriptionStats.class);
-//             Map<String, SubscriptionStats> subscriptions = new HashMap<>();
-//             subscriptions.put("test-subscription", mockSubStats);
-
-//             when(mockTopics.getStats("test-topic")).thenReturn(mockTopicStats);
-//             when(mockTopicStats.getSubscriptions()).thenReturn((Map) subscriptions);
-//             when(mockSubStats.getMsgBacklog()).thenReturn(100L);
-
-//             PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), mockPulsarAdmin, mockProperties);
-
-//             long result = localSource.getPending();
-
-//             assertEquals(100L, result);
-//             verify(mockTopics).getPartitionedTopicMetadata("test-topic");
-//             verify(mockTopics).getStats("test-topic");
-
-//         } catch (PulsarAdminException e) {
-//             fail("Unexpected PulsarAdminException thrown in getPendingNonPartitionedTopic: " + e.getMessage());
-//         }
-
-//     }
-
-//     /**
-//      * Tests that getPending sums backlog across multiple topics.
-//      */
-//     @Test
-//     public void getPendingMultipleTopics() throws PulsarAdminException {
-//         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
-//         Topics mockTopics = mock(Topics.class);
-
-//         Set<String> topicNames = new HashSet<>(Arrays.asList("topic-a", "topic-b"));
-//         String subscriptionName = "test-sub";
-//         Map<String, Object> consumerConfig = new HashMap<>();
-//         consumerConfig.put("topicNames", topicNames);
-//         consumerConfig.put("subscriptionName", subscriptionName);
-
-//         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
-//         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
-//         when(mockAdmin.topics()).thenReturn(mockTopics);
-
-//         PartitionedTopicMetadata metadataPartitioned = new PartitionedTopicMetadata();
-//         metadataPartitioned.partitions = 3;
-//         PartitionedTopicMetadata metadataNonPartitioned = new PartitionedTopicMetadata();
-//         metadataNonPartitioned.partitions = 0;
-
-//         when(mockTopics.getPartitionedTopicMetadata("topic-a")).thenReturn(metadataPartitioned);
-//         when(mockTopics.getPartitionedTopicMetadata("topic-b")).thenReturn(metadataNonPartitioned);
-
-//         PartitionedTopicStats partitionedStats = mock(PartitionedTopicStats.class);
-//         Map<String, SubscriptionStats> subMap = new HashMap<>();
-//         SubscriptionStats subStats = mock(SubscriptionStats.class);
-//         when(subStats.getMsgBacklog()).thenReturn(100L);
-//         subMap.put(subscriptionName, subStats);
-//         when(partitionedStats.getSubscriptions()).thenReturn((Map) subMap);
-//         when(mockTopics.getPartitionedStats("topic-a", false)).thenReturn(partitionedStats);
-
-//         TopicStats topicStats = mock(TopicStats.class);
-//         SubscriptionStats subStatsB = mock(SubscriptionStats.class);
-//         when(subStatsB.getMsgBacklog()).thenReturn(50L);
-//         Map<String, SubscriptionStats> subMapB = new HashMap<>();
-//         subMapB.put(subscriptionName, subStatsB);
-//         when(topicStats.getSubscriptions()).thenReturn((Map) subMapB);
-//         when(mockTopics.getStats("topic-b")).thenReturn(topicStats);
-
-//         PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-//         long result = source.getPending();
-
-//         assertEquals(150L, result);
-//         verify(mockTopics).getPartitionedTopicMetadata("topic-a");
-//         verify(mockTopics).getPartitionedTopicMetadata("topic-b");
-//         verify(mockTopics).getPartitionedStats("topic-a", false);
-//         verify(mockTopics).getStats("topic-b");
-//     }
-
-//     /**
-//      * Tests that the method returns a list of partition indexes from 0 to
-//      * numPartitions-1 for a partitioned topic.
-//      */
-//     @Test
-//     public void getPartitionsPartitionedTopic() {
-//         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
-//         Map<String, Object> consumerConfig = new HashMap<>();
-//         String topicName = "test-topic";
-//         Set<String> topicNames = Set.of(topicName);
-//         consumerConfig.put("topicNames", topicNames);
-//         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
-
-//         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
-//         Topics mockTopics = mock(Topics.class);
-//         when(mockAdmin.topics()).thenReturn(mockTopics);
-
-//         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
-//         metadata.partitions = 3;
-//         try {
-//             when(mockTopics.getPartitionedTopicMetadata(topicName)).thenReturn(metadata);
-
-//             PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-//             List<Integer> result = source.getPartitions();
-
-//             assertEquals(3, result.size());
-//             assertEquals(List.of(0, 1, 2), result);
-
-//             verify(mockTopics).getPartitionedTopicMetadata(topicName);
-
-//         } catch (PulsarAdminException e) {
-//             fail("Unexpected PulsarAdminException thrown in getPartitionsPartitionedTopic: " + e.getMessage());
-//         }
-
-//     }
-
-//     /**
-//      * Tests that a non-partitioned topic (numPartitions < 1) returns a singleton
-//      * list containing 0.
-//      */
-//     @Test
-//     public void getPartitionsNonPartitionedTopic() {
-//         PulsarAdmin pulsarAdmin = mock(PulsarAdmin.class);
-//         Topics topics = mock(Topics.class);
-//         when(pulsarAdmin.topics()).thenReturn(topics);
-//         PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
-//         metadata.partitions = 0;
-//         try {
-//             when(topics.getPartitionedTopicMetadata(anyString())).thenReturn(metadata);
-//         } catch (PulsarAdminException e) {
-//             fail("Unexpected PulsarAdminException thrown: " + e.getMessage());
-//         }
-
-//         PulsarConsumerProperties pulsarConsumerProperties = mock(PulsarConsumerProperties.class);
-//         Map<String, Object> consumerConfig = new HashMap<>();
-//         consumerConfig.put("topicNames", Set.of("test-topic"));
-//         when(pulsarConsumerProperties.getConsumerConfig()).thenReturn(consumerConfig);
-
-//         PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), pulsarAdmin, pulsarConsumerProperties);
-//         List<Integer> partitions = localSource.getPartitions();
-
-//         assertEquals(List.of(0), partitions);
-//     }
-
-//     /**
-//      * Tests that getPartitions returns a flat list of indices across multiple
-//      * topics
-//      * (e.g. topic-a with 3 partitions -> 0,1,2; topic-b with 2 -> 3,4).
-//      */
-//     @Test
-//     public void getPartitionsMultipleTopics() throws PulsarAdminException {
-//         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
-//         Map<String, Object> consumerConfig = new HashMap<>();
-//         Set<String> topicNames = new HashSet<>(Arrays.asList("topic-a", "topic-b"));
-//         consumerConfig.put("topicNames", topicNames);
-//         when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
-
-//         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
-//         Topics mockTopics = mock(Topics.class);
-//         when(mockAdmin.topics()).thenReturn(mockTopics);
-
-//         PartitionedTopicMetadata metadataA = new PartitionedTopicMetadata();
-//         metadataA.partitions = 3;
-//         PartitionedTopicMetadata metadataB = new PartitionedTopicMetadata();
-//         metadataB.partitions = 2;
-
-//         when(mockTopics.getPartitionedTopicMetadata("topic-a")).thenReturn(metadataA);
-//         when(mockTopics.getPartitionedTopicMetadata("topic-b")).thenReturn(metadataB);
-
-//         PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-//         List<Integer> result = source.getPartitions();
-
-//         assertEquals(5, result.size());
-//         assertEquals(List.of(0, 1, 2, 3, 4), result);
-//         verify(mockTopics).getPartitionedTopicMetadata("topic-a");
-//         verify(mockTopics).getPartitionedTopicMetadata("topic-b");
-//     }
-
-//     /**
-//      * Tests that an exception causes the method to fall back to
-//      * defaultPartitions().
-//      */
-//     @Test
-//     public void getPartitionsException() {
-//         // Arrange
-//         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
-//         when(mockProperties.getConsumerConfig()).thenThrow(new RuntimeException("Test exception"));
-
-//         PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
-
-//         // Mock the static method defaultPartitions()
-//         try (MockedStatic<Sourcer> mockedSourcer = mockStatic(Sourcer.class)) {
-//             mockedSourcer.when(Sourcer::defaultPartitions).thenReturn(List.of(42));
-
-//             PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-//             List<Integer> result = source.getPartitions();
-//             assertEquals(List.of(42), result);
-//             mockedSourcer.verify(Sourcer::defaultPartitions);
-//         }
-//     }
-
-//     private static final String AVRO_SCHEMA_JSON = ""
-//             + "{\"type\":\"record\",\"name\":\"TestMessage\",\"fields\":["
-//             + "{\"name\":\"name\",\"type\":\"string\"},"
-//             + "{\"name\":\"topic\",\"type\":\"string\"}"
-//             + "]}";
-
-//     private static byte[] encodeAvro(Schema schema, org.apache.avro.generic.GenericRecord record) throws Exception {
-//         GenericDatumWriter<org.apache.avro.generic.GenericRecord> writer = new GenericDatumWriter<>(schema);
-//         ByteArrayOutputStream out = new ByteArrayOutputStream();
-//         org.apache.avro.io.BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
-//         writer.write(record, encoder);
-//         encoder.flush();
-//         return out.toByteArray();
-//     }
-
-//     /**
-//      * AUTO_CONSUME happy path: payload is getData() (raw message bytes) and sent
-//      * downstream.
-//      */
-//     @SuppressWarnings("unchecked")
-//     @Test
-//     public void readWithAutoConsume_validAvroMessage_sendsToObserver() throws Exception {
-//         PulsarConsumerProperties props = new PulsarConsumerProperties();
-//         props.setUseAutoConsumeSchema(true);
-//         pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, props);
-//         messagesToAckMap(pulsarSource).clear();
-
-//         Schema schema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
-//         GenericData.Record avroRecord = new GenericData.Record(schema);
-//         avroRecord.put("name", "hello");
-//         avroRecord.put("topic", "world");
-//         byte[] avroPayload = encodeAvro(schema, avroRecord);
-
-//         GenericRecord pulsarRecord = mock(GenericRecord.class);
-//         when(pulsarRecord.getSchemaType()).thenReturn(SchemaType.AVRO);
-//         when(pulsarRecord.getNativeObject()).thenReturn(avroRecord);
-
-//         org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
-//                 org.apache.pulsar.client.api.Message.class);
-//         when(pulsarMsg.getValue()).thenReturn(pulsarRecord);
-//         when(pulsarMsg.getData()).thenReturn(avroPayload);
-//         when(pulsarMsg.getTopicName()).thenReturn("test-topic");
-//         MessageId msgId = mock(MessageId.class);
-//         when(msgId.toString()).thenReturn("msg-1");
-//         when(pulsarMsg.getMessageId()).thenReturn(msgId);
-//         when(pulsarMsg.getProducerName()).thenReturn("producer");
-//         when(pulsarMsg.getPublishTime()).thenReturn(1000L);
-//         when(pulsarMsg.getEventTime()).thenReturn(1000L);
-//         when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
-//         when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
-
-//         List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
-//         Messages<GenericRecord> batch = mock(Messages.class);
-//         when(batch.size()).thenReturn(1);
-//         when(batch.iterator()).thenReturn(messageList.iterator());
-
-//         Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
-//         when(consumerGenericMock.batchReceive()).thenReturn(batch);
-//         when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
-//                 .thenReturn(consumerGenericMock);
-
-//         ReadRequest readRequest = mock(ReadRequest.class);
-//         when(readRequest.getCount()).thenReturn(10L);
-//         when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
-//         OutputObserver observer = mock(OutputObserver.class);
-
-//         pulsarSource.read(readRequest, observer);
-
-//         ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
-//         verify(observer, times(1)).send(messageCaptor.capture());
-//         Message sent = messageCaptor.getValue();
-//         assertNotNull(sent.getValue());
-//         assertTrue("payload should be non-empty Avro bytes", sent.getValue().length > 0);
-
-//         GenericDatumReader<org.apache.avro.generic.GenericRecord> reader = new GenericDatumReader<>(schema);
-//         org.apache.avro.generic.GenericRecord decoded = reader.read(null,
-//                 DecoderFactory.get().binaryDecoder(sent.getValue(), null));
-//         assertEquals("hello", decoded.get("name").toString());
-//         assertEquals("world", decoded.get("topic").toString());
-//     }
-
-//     /**
-//      * When useAutoConsumeSchema is true and a message fails schema validation
-//      * (e.g. getValue() throws SchemaSerializationException), read() throws
-//      * RuntimeException.
-//      */
-//     @SuppressWarnings("unchecked")
-//     @Test
-//     public void readWithAutoConsume_schemaValidationFailure_throws() throws PulsarClientException {
-//         PulsarConsumerProperties props = new PulsarConsumerProperties();
-//         props.setUseAutoConsumeSchema(true);
-//         pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, props);
-//         messagesToAckMap(pulsarSource).clear();
-
-//         org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
-//                 org.apache.pulsar.client.api.Message.class);
-//         when(pulsarMsg.getValue()).thenThrow(new SchemaSerializationException("invalid schema"));
-//         when(pulsarMsg.getTopicName()).thenReturn("test-topic");
-//         MessageId msgId = mock(MessageId.class);
-//         when(msgId.toString()).thenReturn("msg-1");
-//         when(pulsarMsg.getMessageId()).thenReturn(msgId);
-//         when(pulsarMsg.getProducerName()).thenReturn("producer");
-//         when(pulsarMsg.getPublishTime()).thenReturn(0L);
-//         when(pulsarMsg.getEventTime()).thenReturn(0L);
-//         when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
-//         when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
-
-//         List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
-//         Messages<GenericRecord> batch = mock(Messages.class);
-//         when(batch.size()).thenReturn(1);
-//         when(batch.iterator()).thenReturn(messageList.iterator());
-
-//         Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
-//         when(consumerGenericMock.batchReceive()).thenReturn(batch);
-//         when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
-//                 .thenReturn(consumerGenericMock);
-
-//         ReadRequest readRequest = mock(ReadRequest.class);
-//         when(readRequest.getCount()).thenReturn(10L);
-//         when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
-//         OutputObserver observer = mock(OutputObserver.class);
-
-//         try {
-//             pulsarSource.read(readRequest, observer);
-//             fail("Expected RuntimeException when getValue() throws");
-//         } catch (RuntimeException e) {
-//             assertNotNull("Expected cause", e.getCause());
-//             // read() wraps in RuntimeException, so cause may be our RuntimeException (with
-//             // SchemaSerializationException) or double-wrapped
-//             Throwable cause = e.getCause();
-//             Throwable schemaFailure = (cause instanceof SchemaSerializationException) ? cause : cause.getCause();
-//             assertNotNull("Expected SchemaSerializationException in cause chain", schemaFailure);
-//             assertTrue("Cause should be schema serialization failure",
-//                     schemaFailure instanceof SchemaSerializationException);
-//             assertTrue("Cause message", schemaFailure.getMessage().contains("invalid schema"));
-//         }
-//     }
-
-// }
+package io.numaproj.pulsar.consumer;
+
+import io.numaproj.numaflow.sourcer.AckRequest;
+import io.numaproj.numaflow.sourcer.Message;
+import io.numaproj.numaflow.sourcer.Offset;
+import io.numaproj.numaflow.sourcer.ReadRequest;
+import io.numaproj.numaflow.sourcer.Sourcer;
+import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
+import io.numaproj.numaflow.sourcer.OutputObserver;
+
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.client.admin.Topics;
+import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.Messages;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SchemaSerializationException;
+import org.apache.pulsar.client.api.schema.GenericRecord;
+import org.apache.pulsar.common.schema.SchemaType;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.EncoderFactory;
+import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
+import org.apache.pulsar.common.policies.data.PartitionedTopicStats;
+import org.apache.pulsar.common.policies.data.SubscriptionStats;
+import org.apache.pulsar.common.policies.data.TopicStats;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+
+import java.io.ByteArrayOutputStream;
+import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+public class PulsarSourceTest {
+
+    private PulsarSource pulsarSource;
+    private PulsarConsumerManager consumerManagerMock;
+    private Consumer<byte[]> consumerMock;
+    private PulsarAdmin mockPulsarAdmin;
+
+    @Before
+    public void setUp() {
+        try {
+            consumerManagerMock = mock(PulsarConsumerManager.class);
+            consumerMock = mock(Consumer.class);
+            mockPulsarAdmin = mock(PulsarAdmin.class);
+            PulsarConsumerProperties consumerProperties = new PulsarConsumerProperties();
+            consumerProperties.setUseAutoConsumeSchema(false);
+            pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, consumerProperties);
+        } catch (Exception e) {
+            fail("Setup failed with exception: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, org.apache.pulsar.client.api.Message<?>> messagesToAckMap(PulsarSource source) {
+        try {
+            Field f = PulsarSource.class.getDeclaredField("messagesToAck");
+            f.setAccessible(true);
+            return (Map<String, org.apache.pulsar.client.api.Message<?>>) f.get(source);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @After
+    public void tearDown() {
+        pulsarSource = null;
+        consumerManagerMock = null;
+        consumerMock = null;
+    }
+
+    /**
+     * Test that when messagesToAck is not empty, the read method returns early.
+     */
+    @Test
+    public void readWhenMessagesToAckNotEmpty() {
+        try {
+            // Prepopulate the messagesToAck map using reflection access.
+            // We simulate that there is already one message waiting for ack.
+            String dummyMsgId = "dummyMsgId";
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                    (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
+            // Create a dummy Pulsar message and add it to the map.
+            @SuppressWarnings("unchecked")
+            org.apache.pulsar.client.api.Message<byte[]> dummyMessage = mock(
+                    org.apache.pulsar.client.api.Message.class);
+            when(dummyMessage.getMessageId()).thenReturn(mock(MessageId.class));
+            messagesToAck.put(dummyMsgId, dummyMessage);
+
+            // Create mocks for ReadRequest and OutputObserver.
+            ReadRequest readRequest = mock(ReadRequest.class);
+            when(readRequest.getCount()).thenReturn(10L);
+            when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+            OutputObserver observer = mock(OutputObserver.class);
+
+            // Call read.
+            pulsarSource.read(readRequest, observer);
+            // Since messagesToAck is not empty, read returns early and does not call
+            // consumer manager.
+            verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+            verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
+            verify(observer, never()).send(any(Message.class));
+        } catch (PulsarClientException e) {
+            fail("Unexpected PulsarClientException thrown in testReadWhenMessagesToAckNotEmpty: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Test the normal behavior of read when batchReceive returns no messages.
+     */
+    @Test
+    public void readWhenNoMessagesReceived() {
+        try {
+            // Reset the messagesToAck map to ensure it is empty.
+            messagesToAckMap(pulsarSource).clear();
+
+            when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
+            // Simulate batchReceive returning null.
+            when(consumerMock.batchReceive()).thenReturn(null);
+
+            ReadRequest readRequest = mock(ReadRequest.class);
+            when(readRequest.getCount()).thenReturn(10L);
+            when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+
+            OutputObserver observer = mock(OutputObserver.class);
+
+            pulsarSource.read(readRequest, observer);
+
+            // Verify that observer.send is never called.
+            verify(observer, never()).send(any(Message.class));
+        } catch (PulsarClientException e) {
+            fail("Unexpected PulsarClientException thrown in testReadWhenNoMessagesReceived: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Test the normal behavior of read when batchReceive returns some messages.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWhenMessagesReceived() {
+        try {
+            messagesToAckMap(pulsarSource).clear();
+
+            // Setup a fake batch of messages
+            org.apache.pulsar.client.api.Message<byte[]> msg1 = mock(org.apache.pulsar.client.api.Message.class);
+            org.apache.pulsar.client.api.Message<byte[]> msg2 = mock(org.apache.pulsar.client.api.Message.class);
+
+            // Stub message ids and values.
+            MessageId msgId1 = mock(MessageId.class);
+            MessageId msgId2 = mock(MessageId.class);
+            when(msgId1.toString()).thenReturn("msg1");
+            when(msgId2.toString()).thenReturn("msg2");
+            when(msg1.getMessageId()).thenReturn(msgId1);
+            when(msg2.getMessageId()).thenReturn(msgId2);
+            when(msg1.getValue()).thenReturn("Hello".getBytes(StandardCharsets.UTF_8));
+            when(msg2.getValue()).thenReturn("World".getBytes(StandardCharsets.UTF_8));
+
+            // Stub metadata methods required by buildHeaders()
+            when(msg1.getProducerName()).thenReturn("test-producer");
+            when(msg2.getProducerName()).thenReturn("test-producer");
+            when(msg1.getTopicName()).thenReturn("test-topic");
+            when(msg2.getTopicName()).thenReturn("test-topic");
+            when(msg1.getPublishTime()).thenReturn(1000L);
+            when(msg2.getPublishTime()).thenReturn(2000L);
+            when(msg1.getEventTime()).thenReturn(1000L);
+            when(msg2.getEventTime()).thenReturn(2000L);
+            when(msg1.getRedeliveryCount()).thenReturn(0);
+            when(msg2.getRedeliveryCount()).thenReturn(0);
+            when(msg1.getProperties()).thenReturn(Collections.emptyMap());
+            when(msg2.getProperties()).thenReturn(Collections.emptyMap());
+
+            // Add custom properties to msg2
+            Map<String, String> customProps = new HashMap<>();
+            customProps.put("custom-key-1", "custom-value-1");
+            customProps.put("custom-key-2", "custom-value-2");
+            customProps.put("app-version", "1.2.3");
+            when(msg2.getProperties()).thenReturn(customProps);
+
+            // Create a fake Messages<byte[]> object
+            Messages<byte[]> messages = mock(Messages.class);
+            when(messages.size()).thenReturn(2);
+            java.util.List<org.apache.pulsar.client.api.Message<byte[]>> messageList = Arrays.asList(msg1, msg2);
+            when(messages.iterator()).thenReturn(messageList.iterator());
+
+            when(consumerManagerMock.getOrCreateBytesConsumer(10L, 1000L)).thenReturn(consumerMock);
+            when(consumerMock.batchReceive()).thenReturn(messages);
+
+            // Create a fake ReadRequest and OutputObserver.
+            ReadRequest readRequest = mock(ReadRequest.class);
+            when(readRequest.getCount()).thenReturn(10L);
+            when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+            OutputObserver observer = mock(OutputObserver.class);
+
+            pulsarSource.read(readRequest, observer);
+
+            // Verify that observer.send is called for each received message.
+            ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+            verify(observer, times(2)).send(messageCaptor.capture());
+            java.util.List<Message> sentMessages = messageCaptor.getAllValues();
+            assertEquals(2, sentMessages.size());
+
+            // Validate contents of messages using getValue().
+            assertEquals("Hello", new String(sentMessages.get(0).getValue(), StandardCharsets.UTF_8));
+            assertEquals("World", new String(sentMessages.get(1).getValue(), StandardCharsets.UTF_8));
+
+            // Verify headers are correctly populated for first message
+            Message firstMessage = sentMessages.get(0);
+            assertNotNull("Headers should not be null", firstMessage.getHeaders());
+            assertEquals("test-producer", firstMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg1", firstMessage.getHeaders().get("x-pulsar-message-id"));
+            assertEquals("test-topic", firstMessage.getHeaders().get("x-pulsar-topic-name"));
+            assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-publish-time"));
+            assertEquals("1000", firstMessage.getHeaders().get("x-pulsar-event-time"));
+            assertEquals("0", firstMessage.getHeaders().get("x-pulsar-redelivery-count"));
+
+            // Verify headers are correctly populated for second message
+            Message secondMessage = sentMessages.get(1);
+            assertNotNull("Headers should not be null", secondMessage.getHeaders());
+            assertEquals("test-producer", secondMessage.getHeaders().get("x-pulsar-producer-name"));
+            assertEquals("msg2", secondMessage.getHeaders().get("x-pulsar-message-id"));
+            assertEquals("test-topic", secondMessage.getHeaders().get("x-pulsar-topic-name"));
+            assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-publish-time"));
+            assertEquals("2000", secondMessage.getHeaders().get("x-pulsar-event-time"));
+            assertEquals("0", secondMessage.getHeaders().get("x-pulsar-redelivery-count"));
+
+            // Verify custom properties are included in headers
+            assertEquals("custom-value-1", secondMessage.getHeaders().get("custom-key-1"));
+            assertEquals("custom-value-2", secondMessage.getHeaders().get("custom-key-2"));
+            assertEquals("1.2.3", secondMessage.getHeaders().get("app-version"));
+
+            // Confirm messages are tracked for ack.
+            // Keys are topicName + messageId (e.g. "test-topicmsg1") for multi-topic
+            // support.
+            java.util.Map<String, ?> ackMap = messagesToAckMap(pulsarSource);
+            assertTrue(ackMap.containsKey("test-topicmsg1"));
+            assertTrue(ackMap.containsKey("test-topicmsg2"));
+        } catch (PulsarClientException e) {
+            fail("Unexpected PulsarClientException thrown in testReadWhenMessagesReceived: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Test the ack method when there is a message to be acknowledged.
+     */
+    @Test
+    public void ackSuccessful() {
+        try {
+            // Create a dummy message to acknowledge.
+            org.apache.pulsar.client.api.Message<byte[]> msg = mock(org.apache.pulsar.client.api.Message.class);
+            MessageId msgId = mock(MessageId.class);
+            when(msgId.toString()).thenReturn("ackMsg");
+            when(msg.getMessageId()).thenReturn(msgId);
+            when(msg.getValue()).thenReturn("AckPayload".getBytes(StandardCharsets.UTF_8));
+
+            // Insert the dummy message into the messagesToAck map.
+            // Key is topicName + messageId for multi-topic support.
+            String ackKey = "test-topicackMsg";
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                    (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
+            messagesToAck.clear();
+            messagesToAck.put(ackKey, msg);
+
+            // Create a fake AckRequest with an offset corresponding to topicName+messageId.
+            AckRequest ackRequest = new AckRequest() {
+                @Override
+                public java.util.List<Offset> getOffsets() {
+                    return Collections.singletonList(new Offset(ackKey.getBytes(StandardCharsets.UTF_8)));
+                }
+            };
+
+            @SuppressWarnings("unchecked")
+            Consumer<byte[]> consumerMock = mock(Consumer.class);
+            doReturn(consumerMock).when(consumerManagerMock).getOrCreateBytesConsumer(0L, 0L);
+
+            pulsarSource.ack(ackRequest);
+
+            verify(consumerManagerMock, times(1)).getOrCreateBytesConsumer(0L, 0L);
+            verify(consumerMock, times(1)).acknowledge(Collections.singletonList(msg.getMessageId()));
+            assertFalse(messagesToAck.containsKey(ackKey));
+        } catch (PulsarClientException e) {
+            fail("Unexpected PulsarClientException thrown in testAckSuccessful: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Test the ack method when the offset does not exist in messagesToAck.
+     */
+    @Test
+    public void ackNoMatchingMessage() throws PulsarClientException {
+        // Ensure messagesToAck is empty.
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>> messagesToAck =
+                (java.util.Map<String, org.apache.pulsar.client.api.Message<byte[]>>) (Map<?, ?>) messagesToAckMap(pulsarSource);
+        messagesToAck.clear();
+
+        AckRequest ackRequest = new AckRequest() {
+            @Override
+            public java.util.List<Offset> getOffsets() {
+                return Collections.singletonList(new Offset("nonExistentMsg".getBytes(StandardCharsets.UTF_8)));
+            }
+        };
+
+        pulsarSource.ack(ackRequest);
+
+        verify(consumerManagerMock, never()).getOrCreateBytesConsumer(anyLong(), anyLong());
+        verify(consumerManagerMock, never()).getOrCreateGenericRecordConsumer(anyLong(), anyLong());
+    }
+
+    /**
+     * Tests that the correct backlog is returned for partitioned topics with
+     * subscription at partitioned level.
+     */
+    @Test
+    public void getPendingPartitionedTopic() {
+        PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
+        PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
+        Topics mockTopics = mock(Topics.class);
+
+        Set<String> topicNames = new HashSet<>();
+        topicNames.add("persistent://tenant/namespace/topic");
+        String subscriptionName = "test-subscription";
+
+        Map<String, Object> consumerConfig = new HashMap<>();
+        consumerConfig.put("topicNames", topicNames);
+        consumerConfig.put("subscriptionName", subscriptionName);
+
+        PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
+        metadata.partitions = 3;
+
+        PartitionedTopicStats partitionedStats = mock(PartitionedTopicStats.class);
+        Map<String, SubscriptionStats> subscriptions = new HashMap<>();
+        SubscriptionStats subscriptionStats = mock(SubscriptionStats.class);
+        subscriptions.put(subscriptionName, subscriptionStats);
+
+        // Configure mocks
+        when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
+        when(mockAdmin.topics()).thenReturn(mockTopics);
+        try {
+            when(mockTopics.getPartitionedTopicMetadata(anyString())).thenReturn(metadata);
+            when(mockTopics.getPartitionedStats(anyString(), anyBoolean())).thenReturn(partitionedStats);
+            @SuppressWarnings("unchecked")
+            Map<String, SubscriptionStats> castedSubscriptions = (Map<String, SubscriptionStats>) (Map<?, ?>) subscriptions;
+            when(partitionedStats.getSubscriptions()).thenReturn((Map) castedSubscriptions);
+            when(subscriptionStats.getMsgBacklog()).thenReturn(100L);
+
+            PulsarConsumerManager mgr = mock(PulsarConsumerManager.class);
+            PulsarSource source = new PulsarSource(mgr, mockAdmin, mockProperties);
+            long result = source.getPending();
+
+            assertEquals(100L, result);
+            verify(mockTopics).getPartitionedTopicMetadata(anyString());
+            verify(mockTopics).getPartitionedStats(anyString(), eq(false));
+            verify(subscriptionStats).getMsgBacklog();
+
+        } catch (PulsarAdminException e) {
+            fail("Unexpected exception in getPendingPartitionedTopic: " + e.getMessage());
+        }
+
+    }
+
+    // Returns backlog count for a non-partitioned topic
+    @Test
+    public void getPendingNonPartitionedTopic() {
+        PulsarAdmin mockPulsarAdmin = mock(PulsarAdmin.class);
+        Topics mockTopics = mock(Topics.class);
+        PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
+
+        Map<String, Object> consumerConfig = new HashMap<>();
+        Set<String> topicNames = new HashSet<>();
+        topicNames.add("test-topic");
+        consumerConfig.put("topicNames", topicNames);
+        consumerConfig.put("subscriptionName", "test-subscription");
+
+        when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
+        when(mockPulsarAdmin.topics()).thenReturn(mockTopics);
+
+        // Mock partitioned topic metadata with 0 partitions (non-partitioned)
+        PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
+        metadata.partitions = 0;
+        try {
+            when(mockTopics.getPartitionedTopicMetadata("test-topic")).thenReturn(metadata);
+
+            TopicStats mockTopicStats = mock(TopicStats.class);
+            SubscriptionStats mockSubStats = mock(SubscriptionStats.class);
+            Map<String, SubscriptionStats> subscriptions = new HashMap<>();
+            subscriptions.put("test-subscription", mockSubStats);
+
+            when(mockTopics.getStats("test-topic")).thenReturn(mockTopicStats);
+            when(mockTopicStats.getSubscriptions()).thenReturn((Map) subscriptions);
+            when(mockSubStats.getMsgBacklog()).thenReturn(100L);
+
+            PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), mockPulsarAdmin, mockProperties);
+
+            long result = localSource.getPending();
+
+            assertEquals(100L, result);
+            verify(mockTopics).getPartitionedTopicMetadata("test-topic");
+            verify(mockTopics).getStats("test-topic");
+
+        } catch (PulsarAdminException e) {
+            fail("Unexpected PulsarAdminException thrown in getPendingNonPartitionedTopic: " + e.getMessage());
+        }
+
+    }
+
+    /**
+     * Tests that getPending sums backlog across multiple topics.
+     */
+    @Test
+    public void getPendingMultipleTopics() throws PulsarAdminException {
+        PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
+        Topics mockTopics = mock(Topics.class);
+
+        Set<String> topicNames = new HashSet<>(Arrays.asList("topic-a", "topic-b"));
+        String subscriptionName = "test-sub";
+        Map<String, Object> consumerConfig = new HashMap<>();
+        consumerConfig.put("topicNames", topicNames);
+        consumerConfig.put("subscriptionName", subscriptionName);
+
+        PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
+        when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
+        when(mockAdmin.topics()).thenReturn(mockTopics);
+
+        PartitionedTopicMetadata metadataPartitioned = new PartitionedTopicMetadata();
+        metadataPartitioned.partitions = 3;
+        PartitionedTopicMetadata metadataNonPartitioned = new PartitionedTopicMetadata();
+        metadataNonPartitioned.partitions = 0;
+
+        when(mockTopics.getPartitionedTopicMetadata("topic-a")).thenReturn(metadataPartitioned);
+        when(mockTopics.getPartitionedTopicMetadata("topic-b")).thenReturn(metadataNonPartitioned);
+
+        PartitionedTopicStats partitionedStats = mock(PartitionedTopicStats.class);
+        Map<String, SubscriptionStats> subMap = new HashMap<>();
+        SubscriptionStats subStats = mock(SubscriptionStats.class);
+        when(subStats.getMsgBacklog()).thenReturn(100L);
+        subMap.put(subscriptionName, subStats);
+        when(partitionedStats.getSubscriptions()).thenReturn((Map) subMap);
+        when(mockTopics.getPartitionedStats("topic-a", false)).thenReturn(partitionedStats);
+
+        TopicStats topicStats = mock(TopicStats.class);
+        SubscriptionStats subStatsB = mock(SubscriptionStats.class);
+        when(subStatsB.getMsgBacklog()).thenReturn(50L);
+        Map<String, SubscriptionStats> subMapB = new HashMap<>();
+        subMapB.put(subscriptionName, subStatsB);
+        when(topicStats.getSubscriptions()).thenReturn((Map) subMapB);
+        when(mockTopics.getStats("topic-b")).thenReturn(topicStats);
+
+        PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+        long result = source.getPending();
+
+        assertEquals(150L, result);
+        verify(mockTopics).getPartitionedTopicMetadata("topic-a");
+        verify(mockTopics).getPartitionedTopicMetadata("topic-b");
+        verify(mockTopics).getPartitionedStats("topic-a", false);
+        verify(mockTopics).getStats("topic-b");
+    }
+
+    /**
+     * Tests that the method returns a list of partition indexes from 0 to
+     * numPartitions-1 for a partitioned topic.
+     */
+    @Test
+    public void getPartitionsPartitionedTopic() {
+        PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
+        Map<String, Object> consumerConfig = new HashMap<>();
+        String topicName = "test-topic";
+        Set<String> topicNames = Set.of(topicName);
+        consumerConfig.put("topicNames", topicNames);
+        when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
+
+        PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
+        Topics mockTopics = mock(Topics.class);
+        when(mockAdmin.topics()).thenReturn(mockTopics);
+
+        PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
+        metadata.partitions = 3;
+        try {
+            when(mockTopics.getPartitionedTopicMetadata(topicName)).thenReturn(metadata);
+
+            PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+            List<Integer> result = source.getPartitions();
+
+            assertEquals(3, result.size());
+            assertEquals(List.of(0, 1, 2), result);
+
+            verify(mockTopics).getPartitionedTopicMetadata(topicName);
+
+        } catch (PulsarAdminException e) {
+            fail("Unexpected PulsarAdminException thrown in getPartitionsPartitionedTopic: " + e.getMessage());
+        }
+
+    }
+
+    /**
+     * Tests that a non-partitioned topic (numPartitions < 1) returns a singleton
+     * list containing 0.
+     */
+    @Test
+    public void getPartitionsNonPartitionedTopic() {
+        PulsarAdmin pulsarAdmin = mock(PulsarAdmin.class);
+        Topics topics = mock(Topics.class);
+        when(pulsarAdmin.topics()).thenReturn(topics);
+        PartitionedTopicMetadata metadata = new PartitionedTopicMetadata();
+        metadata.partitions = 0;
+        try {
+            when(topics.getPartitionedTopicMetadata(anyString())).thenReturn(metadata);
+        } catch (PulsarAdminException e) {
+            fail("Unexpected PulsarAdminException thrown: " + e.getMessage());
+        }
+
+        PulsarConsumerProperties pulsarConsumerProperties = mock(PulsarConsumerProperties.class);
+        Map<String, Object> consumerConfig = new HashMap<>();
+        consumerConfig.put("topicNames", Set.of("test-topic"));
+        when(pulsarConsumerProperties.getConsumerConfig()).thenReturn(consumerConfig);
+
+        PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), pulsarAdmin, pulsarConsumerProperties);
+        List<Integer> partitions = localSource.getPartitions();
+
+        assertEquals(List.of(0), partitions);
+    }
+
+    /**
+     * Tests that getPartitions returns a flat list of indices across multiple
+     * topics
+     * (e.g. topic-a with 3 partitions -> 0,1,2; topic-b with 2 -> 3,4).
+     */
+    @Test
+    public void getPartitionsMultipleTopics() throws PulsarAdminException {
+        PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
+        Map<String, Object> consumerConfig = new HashMap<>();
+        Set<String> topicNames = new HashSet<>(Arrays.asList("topic-a", "topic-b"));
+        consumerConfig.put("topicNames", topicNames);
+        when(mockProperties.getConsumerConfig()).thenReturn(consumerConfig);
+
+        PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
+        Topics mockTopics = mock(Topics.class);
+        when(mockAdmin.topics()).thenReturn(mockTopics);
+
+        PartitionedTopicMetadata metadataA = new PartitionedTopicMetadata();
+        metadataA.partitions = 3;
+        PartitionedTopicMetadata metadataB = new PartitionedTopicMetadata();
+        metadataB.partitions = 2;
+
+        when(mockTopics.getPartitionedTopicMetadata("topic-a")).thenReturn(metadataA);
+        when(mockTopics.getPartitionedTopicMetadata("topic-b")).thenReturn(metadataB);
+
+        PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+        List<Integer> result = source.getPartitions();
+
+        assertEquals(5, result.size());
+        assertEquals(List.of(0, 1, 2, 3, 4), result);
+        verify(mockTopics).getPartitionedTopicMetadata("topic-a");
+        verify(mockTopics).getPartitionedTopicMetadata("topic-b");
+    }
+
+    /**
+     * Tests that an exception causes the method to fall back to
+     * defaultPartitions().
+     */
+    @Test
+    public void getPartitionsException() {
+        // Arrange
+        PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
+        when(mockProperties.getConsumerConfig()).thenThrow(new RuntimeException("Test exception"));
+
+        PulsarAdmin mockAdmin = mock(PulsarAdmin.class);
+
+        // Mock the static method defaultPartitions()
+        try (MockedStatic<Sourcer> mockedSourcer = mockStatic(Sourcer.class)) {
+            mockedSourcer.when(Sourcer::defaultPartitions).thenReturn(List.of(42));
+
+            PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
+            List<Integer> result = source.getPartitions();
+            assertEquals(List.of(42), result);
+            mockedSourcer.verify(Sourcer::defaultPartitions);
+        }
+    }
+
+    private static final String AVRO_SCHEMA_JSON = ""
+            + "{\"type\":\"record\",\"name\":\"TestMessage\",\"fields\":["
+            + "{\"name\":\"name\",\"type\":\"string\"},"
+            + "{\"name\":\"topic\",\"type\":\"string\"}"
+            + "]}";
+
+    private static byte[] encodeAvro(Schema schema, org.apache.avro.generic.GenericRecord record) throws Exception {
+        GenericDatumWriter<org.apache.avro.generic.GenericRecord> writer = new GenericDatumWriter<>(schema);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        org.apache.avro.io.BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
+        writer.write(record, encoder);
+        encoder.flush();
+        return out.toByteArray();
+    }
+
+    /**
+     * AUTO_CONSUME happy path: payload is getData() (raw message bytes) and sent
+     * downstream.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_validAvroMessage_sendsToObserver() throws Exception {
+        PulsarConsumerProperties props = new PulsarConsumerProperties();
+        props.setUseAutoConsumeSchema(true);
+        pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, props);
+        messagesToAckMap(pulsarSource).clear();
+
+        Schema schema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
+        GenericData.Record avroRecord = new GenericData.Record(schema);
+        avroRecord.put("name", "hello");
+        avroRecord.put("topic", "world");
+        byte[] avroPayload = encodeAvro(schema, avroRecord);
+
+        GenericRecord pulsarRecord = mock(GenericRecord.class);
+        when(pulsarRecord.getSchemaType()).thenReturn(SchemaType.AVRO);
+        when(pulsarRecord.getNativeObject()).thenReturn(avroRecord);
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
+                org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenReturn(pulsarRecord);
+        when(pulsarMsg.getData()).thenReturn(avroPayload);
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(1000L);
+        when(pulsarMsg.getEventTime()).thenReturn(1000L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
+                .thenReturn(consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        pulsarSource.read(readRequest, observer);
+
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        verify(observer, times(1)).send(messageCaptor.capture());
+        Message sent = messageCaptor.getValue();
+        assertNotNull(sent.getValue());
+        assertTrue("payload should be non-empty Avro bytes", sent.getValue().length > 0);
+
+        GenericDatumReader<org.apache.avro.generic.GenericRecord> reader = new GenericDatumReader<>(schema);
+        org.apache.avro.generic.GenericRecord decoded = reader.read(null,
+                DecoderFactory.get().binaryDecoder(sent.getValue(), null));
+        assertEquals("hello", decoded.get("name").toString());
+        assertEquals("world", decoded.get("topic").toString());
+    }
+
+    /**
+     * When useAutoConsumeSchema is true and a message fails schema validation
+     * (e.g. getValue() throws SchemaSerializationException), read() throws
+     * RuntimeException.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    public void readWithAutoConsume_schemaValidationFailure_throws() throws PulsarClientException {
+        PulsarConsumerProperties props = new PulsarConsumerProperties();
+        props.setUseAutoConsumeSchema(true);
+        pulsarSource = new PulsarSource(consumerManagerMock, mockPulsarAdmin, props);
+        messagesToAckMap(pulsarSource).clear();
+
+        org.apache.pulsar.client.api.Message<GenericRecord> pulsarMsg = mock(
+                org.apache.pulsar.client.api.Message.class);
+        when(pulsarMsg.getValue()).thenThrow(new SchemaSerializationException("invalid schema"));
+        when(pulsarMsg.getTopicName()).thenReturn("test-topic");
+        MessageId msgId = mock(MessageId.class);
+        when(msgId.toString()).thenReturn("msg-1");
+        when(pulsarMsg.getMessageId()).thenReturn(msgId);
+        when(pulsarMsg.getProducerName()).thenReturn("producer");
+        when(pulsarMsg.getPublishTime()).thenReturn(0L);
+        when(pulsarMsg.getEventTime()).thenReturn(0L);
+        when(pulsarMsg.getRedeliveryCount()).thenReturn(0);
+        when(pulsarMsg.getProperties()).thenReturn(Collections.emptyMap());
+
+        List<org.apache.pulsar.client.api.Message<GenericRecord>> messageList = Collections.singletonList(pulsarMsg);
+        Messages<GenericRecord> batch = mock(Messages.class);
+        when(batch.size()).thenReturn(1);
+        when(batch.iterator()).thenReturn(messageList.iterator());
+
+        Consumer<GenericRecord> consumerGenericMock = mock(Consumer.class);
+        when(consumerGenericMock.batchReceive()).thenReturn(batch);
+        when(consumerManagerMock.getOrCreateGenericRecordConsumer(anyLong(), anyLong()))
+                .thenReturn(consumerGenericMock);
+
+        ReadRequest readRequest = mock(ReadRequest.class);
+        when(readRequest.getCount()).thenReturn(10L);
+        when(readRequest.getTimeout()).thenReturn(Duration.ofMillis(1000));
+        OutputObserver observer = mock(OutputObserver.class);
+
+        try {
+            pulsarSource.read(readRequest, observer);
+            fail("Expected RuntimeException when getValue() throws");
+        } catch (RuntimeException e) {
+            assertNotNull("Expected cause", e.getCause());
+            // read() wraps in RuntimeException, so cause may be our RuntimeException (with
+            // SchemaSerializationException) or double-wrapped
+            Throwable cause = e.getCause();
+            Throwable schemaFailure = (cause instanceof SchemaSerializationException) ? cause : cause.getCause();
+            assertNotNull("Expected SchemaSerializationException in cause chain", schemaFailure);
+            assertTrue("Cause should be schema serialization failure",
+                    schemaFailure instanceof SchemaSerializationException);
+            assertTrue("Cause message", schemaFailure.getMessage().contains("invalid schema"));
+        }
+    }
+
+}
