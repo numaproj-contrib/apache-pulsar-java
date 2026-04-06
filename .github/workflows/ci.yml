@@ -53,7 +53,7 @@ jobs:
       uses: madrapps/jacoco-report@v1.7.2
       with:
         paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
-        token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        token: ${{ secrets.CODE_COVERAGE_TOKEN }}
         min-coverage-overall: 50
         min-coverage-changed-files: 50
         title: Code Coverage
