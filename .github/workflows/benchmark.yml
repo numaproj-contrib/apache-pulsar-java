@@ -101,6 +101,30 @@ jobs:
             --timeout=120s || kubectl get pods
           sleep ${{ inputs.prefill_duration || '300' }}
 
+      - name: Check topic backlog
+        run: |
+          kubectl exec pulsar -- bin/pulsar-admin topics stats \
+            persistent://public/default/benchmark-topic \
+            | grep -E '"msgBacklog"|"storageSize"|"msgRateIn"|"msgThroughputIn"' || \
+            kubectl exec pulsar -- bin/pulsar-admin topics stats \
+              persistent://public/default/benchmark-topic
+
+      - name: Stop producer pipeline
+        run: |
+          kubectl delete pipeline producer-pipeline --timeout=30s
+          echo "Waiting for producer pods to terminate..."
+          kubectl wait --for=delete pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
+            --timeout=60s || true
+          sleep 5
+
+      - name: Verify backlog after producer stopped
+        run: |
+          kubectl exec pulsar -- bin/pulsar-admin topics stats \
+            persistent://public/default/benchmark-topic \
+            | grep -E '"msgBacklog"|"storageSize"' || \
+            kubectl exec pulsar -- bin/pulsar-admin topics stats \
+              persistent://public/default/benchmark-topic
+
       - name: Deploy consumer MonoVertex
         run: |
           sed "s|__IMAGE_TAG__|${{ steps.image.outputs.tag }}|g" \
