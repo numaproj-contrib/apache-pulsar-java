@@ -118,6 +118,32 @@ jobs:
           sed "s|__IMAGE_TAG__|${{ steps.image.outputs.tag }}|g" \
             .github/benchmark/consumer-monovertex.yaml | kubectl apply -f -
 
+      - name: Report runner and cluster resource headroom
+        run: |
+          set -euo pipefail
+          echo "=== GitHub-hosted runner (host VM) ==="
+          echo "Logical CPUs visible to this job: $(nproc)"
+          if command -v lscpu >/dev/null 2>&1; then
+            lscpu | grep -E '^CPU\(s\)|^Model name|^Thread\(s\) per core|^Core\(s\) per socket' || true
+          fi
+          echo ""
+          free -h
+          echo ""
+          echo "Disk (workspace):"
+          df -h "${GITHUB_WORKSPACE}" 2>/dev/null || df -h /
+          echo ""
+          echo "=== cgroup limits for this job (if exposed) ==="
+          if [ -r /sys/fs/cgroup/memory.max ]; then echo "memory.max: $(cat /sys/fs/cgroup/memory.max)"; fi
+          if [ -r /sys/fs/cgroup/cpu.max ]; then echo "cpu.max: $(cat /sys/fs/cgroup/cpu.max)"; fi
+          echo ""
+          echo "=== Kubernetes (after consumer is Ready) ==="
+          kubectl wait --for=condition=Ready pod \
+            -l "numaflow.numaproj.io/mono-vertex-name=consumer-mvtx" \
+            --timeout=180s
+          kubectl top nodes 2>/dev/null || echo "(kubectl top nodes: metrics not ready yet)"
+          echo ""
+          kubectl top pods -A --sort-by=memory 2>/dev/null | head -50 || true
+
       # ── Capture metrics ──────────────────────────────────────────────
       - name: Run benchmark and capture metrics
         run: .github/benchmark/capture-metrics.sh ${{ inputs.measurement_duration || '120' }}
