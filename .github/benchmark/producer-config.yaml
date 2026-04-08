@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: producer-config
+data:
+  application.yml: |
+    pulsar:
+      client:
+        clientConfig:
+          serviceUrl: "pulsar://pulsar.default.svc.cluster.local:6650"
+      producer:
+        enabled: true
+        useAutoProduceSchema: true
+        dropInvalidMessages: false
+        producerConfig:
+          topicName: "persistent://public/default/benchmark-topic"
+      admin:
+        adminConfig:
+          serviceUrl: "http://pulsar.default.svc.cluster.local:8080"

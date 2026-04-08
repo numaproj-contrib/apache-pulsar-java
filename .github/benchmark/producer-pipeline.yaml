@@ -1,0 +1,32 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: producer-pipeline
+spec:
+  vertices:
+    - name: in
+      source:
+        generator:
+          rpu: 10000
+          duration: 1s
+          valueBlob: "anVzdCBhIHN0cmluZw=="
+    - name: out
+      volumes:
+        - name: pulsar-config-volume
+          configMap:
+            name: producer-config
+            items:
+              - key: application.yml
+                path: application.yml
+      sink:
+        udsink:
+          container:
+            image: __IMAGE_TAG__
+            args: ["--config=file:/conf/application.yml"]
+            imagePullPolicy: Never
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+  edges:
+    - from: in
+      to: out
