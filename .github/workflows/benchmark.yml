@@ -12,7 +12,7 @@ on:
       prefill_duration:
         description: 'How long to run the producer before starting the consumer (seconds)'
         required: false
-        default: '60'
+        default: '300'
 
 permissions:
   contents: write
@@ -95,11 +95,11 @@ jobs:
         run: |
           sed "s|__IMAGE_TAG__|${{ steps.image.outputs.tag }}|g" \
             .github/benchmark/producer-pipeline.yaml | kubectl apply -f -
-          echo "Pre-filling topic for ${{ inputs.prefill_duration || '60' }}s..."
+          echo "Pre-filling topic for ${{ inputs.prefill_duration || '300' }}s..."
           sleep 10
           kubectl wait --for=condition=Ready pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
             --timeout=120s || kubectl get pods
-          sleep ${{ inputs.prefill_duration || '60' }}
+          sleep ${{ inputs.prefill_duration || '300' }}
 
       - name: Deploy consumer MonoVertex
         run: |
