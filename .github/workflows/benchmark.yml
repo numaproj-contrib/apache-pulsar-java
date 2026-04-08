@@ -51,6 +51,12 @@ jobs:
           k3d cluster create benchmark
           kubectl cluster-info
 
+      - name: Install metrics-server
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          kubectl -n kube-system patch deployment metrics-server --type=json \
+            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
       - name: Import application image into k3d
         run: k3d image import ${{ steps.image.outputs.tag }} -c benchmark
 
@@ -101,21 +107,11 @@ jobs:
             --timeout=120s || kubectl get pods
           sleep ${{ inputs.prefill_duration || '300' }}
 
-      - name: Check topic backlog
+      - name: Check topic stats
         run: |
           kubectl exec pulsar -- bin/pulsar-admin topics stats \
             persistent://public/default/benchmark-topic \
-            | grep -E '"msgBacklog"|"storageSize"|"msgRateIn"|"msgThroughputIn"' || \
-            kubectl exec pulsar -- bin/pulsar-admin topics stats \
-              persistent://public/default/benchmark-topic
-
-      - name: Verify backlog of topic
-        run: |
-          kubectl exec pulsar -- bin/pulsar-admin topics stats \
-            persistent://public/default/benchmark-topic \
-            | grep -E '"msgBacklog"|"storageSize"' || \
-            kubectl exec pulsar -- bin/pulsar-admin topics stats \
-              persistent://public/default/benchmark-topic
+            | grep -E '"msgInCounter"|"msgOutCounter"|"storageSize"|"msgRateIn"'
 
       - name: Deploy consumer MonoVertex
         run: |
