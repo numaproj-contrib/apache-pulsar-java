@@ -167,19 +167,21 @@ jobs:
       # ── Report results ───────────────────────────────────────────────
       # Push to gh-pages only on pushes to main (not on every PR commit).
       - name: Store benchmark result
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Benchmark
           tool: customBiggerIsBetter
           output-file-path: benchmark-results.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          auto-push: true
           alert-threshold: '200%'
           comment-on-alert: false
           comment-always: false
           fail-on-alert: false
           benchmark-data-dir-path: dev/bench
 
+      # ── Post sticky benchmark PR comment ───────────────────────────────
       - name: Post sticky benchmark PR comment
         if: github.event_name == 'pull_request'
         env:
