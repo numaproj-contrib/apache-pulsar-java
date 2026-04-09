@@ -37,7 +37,7 @@ if (baselinePath && fs.existsSync(baselinePath) && fs.statSync(baselinePath).siz
     if (Array.isArray(arr) && arr.length > 0) {
       const last = arr[arr.length - 1];
       for (const b of last.benches || []) {
-        baselineMap.set(b.name, b.value);
+        baselineMetricsMap.set(b.name, b.value);
       }
     }
   } catch (e) {
