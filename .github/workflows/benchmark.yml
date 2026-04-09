@@ -3,6 +3,8 @@ name: Benchmark
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       measurement_duration:
@@ -149,18 +151,56 @@ jobs:
       - name: Run benchmark and capture metrics
         run: .github/benchmark/capture-metrics.sh ${{ inputs.measurement_duration || '120' }}
 
+      # Baseline for PR comment (before github-action-benchmark mutates git state)
+      - name: Fetch gh-pages benchmark baseline for PR comment
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p baseline
+          git fetch --no-tags --depth=1 origin gh-pages 2>/dev/null || true
+          if git rev-parse -q --verify refs/remotes/origin/gh-pages >/dev/null; then
+            git show origin/gh-pages:dev/bench/data.js > baseline/data.js 2>/dev/null || true
+          fi
+          if [ ! -s baseline/data.js ]; then
+            rm -f baseline/data.js
+          fi
+
       # ── Report results ───────────────────────────────────────────────
+      # Push to gh-pages only on pushes to main (not on every PR commit).
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
+          name: Benchmark
           tool: customBiggerIsBetter
           output-file-path: benchmark-results.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           alert-threshold: '200%'
-          comment-on-alert: true
+          comment-on-alert: false
+          comment-always: false
           fail-on-alert: false
           benchmark-data-dir-path: dev/bench
+
+      - name: Post sticky benchmark PR comment
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          ALERT_RATIO: '2'
+        run: |
+          BL=""
+          [ -f baseline/data.js ] && BL="baseline/data.js"
+          node .github/benchmark/pr-benchmark-comment.mjs benchmark-results.json "$BL" > benchmark-pr-comment.md
+
+      - name: Upsert sticky PR comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: continuous-benchmark
+          path: benchmark-pr-comment.md
+          hide_and_recreate: false
+          hide_details: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Debug / cleanup ──────────────────────────────────────────────
       - name: Dump pod status on failure
