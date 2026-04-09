@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Captures throughput + resource utilization from a Numaflow MonoVertex.
+# Captures throughput, latency, and resource utilization from a Numaflow MonoVertex.
 # Outputs a JSON file compatible with github-action-benchmark.
 #
 # Usage: ./capture-metrics.sh [measurement_seconds]
@@ -12,6 +12,8 @@ MVTX_NAME="consumer-mvtx"
 METRICS_PORT=2469
 OUTPUT_FILE="benchmark-results.json"
 RESOURCE_LOG=$(mktemp)
+SNAP_A=$(mktemp)
+SNAP_B=$(mktemp)
 
 echo "=== Benchmark metrics capture ==="
 echo "Measurement duration: ${DURATION}s"
@@ -39,30 +41,23 @@ echo "Found pod: ${POD}"
 # Port-forward to the metrics endpoint
 kubectl port-forward "${POD}" "${METRICS_PORT}:${METRICS_PORT}" &
 PF_PID=$!
-trap "kill ${PF_PID} 2>/dev/null || true; rm -f ${RESOURCE_LOG}" EXIT
+trap "kill ${PF_PID} 2>/dev/null || true; rm -f ${RESOURCE_LOG} ${SNAP_A} ${SNAP_B}" EXIT
 sleep 5
 
-# Helper: scrape monovtx_read_total and sum across all replicas
-get_read_total() {
-  local raw
-  raw=$(curl -sk "https://localhost:${METRICS_PORT}/metrics" 2>/dev/null || \
-        curl -s  "http://localhost:${METRICS_PORT}/metrics"  2>/dev/null || echo "")
+# Scrape all metrics into a file
+scrape_metrics() {
+  local dest=$1
+  curl -sk "https://localhost:${METRICS_PORT}/metrics" 2>/dev/null > "${dest}" || \
+    curl -s  "http://localhost:${METRICS_PORT}/metrics"  2>/dev/null > "${dest}" || \
+    echo "" > "${dest}"
+}
 
-  if [ -z "$raw" ]; then
-    echo "0"
-    return
-  fi
-
-  if [ "${DUMP_METRICS:-0}" = "1" ]; then
-    echo "$raw" | grep -E '^[a-z]' | head -60 >&2
-    DUMP_METRICS=0
-  fi
-
-  local total
-  total=$(echo "$raw" \
-    | grep '^monovtx_read_total' \
-    | awk '{s+=$2} END {printf "%.0f", s}')
-  echo "${total:-0}"
+# Extract a single metric value (sum across replicas)
+extract_metric() {
+  local file=$1
+  local name=$2
+  grep "^${name}" "${file}" 2>/dev/null \
+    | awk '{s+=$2} END {printf "%.2f", s}' || echo "0"
 }
 
 # Background loop: sample kubectl top every 10s and log to file
@@ -80,16 +75,17 @@ sample_resources() {
 echo "Warming up (30s)..."
 sleep 30
 
-# --- initial snapshot ---
-export DUMP_METRICS=1
-INITIAL=$(get_read_total)
-echo "Initial read total: ${INITIAL}"
+# --- snapshot A ---
+scrape_metrics "${SNAP_A}"
+echo "=== Snapshot A metrics ==="
+grep -E '^monovtx_(read_total|ack_total|processing_time_sum|processing_time_count|read_time_sum|read_time_count|ack_time_sum|ack_time_count)' "${SNAP_A}" || true
+
 START_TS=$(date +%s)
 
 # Start resource sampling in background
 sample_resources &
 SAMPLE_PID=$!
-trap "kill ${PF_PID} 2>/dev/null || true; kill ${SAMPLE_PID} 2>/dev/null || true; rm -f ${RESOURCE_LOG}" EXIT
+trap "kill ${PF_PID} 2>/dev/null || true; kill ${SAMPLE_PID} 2>/dev/null || true; rm -f ${RESOURCE_LOG} ${SNAP_A} ${SNAP_B}" EXIT
 
 echo "Measuring for ${DURATION}s..."
 sleep "${DURATION}"
@@ -97,13 +93,18 @@ sleep "${DURATION}"
 # Stop resource sampling
 kill ${SAMPLE_PID} 2>/dev/null || true
 
-# --- final snapshot ---
-FINAL=$(get_read_total)
+# --- snapshot B ---
+scrape_metrics "${SNAP_B}"
 END_TS=$(date +%s)
 ELAPSED=$((END_TS - START_TS))
 
-echo "Final read total: ${FINAL}"
-MESSAGES=$((FINAL - INITIAL))
+echo "=== Snapshot B metrics ==="
+grep -E '^monovtx_(read_total|ack_total|processing_time_sum|processing_time_count|read_time_sum|read_time_count|ack_time_sum|ack_time_count)' "${SNAP_B}" || true
+
+# --- throughput ---
+READ_A=$(extract_metric "${SNAP_A}" "monovtx_read_total")
+READ_B=$(extract_metric "${SNAP_B}" "monovtx_read_total")
+MESSAGES=$(awk "BEGIN {printf \"%.0f\", ${READ_B} - ${READ_A}}")
 
 if [ "${ELAPSED}" -le 0 ]; then
   echo "ERROR: elapsed time is zero"
@@ -112,9 +113,26 @@ fi
 
 THROUGHPUT=$(awk "BEGIN {printf \"%.2f\", ${MESSAGES} / ${ELAPSED}}")
 
-# --- parse resource samples ---
-# kubectl top output: "pod-name   250m   180Mi"
-# Extract CPU (millicores) and memory (MiB), compute averages
+# --- latencies (microseconds → milliseconds per batch) ---
+# Average = (sum_B - sum_A) / (count_B - count_A) / 1000
+calc_avg_latency_ms() {
+  local sum_a count_a sum_b count_b
+  sum_a=$(extract_metric "${SNAP_A}" "$1_sum")
+  sum_b=$(extract_metric "${SNAP_B}" "$1_sum")
+  count_a=$(extract_metric "${SNAP_A}" "$1_count")
+  count_b=$(extract_metric "${SNAP_B}" "$1_count")
+  awk "BEGIN {
+    d = ${count_b} - ${count_a};
+    if (d > 0) printf \"%.2f\", (${sum_b} - ${sum_a}) / d / 1000;
+    else printf \"0\";
+  }"
+}
+
+PROCESSING_LATENCY=$(calc_avg_latency_ms "monovtx_processing_time")
+READ_LATENCY=$(calc_avg_latency_ms "monovtx_read_time")
+ACK_LATENCY=$(calc_avg_latency_ms "monovtx_ack_time")
+
+# --- resource utilization ---
 AVG_CPU="0"
 AVG_MEM="0"
 SAMPLE_COUNT=0
@@ -125,9 +143,7 @@ if [ -s "${RESOURCE_LOG}" ]; then
   cat "${RESOURCE_LOG}"
 
   SAMPLE_COUNT=$(wc -l < "${RESOURCE_LOG}" | tr -d ' ')
-  # CPU: strip trailing 'm', sum, average
   CPU_SUM=$(awk '{gsub(/m$/,"",$2); s+=$2} END {printf "%.0f", s}' "${RESOURCE_LOG}")
-  # Memory: strip trailing 'Mi', sum, average
   MEM_SUM=$(awk '{gsub(/Mi$/,"",$3); s+=$3} END {printf "%.0f", s}' "${RESOURCE_LOG}")
 
   if [ "${SAMPLE_COUNT}" -gt 0 ]; then
@@ -138,11 +154,14 @@ fi
 
 echo ""
 echo "=== Results ==="
-echo "Messages processed : ${MESSAGES}"
-echo "Elapsed            : ${ELAPSED}s"
-echo "Throughput         : ${THROUGHPUT} msgs/sec"
-echo "Avg CPU            : ${AVG_CPU}m (${SAMPLE_COUNT} samples)"
-echo "Avg Memory         : ${AVG_MEM}Mi (${SAMPLE_COUNT} samples)"
+echo "Messages processed    : ${MESSAGES}"
+echo "Elapsed               : ${ELAPSED}s"
+echo "Throughput            : ${THROUGHPUT} msgs/sec"
+echo "Avg Processing Latency: ${PROCESSING_LATENCY} ms/batch"
+echo "Avg Read Latency      : ${READ_LATENCY} ms/batch"
+echo "Avg Ack Latency       : ${ACK_LATENCY} ms/batch"
+echo "Avg CPU               : ${AVG_CPU}m (${SAMPLE_COUNT} samples)"
+echo "Avg Memory            : ${AVG_MEM}Mi (${SAMPLE_COUNT} samples)"
 
 cat > "${OUTPUT_FILE}" <<EOF
 [
@@ -150,6 +169,21 @@ cat > "${OUTPUT_FILE}" <<EOF
     "name": "Consumer Throughput",
     "unit": "msgs/sec",
     "value": ${THROUGHPUT}
+  },
+  {
+    "name": "Processing Latency (per batch)",
+    "unit": "ms",
+    "value": ${PROCESSING_LATENCY}
+  },
+  {
+    "name": "Read Latency (per batch)",
+    "unit": "ms",
+    "value": ${READ_LATENCY}
+  },
+  {
+    "name": "Ack Latency (per batch)",
+    "unit": "ms",
+    "value": ${ACK_LATENCY}
   },
   {
     "name": "Consumer CPU",
