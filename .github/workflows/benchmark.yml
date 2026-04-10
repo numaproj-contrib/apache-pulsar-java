@@ -102,6 +102,7 @@ jobs:
       - name: Deploy producer pipeline & pre-fill topic
         run: |
           IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/producer-pipeline.yaml | kubectl apply -f -
+          sleep 10
           kubectl wait --for=condition=Ready pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
             --timeout=120s || kubectl get pods
           sleep ${{ inputs.prefill_duration || '300' }}
@@ -115,11 +116,12 @@ jobs:
       - name: Deploy consumer MonoVertex
         run: |
           IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/consumer-monovertex.yaml | kubectl apply -f -
+          sleep 10
           kubectl wait --for=condition=Ready pod \
             -l "numaflow.numaproj.io/mono-vertex-name=consumer-mvtx" \
             --timeout=180s
 
-      - name: Report cluster resource usage
+      - name: Report k8s cluster resource usage
         run: |
           kubectl top nodes 2>/dev/null || echo "(metrics-server not ready)"
           kubectl top pods -A --sort-by=memory 2>/dev/null | head -30 || true
@@ -166,6 +168,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           ALERT_RATIO: '2'
+          BATCH_SIZE: '500'
         run: |
           BL=""
           [ -f baseline/data.js ] && BL="baseline/data.js"

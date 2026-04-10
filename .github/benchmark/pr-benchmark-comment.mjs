@@ -72,8 +72,12 @@ function fmt(n) {
 let anyRegression = false;
 let anyBaseline = false;
 
+const batchSize = process.env.BATCH_SIZE || "500";
+
 const lines = [];
 lines.push("### Continuous benchmark");
+lines.push("");
+lines.push(`**Config:** batch size = \`${batchSize}\``);
 lines.push("");
 lines.push(
   `Compared to the **latest result on \`gh-pages\`** (last \`main\` run that updated charts). Regression when a metric degrades by more than **${ratioThreshold}×** vs baseline.`,
@@ -126,7 +130,7 @@ lines.push("");
 if (runUrl) lines.push(`[Workflow run](${runUrl})`);
 if (pagesBase) {
   lines.push(
-    ` · [GitHub Pages charts](${pagesBase}dev/bench/) (after \`main\` has published \`gh-pages\`).`,
+    ` · [GitHub Pages charts](${pagesBase}dev/bench/)`,
   );
 } else {
   lines.push("");
