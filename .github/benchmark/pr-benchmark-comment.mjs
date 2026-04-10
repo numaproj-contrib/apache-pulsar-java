@@ -95,7 +95,7 @@ for (const { name, value, unit } of currentBenchmarkResults) {
   else if (reg === false) {
     const improved = smallerIsBetter ? value < base : value > base;
     status = improved ? "✅ Improved" : "OK";
-  } else if (base === undefined) status = "No baseline metric to compare against";
+  } else if (base === undefined) status = "No baseline metric to compare";
 
   let change = "—";
   if (base !== undefined && base > 0 && value > 0) {

@@ -19,7 +19,7 @@ spec:
   source:
     udsource:
       container:
-        image: __IMAGE_TAG__
+        image: ${IMAGE_TAG}
         args: ["--config=file:/conf/application.yml"]
         imagePullPolicy: Never
         resources:

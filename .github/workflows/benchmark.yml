@@ -67,19 +67,18 @@ jobs:
       - name: Install Numaflow controller
         run: |
           kubectl create ns numaflow-system
-          kubectl apply -n numaflow-system \
-            -f https://raw.githubusercontent.com/numaproj/numaflow/stable/config/install.yaml
+          kubectl apply -n numaflow-system -f \
+            https://raw.githubusercontent.com/numaproj/numaflow/stable/config/install.yaml
           kubectl -n numaflow-system rollout status deployment/numaflow-controller --timeout=120s
 
       - name: Install ISB service (JetStream)
         run: |
-          kubectl apply \
-            -f https://raw.githubusercontent.com/numaproj/numaflow/stable/examples/0-isbsvc-jetstream.yaml
-          echo "Waiting for ISB StatefulSet to be ready..."
+          kubectl apply -f \
+            https://raw.githubusercontent.com/numaproj/numaflow/stable/examples/0-isbsvc-jetstream.yaml
           sleep 10
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=numaflow \
-            -l app.kubernetes.io/component=isbsvc --timeout=180s || \
-            kubectl get pods -A
+          kubectl wait --for=condition=Ready pod \
+            -l 'app.kubernetes.io/part-of=numaflow,app.kubernetes.io/component=isbsvc' \
+            --timeout=180s || kubectl get pods -A
 
       # ── Deploy Pulsar inside the cluster ─────────────────────────────
       - name: Deploy Pulsar standalone
@@ -100,12 +99,9 @@ jobs:
           kubectl apply -f .github/benchmark/producer-config.yaml
 
       # ── Substitute image tag in manifests and deploy ─────────────────
-      - name: Deploy producer pipeline (load generator)
+      - name: Deploy producer pipeline & pre-fill topic
         run: |
-          sed "s|__IMAGE_TAG__|${{ steps.image.outputs.tag }}|g" \
-            .github/benchmark/producer-pipeline.yaml | kubectl apply -f -
-          echo "Pre-filling topic for ${{ inputs.prefill_duration || '300' }}s..."
-          sleep 10
+          IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/producer-pipeline.yaml | kubectl apply -f -
           kubectl wait --for=condition=Ready pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
             --timeout=120s || kubectl get pods
           sleep ${{ inputs.prefill_duration || '300' }}
@@ -118,34 +114,15 @@ jobs:
 
       - name: Deploy consumer MonoVertex
         run: |
-          sed "s|__IMAGE_TAG__|${{ steps.image.outputs.tag }}|g" \
-            .github/benchmark/consumer-monovertex.yaml | kubectl apply -f -
-
-      - name: Report runner and cluster resource headroom
-        run: |
-          set -euo pipefail
-          echo "=== GitHub-hosted runner (host VM) ==="
-          echo "Logical CPUs visible to this job: $(nproc)"
-          if command -v lscpu >/dev/null 2>&1; then
-            lscpu | grep -E '^CPU\(s\)|^Model name|^Thread\(s\) per core|^Core\(s\) per socket' || true
-          fi
-          echo ""
-          free -h
-          echo ""
-          echo "Disk (workspace):"
-          df -h "${GITHUB_WORKSPACE}" 2>/dev/null || df -h /
-          echo ""
-          echo "=== cgroup limits for this job (if exposed) ==="
-          if [ -r /sys/fs/cgroup/memory.max ]; then echo "memory.max: $(cat /sys/fs/cgroup/memory.max)"; fi
-          if [ -r /sys/fs/cgroup/cpu.max ]; then echo "cpu.max: $(cat /sys/fs/cgroup/cpu.max)"; fi
-          echo ""
-          echo "=== Kubernetes (after consumer is Ready) ==="
+          IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/consumer-monovertex.yaml | kubectl apply -f -
           kubectl wait --for=condition=Ready pod \
             -l "numaflow.numaproj.io/mono-vertex-name=consumer-mvtx" \
             --timeout=180s
-          kubectl top nodes 2>/dev/null || echo "(kubectl top nodes: metrics not ready yet)"
-          echo ""
-          kubectl top pods -A --sort-by=memory 2>/dev/null | head -50 || true
+
+      - name: Report cluster resource usage
+        run: |
+          kubectl top nodes 2>/dev/null || echo "(metrics-server not ready)"
+          kubectl top pods -A --sort-by=memory 2>/dev/null | head -30 || true
 
       # ── Capture metrics ──────────────────────────────────────────────
       - name: Run benchmark and capture metrics
