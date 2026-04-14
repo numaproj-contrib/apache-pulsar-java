@@ -184,15 +184,18 @@ public class PulsarSource extends Sourcer {
             return;
         }
 
+        // because request key values and messsages to ack key values already match, can directly iterate over the messagesToAck map values to get the message ids
+        List<MessageId> messageIds = messagesToAck.values().stream()
+                .map(org.apache.pulsar.client.api.Message::getMessageId)
+                .toList();
+
         try {
-            for (org.apache.pulsar.client.api.Message<?> msg : messagesToAck.values()) {
-                if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
-                    pulsarConsumerManager.getOrCreateGenericRecordConsumer(0, 0).acknowledge(msg.getMessageId());
-                } else {
-                    pulsarConsumerManager.getOrCreateBytesConsumer(0, 0).acknowledge(msg.getMessageId());
-                }
+            if (pulsarConsumerProperties.isUseAutoConsumeSchema()) {
+                pulsarConsumerManager.getOrCreateGenericRecordConsumer(0, 0).acknowledge(messageIds);
+            } else {
+                pulsarConsumerManager.getOrCreateBytesConsumer(0, 0).acknowledge(messageIds);
             }
-            log.info("Successfully acknowledged {} messages", messagesToAck.size());
+            log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
             log.error("Failed to acknowledge Pulsar messages", e);
         }
