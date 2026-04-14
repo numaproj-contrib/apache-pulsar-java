@@ -24,10 +24,10 @@ spec:
         imagePullPolicy: Never
         resources:
           requests:
-            cpu: 1300m
+            cpu: 1500m
             memory: 640Mi
           limits:
-            cpu: 1300m
+            cpu: 1500m
             memory: 640Mi
         volumeMounts:
           - name: pulsar-config-volume
