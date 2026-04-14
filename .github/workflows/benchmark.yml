@@ -115,18 +115,14 @@ jobs:
             persistent://public/default/benchmark-topic \
             | grep -o '"msgInCounter" : [0-9]*' | grep -o '[0-9]*')
           echo "Backlog: ${BACKLOG} messages"
-          if [ "${BACKLOG}" -lt 3000000 ]; then
-            echo "ERROR: backlog too small (${BACKLOG} < 3,000,000). Consumer may drain it during measurement."
+          if [ "${BACKLOG}" -lt 4000000 ]; then
+            echo "ERROR: backlog too small (${BACKLOG} < 4,000,000). Consumer may drain it during measurement."
             exit 1
           fi
 
       - name: Deploy consumer MonoVertex
         run: |
           IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/consumer-monovertex.yaml | kubectl apply -f -
-          sleep 10
-          kubectl wait --for=condition=Ready pod \
-            -l "numaflow.numaproj.io/mono-vertex-name=consumer-mvtx" \
-            --timeout=180s
 
       - name: Report k8s cluster resource usage
         run: |
@@ -153,7 +149,7 @@ jobs:
       # ── Report results ───────────────────────────────────────────────
       # Push to gh-pages only on pushes to main (not on every PR commit).
       - name: Store benchmark result
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Benchmark
