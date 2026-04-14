@@ -45,7 +45,22 @@ echo "Found pod: ${POD}"
 kubectl port-forward "${POD}" "${METRICS_PORT}:${METRICS_PORT}" &
 PF_PID=$!
 trap "kill ${PF_PID} 2>/dev/null || true; rm -f ${RESOURCE_LOG} ${SNAP_A} ${SNAP_B}" EXIT
-sleep 5
+
+echo "Waiting for port-forward to be ready..."
+PF_READY=false
+for attempt in $(seq 1 10); do
+  if curl -sk --max-time 2 "https://localhost:${METRICS_PORT}/metrics" >/dev/null 2>&1 || \
+     curl -s  --max-time 2 "http://localhost:${METRICS_PORT}/metrics"  >/dev/null 2>&1; then
+    echo "Port-forward ready after ${attempt}s"
+    PF_READY=true
+    break
+  fi
+  sleep 1
+done
+if [ "${PF_READY}" != "true" ]; then
+  echo "ERROR: could not reach metrics endpoint after 30s"
+  exit 1
+fi
 
 # Scrape all metrics into a file
 scrape_metrics() {
