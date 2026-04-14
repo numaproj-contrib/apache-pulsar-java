@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       measurement_duration:
-        description: 'Measurement duration in seconds (after warmup)'
+        description: 'Duration of each measurement round in seconds (after warmup)'
         required: false
-        default: '120'
+        default: '90'
       prefill_duration:
         description: 'How long to run the producer before starting the consumer (seconds)'
         required: false
@@ -128,7 +128,7 @@ jobs:
 
       # ── Capture metrics ──────────────────────────────────────────────
       - name: Run benchmark and capture metrics
-        run: .github/benchmark/capture-metrics.sh ${{ inputs.measurement_duration || '120' }}
+        run: .github/benchmark/capture-metrics.sh ${{ inputs.measurement_duration || '90' }}
 
       # Baseline for PR comment (before github-action-benchmark mutates git state)
       - name: Fetch gh-pages benchmark baseline for PR comment
