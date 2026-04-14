@@ -14,7 +14,7 @@ on:
       prefill_duration:
         description: 'How long to run the producer before starting the consumer (seconds)'
         required: false
-        default: '400'
+        default: '500'
 
 permissions:
   contents: write
@@ -105,7 +105,7 @@ jobs:
           sleep 10
           kubectl wait --for=condition=Ready pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
             --timeout=120s || kubectl get pods
-          sleep ${{ inputs.prefill_duration || '400' }}
+          sleep ${{ inputs.prefill_duration || '500' }}
 
       - name: Stop producer and verify backlog
         run: |

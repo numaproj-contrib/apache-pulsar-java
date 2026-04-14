@@ -2,15 +2,12 @@
 set -euo pipefail
 
 # Captures throughput, latency, and resource utilization from a Numaflow MonoVertex.
-# Runs 3 measurement rounds and reports the median to reduce variance from noisy CI runners.
 # Outputs a JSON file compatible with github-action-benchmark.
 #
-# Usage: ./capture-metrics.sh [measurement_seconds] [num_rounds]
-#   measurement_seconds: how long each measurement round lasts (default 90)
-#   num_rounds: number of rounds to run (default 3)
+# Usage: ./capture-metrics.sh [measurement_seconds]
+#   measurement_seconds: how long the measurement window lasts (default 90)
 
 DURATION=${1:-90}
-NUM_ROUNDS=${2:-3}
 MVTX_NAME="consumer-mvtx"
 METRICS_PORT=2469
 OUTPUT_FILE="benchmark-results.json"
@@ -106,76 +103,46 @@ calc_avg_latency_ms() {
   }"
 }
 
-median_of_three() {
-  echo -e "$1\n$2\n$3" | sort -g | sed -n '2p'
-}
-
-stats() {
-  local a=$1 b=$2 c=$3
-  awk "BEGIN {
-    min = ($a < $b) ? $a : $b; if ($c < min) min = $c;
-    max = ($a > $b) ? $a : $b; if ($c > max) max = $c;
-    mean = ($a + $b + $c) / 3;
-    var = (($a-mean)^2 + ($b-mean)^2 + ($c-mean)^2) / 3;
-    printf \"min=%.2f max=%.2f mean=%.2f stddev=%.2f\", min, max, mean, sqrt(var);
-  }"
-}
-
-# ── Measurement rounds ────────────────────────────────────────────
-echo "Warming up (60s)..."
-sleep 60
+# ── Measurement ───────────────────────────────────────────────────
+echo "Waiting 45s for MonoVertex to start up..."
+sleep 45
 
 sample_resources &
 SAMPLE_PID=$!
 trap "kill ${PF_PID} 2>/dev/null || true; kill ${SAMPLE_PID} 2>/dev/null || true; rm -f ${RESOURCE_LOG} ${SNAP_A} ${SNAP_B}" EXIT
 
-declare -a R_THROUGHPUT R_PROC_LAT R_READ_LAT R_ACK_LAT
+echo ""
+echo "=== Measurement (${DURATION}s) ==="
 
-for round in $(seq 1 "${NUM_ROUNDS}"); do
-  echo ""
-  echo "=== Round ${round}/${NUM_ROUNDS} (${DURATION}s) ==="
+scrape_metrics "${SNAP_A}"
+START_TS=$(date +%s)
+sleep "${DURATION}"
+scrape_metrics "${SNAP_B}"
+END_TS=$(date +%s)
+ELAPSED=$((END_TS - START_TS))
 
-  scrape_metrics "${SNAP_A}"
-  START_TS=$(date +%s)
-  sleep "${DURATION}"
-  scrape_metrics "${SNAP_B}"
-  END_TS=$(date +%s)
-  ELAPSED=$((END_TS - START_TS))
+if [ "${ELAPSED}" -le 0 ]; then
+  echo "ERROR: elapsed time is zero"
+  exit 1
+fi
 
-  if [ "${ELAPSED}" -le 0 ]; then
-    echo "ERROR: elapsed time is zero in round ${round}"
-    exit 1
-  fi
+READ_A=$(extract_metric "${SNAP_A}" "monovtx_read_total")
+READ_B=$(extract_metric "${SNAP_B}" "monovtx_read_total")
+MESSAGES=$(awk "BEGIN {printf \"%.0f\", ${READ_B} - ${READ_A}}")
 
-  READ_A=$(extract_metric "${SNAP_A}" "monovtx_read_total")
-  READ_B=$(extract_metric "${SNAP_B}" "monovtx_read_total")
-  MESSAGES=$(awk "BEGIN {printf \"%.0f\", ${READ_B} - ${READ_A}}")
+THROUGHPUT=$(awk "BEGIN {printf \"%.2f\", ${MESSAGES} / ${ELAPSED}}")
+PROCESSING_LATENCY=$(calc_avg_latency_ms "${SNAP_A}" "${SNAP_B}" "monovtx_processing_time")
+READ_LATENCY=$(calc_avg_latency_ms "${SNAP_A}" "${SNAP_B}" "monovtx_read_time")
+ACK_LATENCY=$(calc_avg_latency_ms "${SNAP_A}" "${SNAP_B}" "monovtx_ack_time")
 
-  tp=$(awk "BEGIN {printf \"%.2f\", ${MESSAGES} / ${ELAPSED}}")
-  pl=$(calc_avg_latency_ms "${SNAP_A}" "${SNAP_B}" "monovtx_processing_time")
-  rl=$(calc_avg_latency_ms "${SNAP_A}" "${SNAP_B}" "monovtx_read_time")
-  al=$(calc_avg_latency_ms "${SNAP_A}" "${SNAP_B}" "monovtx_ack_time")
-
-  R_THROUGHPUT+=("$tp")
-  R_PROC_LAT+=("$pl")
-  R_READ_LAT+=("$rl")
-  R_ACK_LAT+=("$al")
-
-  echo "  Throughput         : ${tp} msgs/sec"
-  echo "  Processing Latency : ${pl} ms"
-  echo "  Read Latency       : ${rl} ms"
-  echo "  Ack Latency        : ${al} ms"
-done
+echo "  Throughput         : ${THROUGHPUT} msgs/sec"
+echo "  Processing Latency : ${PROCESSING_LATENCY} ms"
+echo "  Read Latency       : ${READ_LATENCY} ms"
+echo "  Ack Latency        : ${ACK_LATENCY} ms"
 
 kill ${SAMPLE_PID} 2>/dev/null || true
 
-# ── Select medians ────────────────────────────────────────────────
-THROUGHPUT=$(median_of_three "${R_THROUGHPUT[0]}" "${R_THROUGHPUT[1]}" "${R_THROUGHPUT[2]}")
-PROCESSING_LATENCY=$(median_of_three "${R_PROC_LAT[0]}" "${R_PROC_LAT[1]}" "${R_PROC_LAT[2]}")
-READ_LATENCY=$(median_of_three "${R_READ_LAT[0]}" "${R_READ_LAT[1]}" "${R_READ_LAT[2]}")
-ACK_LATENCY=$(median_of_three "${R_ACK_LAT[0]}" "${R_ACK_LAT[1]}" "${R_ACK_LAT[2]}")
-
-# ── Resource utilization (averaged across all rounds) ─────────────
+# ── Resource utilization ──────────────────────────────────────────
 AVG_CPU="0"
 AVG_MEM="0"
 SAMPLE_COUNT=0
@@ -195,21 +162,17 @@ if [ -s "${RESOURCE_LOG}" ]; then
   fi
 fi
 
+# ── Check remaining backlog ────────────────────────────────────────
+echo ""
+echo "=== Backlog check ==="
+BACKLOG=$(kubectl exec pulsar -- bin/pulsar-admin topics stats \
+  persistent://public/default/benchmark-topic \
+  | grep -o '"msgBacklog" : [0-9]*' | grep -o '[0-9]*' || echo "unknown")
+echo "Remaining backlog: ${BACKLOG} messages"
+
 # ── Report ────────────────────────────────────────────────────────
 echo ""
-echo "=== Per-round values ==="
-echo "  Throughput         : ${R_THROUGHPUT[*]}"
-echo "  Processing Latency : ${R_PROC_LAT[*]}"
-echo "  Read Latency       : ${R_READ_LAT[*]}"
-echo "  Ack Latency        : ${R_ACK_LAT[*]}"
-echo ""
-echo "=== Variance ==="
-echo "  Throughput         : $(stats "${R_THROUGHPUT[0]}" "${R_THROUGHPUT[1]}" "${R_THROUGHPUT[2]}")"
-echo "  Processing Latency : $(stats "${R_PROC_LAT[0]}" "${R_PROC_LAT[1]}" "${R_PROC_LAT[2]}")"
-echo "  Read Latency       : $(stats "${R_READ_LAT[0]}" "${R_READ_LAT[1]}" "${R_READ_LAT[2]}")"
-echo "  Ack Latency        : $(stats "${R_ACK_LAT[0]}" "${R_ACK_LAT[1]}" "${R_ACK_LAT[2]}")"
-echo ""
-echo "=== Median results (reported) ==="
+echo "=== Results ==="
 echo "Throughput            : ${THROUGHPUT} msgs/sec"
 echo "Processing Latency    : ${PROCESSING_LATENCY} ms/batch"
 echo "Read Latency          : ${READ_LATENCY} ms/batch"
