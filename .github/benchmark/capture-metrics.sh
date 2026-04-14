@@ -48,7 +48,7 @@ PF_READY=false
 for attempt in $(seq 1 10); do
   if curl -sk --max-time 2 "https://localhost:${METRICS_PORT}/metrics" >/dev/null 2>&1 || \
      curl -s  --max-time 2 "http://localhost:${METRICS_PORT}/metrics"  >/dev/null 2>&1; then
-    echo "Port-forward ready after ${attempt}s"
+    echo "Port-forward ready (attempt ${attempt})"
     PF_READY=true
     break
   fi
