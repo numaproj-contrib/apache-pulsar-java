@@ -65,7 +65,7 @@ function regressed(currentVal, baselineVal, smallerIsBetter) {
 // formats the number to a string
 function fmt(n) {
   if (n == null || Number.isNaN(n)) return "—";
-  if (typeof n === "number" && !Number.isInteger(n)) return String(n);
+  if (typeof n === "number" && !Number.isInteger(n)) return n.toFixed(2);
   return String(n);
 }
 
