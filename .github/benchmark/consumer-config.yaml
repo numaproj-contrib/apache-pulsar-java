@@ -14,6 +14,7 @@ data:
         consumerConfig:
           topicNames: "persistent://public/default/benchmark-topic"
           subscriptionName: "benchmark-consumer-sub"
+          subscriptionInitialPosition: "Earliest"
           receiverQueueSize: 500
       admin:
         adminConfig:
