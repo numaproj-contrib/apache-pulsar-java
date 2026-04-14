@@ -149,7 +149,7 @@ jobs:
       # ── Report results ───────────────────────────────────────────────
       # Push to gh-pages only on pushes to main (not on every PR commit).
       - name: Store benchmark result
-        # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Benchmark

@@ -59,20 +59,31 @@ if [ "${PF_READY}" != "true" ]; then
   exit 1
 fi
 
-# Scrape all metrics into a file
+# Scrape all metrics into a file; fail if the endpoint is unreachable
 scrape_metrics() {
   local dest=$1
-  curl -sk "https://localhost:${METRICS_PORT}/metrics" 2>/dev/null > "${dest}" || \
-    curl -s  "http://localhost:${METRICS_PORT}/metrics"  2>/dev/null > "${dest}" || \
-    echo "" > "${dest}"
+  if ! curl -sk --max-time 5 "https://localhost:${METRICS_PORT}/metrics" > "${dest}" 2>/dev/null && \
+     ! curl -s  --max-time 5 "http://localhost:${METRICS_PORT}/metrics"  > "${dest}" 2>/dev/null; then
+    echo "ERROR: failed to scrape metrics from localhost:${METRICS_PORT}" >&2
+    exit 1
+  fi
+  if [ ! -s "${dest}" ]; then
+    echo "ERROR: metrics scrape returned empty response" >&2
+    exit 1
+  fi
 }
 
-# Extract a single metric value (sum across replicas)
+# Extract a single metric value (sum across replicas); exits if metric is missing
 extract_metric() {
   local file=$1
   local name=$2
-  grep "^${name}" "${file}" 2>/dev/null \
-    | awk '{s+=$2} END {printf "%.2f", s}' || echo "0"
+  local result
+  result=$(grep "^${name}" "${file}" 2>/dev/null | awk '{s+=$2} END {printf "%.2f", s}')
+  if [ -z "${result}" ]; then
+    echo "ERROR: metric '${name}' not found in ${file}" >&2
+    exit 1
+  fi
+  echo "${result}"
 }
 
 # Background loop: sample kubectl top every 10s and log to file
@@ -104,7 +115,7 @@ calc_avg_latency_ms() {
 }
 
 # ── Measurement ───────────────────────────────────────────────────
-echo "Waiting 45s for MonoVertex to start up..."
+echo "Waiting 45s for MonoVertex to start up to max tps..."
 sleep 45
 
 sample_resources &
