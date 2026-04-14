@@ -14,7 +14,7 @@ on:
       prefill_duration:
         description: 'How long to run the producer before starting the consumer (seconds)'
         required: false
-        default: '300'
+        default: '400'
 
 permissions:
   contents: write
@@ -105,13 +105,20 @@ jobs:
           sleep 10
           kubectl wait --for=condition=Ready pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
             --timeout=120s || kubectl get pods
-          sleep ${{ inputs.prefill_duration || '300' }}
+          sleep ${{ inputs.prefill_duration || '400' }}
 
-      - name: Check topic stats
+      - name: Stop producer and verify backlog
         run: |
-          kubectl exec pulsar -- bin/pulsar-admin topics stats \
+          kubectl delete pipeline producer-pipeline --wait=true --timeout=60s
+          echo "Producer pipeline stopped."
+          BACKLOG=$(kubectl exec pulsar -- bin/pulsar-admin topics stats \
             persistent://public/default/benchmark-topic \
-            | grep -E '"msgInCounter"|"msgOutCounter"|"storageSize"|"msgRateIn"'
+            | grep -o '"msgInCounter" : [0-9]*' | grep -o '[0-9]*')
+          echo "Backlog: ${BACKLOG} messages"
+          if [ "${BACKLOG}" -lt 3000000 ]; then
+            echo "ERROR: backlog too small (${BACKLOG} < 3,000,000). Consumer may drain it during measurement."
+            exit 1
+          fi
 
       - name: Deploy consumer MonoVertex
         run: |
