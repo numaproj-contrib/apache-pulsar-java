@@ -1,0 +1,208 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      measurement_duration:
+        description: 'Duration of each measurement round in seconds (after warmup)'
+        required: false
+        default: '90'
+      prefill_duration:
+        description: 'How long to run the producer before starting the consumer (seconds)'
+        required: false
+        default: '500'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Build the application image ──────────────────────────────────
+      - name: Set up JDK 23
+        uses: actions/setup-java@v4
+        with:
+          java-version: '23'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build image with Jib
+        run: mvn clean package -DskipTests
+
+      - name: Resolve image tag
+        id: image
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "tag=apache-pulsar-java:v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # ── k3d cluster ──────────────────────────────────────────────────
+      - name: Install k3d
+        run: curl -sfL https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+
+      - name: Create k3d cluster
+        run: |
+          k3d cluster create benchmark
+          kubectl cluster-info
+
+      - name: Install metrics-server
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          kubectl -n kube-system patch deployment metrics-server --type=json \
+            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
+      - name: Import application image into k3d
+        run: k3d image import ${{ steps.image.outputs.tag }} -c benchmark
+
+      # ── Install Numaflow ─────────────────────────────────────────────
+      - name: Install Numaflow controller
+        run: |
+          kubectl create ns numaflow-system
+          kubectl apply -n numaflow-system -f \
+            https://raw.githubusercontent.com/numaproj/numaflow/stable/config/install.yaml
+          kubectl -n numaflow-system rollout status deployment/numaflow-controller --timeout=120s
+
+      - name: Install ISB service (JetStream)
+        run: |
+          kubectl apply -f \
+            https://raw.githubusercontent.com/numaproj/numaflow/stable/examples/0-isbsvc-jetstream.yaml
+          sleep 10
+          kubectl wait --for=condition=Ready pod \
+            -l 'app.kubernetes.io/part-of=numaflow,app.kubernetes.io/component=isbsvc' \
+            --timeout=180s || kubectl get pods -A
+
+      # ── Deploy Pulsar inside the cluster ─────────────────────────────
+      - name: Deploy Pulsar standalone
+        run: |
+          kubectl apply -f .github/benchmark/pulsar.yaml
+          echo "Waiting for Pulsar to be ready..."
+          kubectl wait --for=condition=Ready pod/pulsar --timeout=180s
+
+      - name: Create benchmark topic
+        run: |
+          kubectl exec pulsar -- bin/pulsar-admin topics create \
+            persistent://public/default/benchmark-topic
+
+      # ── Deploy ConfigMaps ────────────────────────────────────────────
+      - name: Apply ConfigMaps
+        run: |
+          kubectl apply -f .github/benchmark/consumer-config.yaml
+          kubectl apply -f .github/benchmark/producer-config.yaml
+
+      # ── Substitute image tag in manifests and deploy ─────────────────
+      - name: Deploy producer pipeline & pre-fill topic
+        run: |
+          IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/producer-pipeline.yaml | kubectl apply -f -
+          sleep 10
+          kubectl wait --for=condition=Ready pod -l numaflow.numaproj.io/pipeline-name=producer-pipeline \
+            --timeout=120s || kubectl get pods
+          sleep ${{ inputs.prefill_duration || '500' }}
+
+      - name: Stop producer and verify backlog
+        run: |
+          kubectl delete pipeline producer-pipeline --wait=true --timeout=60s
+          echo "Producer pipeline stopped."
+          BACKLOG=$(kubectl exec pulsar -- bin/pulsar-admin topics stats \
+            persistent://public/default/benchmark-topic \
+            | grep -o '"msgInCounter" : [0-9]*' | grep -o '[0-9]*')
+          echo "Backlog: ${BACKLOG} messages"
+          if [ "${BACKLOG}" -lt 4000000 ]; then
+            echo "ERROR: backlog too small (${BACKLOG} < 4,000,000). Consumer may drain it during measurement."
+            exit 1
+          fi
+
+      - name: Deploy consumer MonoVertex
+        run: |
+          IMAGE_TAG=${{ steps.image.outputs.tag }} envsubst < .github/benchmark/consumer-monovertex.yaml | kubectl apply -f -
+
+      - name: Report k8s cluster resource usage
+        run: |
+          kubectl top nodes 2>/dev/null || echo "(metrics-server not ready)"
+          kubectl top pods -A --sort-by=memory 2>/dev/null | head -30 || true
+
+      # ── Capture metrics ──────────────────────────────────────────────
+      - name: Run benchmark and capture metrics
+        run: .github/benchmark/capture-metrics.sh ${{ inputs.measurement_duration || '90' }}
+
+      # Baseline for PR comment (before github-action-benchmark mutates git state)
+      - name: Fetch gh-pages benchmark baseline for PR comment
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p baseline
+          git fetch --no-tags --depth=1 origin gh-pages 2>/dev/null || true
+          if git rev-parse -q --verify refs/remotes/origin/gh-pages >/dev/null; then
+            git show origin/gh-pages:dev/bench/data.js > baseline/data.js 2>/dev/null || true
+          fi
+          if [ ! -s baseline/data.js ]; then
+            rm -f baseline/data.js
+          fi
+
+      # ── Report results ───────────────────────────────────────────────
+      # Push to gh-pages only on pushes to main (not on every PR commit).
+      - name: Store benchmark result
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Benchmark
+          tool: customBiggerIsBetter
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: false
+          comment-always: false
+          fail-on-alert: false
+          benchmark-data-dir-path: dev/bench
+
+      # ── Post sticky benchmark PR comment ───────────────────────────────
+      - name: Post sticky benchmark PR comment
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          ALERT_RATIO: '2'
+          BATCH_SIZE: '500'
+        run: |
+          BL=""
+          [ -f baseline/data.js ] && BL="baseline/data.js"
+          node .github/benchmark/pr-benchmark-comment.mjs benchmark-results.json "$BL" > benchmark-pr-comment.md
+
+      - name: Upsert sticky PR comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: continuous-benchmark
+          path: benchmark-pr-comment.md
+          hide_and_recreate: false
+          hide_details: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Debug / cleanup ──────────────────────────────────────────────
+      - name: Dump pod status on failure
+        if: failure()
+        run: |
+          echo "=== Pod status ==="
+          kubectl get pods -A
+          echo ""
+          echo "=== Consumer MonoVertex logs ==="
+          kubectl logs -l numaflow.numaproj.io/mono-vertex-name=consumer-mvtx --all-containers --tail=50 || true
+          echo ""
+          echo "=== Producer pipeline logs ==="
+          kubectl logs -l numaflow.numaproj.io/pipeline-name=producer-pipeline --all-containers --tail=50 || true
+          echo ""
+          echo "=== Pulsar logs ==="
+          kubectl logs pulsar --tail=30 || true
+
+      - name: Cleanup
+        if: always()
+        run: k3d cluster delete benchmark

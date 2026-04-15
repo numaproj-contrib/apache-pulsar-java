@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consumer-config
+data:
+  application.yml: |
+    pulsar:
+      client:
+        clientConfig:
+          serviceUrl: "pulsar://pulsar.default.svc.cluster.local:6650"
+      consumer:
+        enabled: true
+        useAutoConsumeSchema: true
+        consumerConfig:
+          topicNames: "persistent://public/default/benchmark-topic"
+          subscriptionName: "benchmark-consumer-sub"
+          subscriptionInitialPosition: "Earliest"
+          receiverQueueSize: 500
+      admin:
+        adminConfig:
+          serviceUrl: "http://pulsar.default.svc.cluster.local:8080"
