@@ -55,7 +55,7 @@ for attempt in $(seq 1 10); do
   sleep 1
 done
 if [ "${PF_READY}" != "true" ]; then
-  echo "ERROR: could not reach metrics endpoint after 30s"
+  echo "ERROR: could not reach metrics endpoint after 10 reconnection attempts"
   exit 1
 fi
 
@@ -74,7 +74,8 @@ extract_metric() {
   local result
   result=$(grep "^${name}" "${file}" 2>/dev/null | awk '{s+=$2} END {printf "%.2f", s}')
   if [ -z "${result}" ]; then
-    echo "ERROR: metric '${name}' not found in ${file}" >&2
+    echo "ERROR: metric '${name}' not found. File contents:" >&2
+    cat "${file}" >&2
     exit 1
   fi
   echo "${result}"

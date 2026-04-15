@@ -45,7 +45,9 @@ public class PulsarConsumerManager {
                 .batchReceivePolicy(batchPolicy)
                 .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
                 .subscribe();
-        log.info("Created byte-array consumer; batch receive: {}, timeoutMillis: {}", count, timeoutMillis);
+        log.atInfo().setMessage("Created byte-array consumer.")
+                .addKeyValue("batchSize", count)
+                .addKeyValue("timeoutMillis", timeoutMillis).log();
         return bytesConsumer;
     }
 
@@ -63,7 +65,9 @@ public class PulsarConsumerManager {
                 .batchReceivePolicy(batchPolicy)
                 .subscriptionType(SubscriptionType.Shared) // Must be shared to support multiple pods
                 .subscribe();
-        log.info("Created AUTO_CONSUME (GenericRecord) consumer; batch receive: {}, timeoutMillis: {}", count, timeoutMillis);
+        log.atInfo().setMessage("Created AUTO_CONSUME (GenericRecord) consumer.")
+                .addKeyValue("batchSize", count)
+                .addKeyValue("timeoutMillis", timeoutMillis).log();
         return genericRecordConsumer;
     }
 
@@ -71,27 +75,27 @@ public class PulsarConsumerManager {
         if (bytesConsumer != null) {
             try {
                 bytesConsumer.close();
-                log.info("Byte-array consumer closed.");
+                log.atInfo().setMessage("Byte-array consumer closed.").log();
             } catch (Exception e) {
-                log.error("Error closing byte-array consumer", e);
+                log.atError().setMessage("Error closing byte-array consumer.").setCause(e).log();
             }
             bytesConsumer = null;
         }
         if (genericRecordConsumer != null) {
             try {
                 genericRecordConsumer.close();
-                log.info("GenericRecord consumer closed.");
+                log.atInfo().setMessage("GenericRecord consumer closed.").log();
             } catch (Exception e) {
-                log.error("Error closing GenericRecord consumer", e);
+                log.atError().setMessage("Error closing GenericRecord consumer.").setCause(e).log();
             }
             genericRecordConsumer = null;
         }
         if (pulsarClient != null) {
             try {
                 pulsarClient.close();
-                log.info("Pulsar client closed.");
+                log.atInfo().setMessage("Pulsar client closed.").log();
             } catch (PulsarClientException e) {
-                log.error("Error closing Pulsar client", e);
+                log.atError().setMessage("Error closing Pulsar client.").setCause(e).log();
             }
         }
     }

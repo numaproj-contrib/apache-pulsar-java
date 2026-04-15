@@ -79,7 +79,7 @@ public class PulsarApplication {
                     Thread.currentThread().interrupt();
                 }
                 hookSource.cleanup();
-                log.info("Consumer cleanup finished (shutdown hook).");
+                log.atInfo().setMessage("Consumer cleanup finished.").addKeyValue("trigger", "shutdown_hook").log();
             }, "pulsar-source-shutdown"));
 
             // Blocks until gRPC server terminates (SIGTERM causes graceful drain, letting
@@ -101,7 +101,7 @@ public class PulsarApplication {
                     closePulsarClient(pulsarClient);
                 }
                 closePulsarAdmin(pulsarAdmin);
-                log.info("Consumer cleanup finished.");
+                log.atInfo().setMessage("Consumer cleanup finished.").addKeyValue("trigger", "partial_init_failure").log();
             }
         }
     }
@@ -138,7 +138,7 @@ public class PulsarApplication {
                     Thread.currentThread().interrupt();
                 }
                 hookSink.cleanup();
-                log.info("Producer cleanup finished (shutdown hook).");
+                log.atInfo().setMessage("Producer cleanup finished.").addKeyValue("trigger", "shutdown_hook").log();
             }, "pulsar-sink-shutdown"));
 
             // Blocks until gRPC server terminates.
@@ -152,7 +152,7 @@ public class PulsarApplication {
             if (sink == null) {
                 closePulsarClient(pulsarClient);
                 closePulsarAdmin(pulsarAdmin);
-                log.info("Producer cleanup finished.");
+                log.atInfo().setMessage("Producer cleanup finished.").addKeyValue("trigger", "partial_init_failure").log();
             }
         }
     }
@@ -165,7 +165,7 @@ public class PulsarApplication {
         try {
             pulsarAdmin.close();
         } catch (Exception e) {
-            log.warn("Failed to close Pulsar admin during cleanup.", e);
+            log.atWarn().setMessage("Failed to close Pulsar admin during cleanup.").setCause(e).log();
         }
     }
 
@@ -177,7 +177,7 @@ public class PulsarApplication {
         try {
             pulsarClient.close();
         } catch (Exception e) {
-            log.warn("Failed to close Pulsar client during cleanup.", e);
+            log.atWarn().setMessage("Failed to close Pulsar client during cleanup.").setCause(e).log();
         }
     }
 }
