@@ -66,11 +66,9 @@ public class PulsarConsumerProperties {
         String subscriptionNameKey = "subscriptionName";
         if (!consumerConfig.containsKey(subscriptionNameKey)) {
             consumerConfig.put(subscriptionNameKey, defaultSubscriptionName);
-            log.atInfo().setMessage("No subscriptionName provided; using default.")
-                    .addKeyValue("subscriptionName", defaultSubscriptionName).log();
+            log.info("No subscriptionName provided. Setting default: '{}'", defaultSubscriptionName);
         } else {
-            log.atInfo().setMessage("subscriptionName already configured; leaving as-is.")
-                    .addKeyValue("subscriptionName", consumerConfig.get(subscriptionNameKey)).log();
+            log.info("subscriptionName was already set, leaving as-is.");
         }
     }
 }

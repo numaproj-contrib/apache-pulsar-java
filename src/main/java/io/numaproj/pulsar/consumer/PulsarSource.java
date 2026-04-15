@@ -60,8 +60,7 @@ public class PulsarSource extends Sourcer {
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
         if (!messagesToAck.isEmpty()) {
-            log.atTrace().setMessage("messagesToAck not empty, skipping read.")
-                    .addKeyValue("pendingCount", messagesToAck.size()).log();
+            log.trace("messagesToAck not empty: {}", messagesToAck);
             return;
         }
 
@@ -72,7 +71,7 @@ public class PulsarSource extends Sourcer {
                 readWithBytes(request, observer);
             }
         } catch (Exception e) {
-            log.atError().setMessage("Failed to read from Pulsar.").setCause(e).log();
+            log.error("Failed to read from Pulsar", e);
             throw new RuntimeException(e);
         }
     }
@@ -82,16 +81,15 @@ public class PulsarSource extends Sourcer {
         Messages<byte[]> batchMessages = consumer.batchReceive();
 
         if (batchMessages == null || batchMessages.size() == 0) {
-            log.atTrace().setMessage("Received 0 messages, return early.").log();
+            log.trace("Received 0 messages, return early.");
             return;
         }
 
         for (org.apache.pulsar.client.api.Message<byte[]> pMsg : batchMessages) {
 
-            log.atInfo().setMessage("Consumed Pulsar message.")
-                    .addKeyValue("topic", pMsg.getTopicName())
-                    .addKeyValue("messageId", pMsg.getMessageId())
-                    .addKeyValue("content", new String(pMsg.getValue(), StandardCharsets.UTF_8)).log();
+            // TODO : change to .debug or .trace to reduce log noise
+            log.info("Consumed Pulsar message [topic: {}, id: {}]: {}", pMsg.getTopicName(), pMsg.getMessageId(),
+                    new String(pMsg.getValue(), StandardCharsets.UTF_8));
             sendMessage(pMsg, pMsg.getValue(), observer);
         }
     }
@@ -101,22 +99,19 @@ public class PulsarSource extends Sourcer {
         Messages<GenericRecord> batchMessages = consumer.batchReceive();
 
         if (batchMessages == null || batchMessages.size() == 0) {
-            log.atTrace().setMessage("Received 0 messages, return early.").log();
+            log.trace("Received 0 messages, return early.");
             return;
         }
 
         for (org.apache.pulsar.client.api.Message<GenericRecord> pMsg : batchMessages) {
 
             try {
-                GenericRecord record = pMsg.getValue();
+                GenericRecord record = pMsg.getValue(); // This will throw SchemaSerializationException if the message is not valid based on the topic schema 
                 byte[] payloadBytes = pMsg.getData();
 
                 String decoded = recordToLogString(record);
-                log.atInfo().setMessage("Consumed Pulsar message (AUTO_CONSUME).")
-                        .addKeyValue("topic", pMsg.getTopicName())
-                        .addKeyValue("messageId", pMsg.getMessageId())
-                        .addKeyValue("bytes", payloadBytes.length)
-                        .addKeyValue("decoded", decoded).log();
+                // TODO : change to .debug or .trace to reduce log noise
+                log.info("Consumed Pulsar message (AUTO_CONSUME) [topic: {}, id: {}]: {} bytes, decoded={}", pMsg.getTopicName(), pMsg.getMessageId(), payloadBytes.length, decoded);
                 sendMessage(pMsg, payloadBytes, observer);
             } catch (Exception e) {
                 if (isSchemaValidationFailure(e)) {
@@ -183,9 +178,8 @@ public class PulsarSource extends Sourcer {
 
         // Verify that the keys in messagesToAck match the offsets from the request
         if (!messagesToAck.keySet().equals(requestOffsetMap.keySet())) {
-            log.atError().setMessage("Mismatch in acknowledgment: internal pending IDs do not match requested ack IDs.")
-                    .addKeyValue("pendingIds", messagesToAck.keySet())
-                    .addKeyValue("requestedIds", requestOffsetMap.keySet()).log();
+            log.error("Mismatch in acknowledgment: internal pending IDs {} do not match requested ack IDs {}",
+                    messagesToAck.keySet(), requestOffsetMap.keySet());
             // Return early without processing the ack to prevent any inconsistent state
             return;
         }
@@ -201,10 +195,9 @@ public class PulsarSource extends Sourcer {
             } else {
                 pulsarConsumerManager.getOrCreateBytesConsumer(0, 0).acknowledge(messageIds);
             }
-            log.atInfo().setMessage("Successfully acknowledged messages.")
-                    .addKeyValue("count", messageIds.size()).log();
+            log.info("Successfully acknowledged {} messages", messageIds.size());
         } catch (PulsarClientException e) {
-            log.atError().setMessage("Failed to acknowledge Pulsar messages.").setCause(e).log();
+            log.error("Failed to acknowledge Pulsar messages", e);
         }
         messagesToAck.clear();
     }
@@ -230,7 +223,7 @@ public class PulsarSource extends Sourcer {
             });
         }
 
-        log.atTrace().setMessage("Message headers built.").addKeyValue("headers", headers).log();
+        log.trace("Message headers: {}", headers);
         return headers;
     }
 
@@ -250,13 +243,11 @@ public class PulsarSource extends Sourcer {
             for (String topicName : topicNames) {
                 totalBacklog += getBacklogForTopic(topicName, subscriptionName);
             }
-            log.atInfo().setMessage("Fetched total backlog.")
-                    .addKeyValue("topicCount", topicNames.size())
-                    .addKeyValue("subscription", subscriptionName)
-                    .addKeyValue("totalBacklog", totalBacklog).log();
+            log.info("Total messages in backlog across {} topic(s) for subscription {}: {}",
+                    topicNames.size(), subscriptionName, totalBacklog);
             return totalBacklog;
         } catch (PulsarAdminException e) {
-            log.atError().setMessage("Error while fetching admin stats for pending messages.").setCause(e).log();
+            log.error("Error while fetching admin stats for pending messages", e);
             return -1;
         }
     }
@@ -300,13 +291,9 @@ public class PulsarSource extends Sourcer {
             for (String topicName : topicNames) {
                 var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
                 int numPartitions = (metadata != null) ? metadata.partitions : 0;
-                log.atInfo().setMessage("Partition count retrieved for topic.")
-                        .addKeyValue("topic", topicName)
-                        .addKeyValue("partitions", numPartitions).log();
+                log.info("Number of partitions reported for topic {}: {}", topicName, numPartitions);
                 if (numPartitions < 1) {
-                    log.atWarn().setMessage("Topic is non-partitioned; treating as single partition.")
-                            .addKeyValue("topic", topicName)
-                            .addKeyValue("partitions", numPartitions).log();
+                    log.warn("Topic '{}' is non-partitioned (partitions={}). It will be treated as a single partition.", topicName, numPartitions);
                 }
                 int effectivePartitions = numPartitions < 1 ? 1 : numPartitions;
                 for (int i = 0; i < effectivePartitions; i++) {
@@ -318,8 +305,7 @@ public class PulsarSource extends Sourcer {
             }
             return partitionIndexes;
         } catch (Exception e) {
-            log.atError().setMessage("Error while retrieving partition information. Falling back to default partitions.")
-                    .setCause(e).log();
+            log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();
         }
     }
@@ -328,14 +314,14 @@ public class PulsarSource extends Sourcer {
         try {
             pulsarConsumerManager.cleanup();
         } catch (Exception e) {
-            log.atError().setMessage("Error while cleaning up Pulsar consumers.").setCause(e).log();
+            log.error("Error while cleaning up Pulsar consumers", e);
         }
 
         try {
             pulsarAdmin.close();
-            log.atInfo().setMessage("Pulsar admin closed.").log();
+            log.info("Pulsar admin closed.");
         } catch (Exception e) {
-            log.atError().setMessage("Error while closing Pulsar admin.").setCause(e).log();
+            log.error("Error while closing Pulsar admin", e);
         }
     }
 

@@ -63,27 +63,20 @@ public class PulsarSink extends Sinker {
 
             CompletableFuture<Void> future = producer.sendAsync(msg)
                     .thenAccept(messageId -> {
-                        log.atInfo().setMessage("Processed message.")
-                                .addKeyValue("messageId", msgId)
-                                .addKeyValue("content", new String(msg)).log();
+                        log.info("Processed message ID: {}, Content: {}", msgId, new String(msg));
                         responseListBuilder.addResponse(Response.responseOK(msgId));
                     })
                     .exceptionally(ex -> {
                         Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
                         if (producerProperties.isDropInvalidMessages() && isSchemaSerializationFailure(cause != null ? cause : ex)) {
-                            log.atWarn().setMessage("Dropping message due to schema/serialization error.")
-                                    .addKeyValue("messageId", msgId)
-                                    .addKeyValue("dropInvalidMessages", true)
-                                    .addKeyValue("error", cause != null ? cause.getMessage() : ex.getMessage()).log();
+                            log.warn("Dropping message ID {} due to schema/serialization error (drop-invalid-messages=true): {}",
+                                    msgId, cause != null ? cause.getMessage() : ex.getMessage());
                             responseListBuilder.addResponse(Response.responseOK(msgId));
                         } else if (isSchemaSerializationFailure(cause != null ? cause : ex)) {
-                            log.atWarn().setMessage("Message failed schema validation.")
-                                    .addKeyValue("messageId", msgId)
-                                    .addKeyValue("error", cause != null ? cause.getMessage() : ex.getMessage()).log();
+                            log.warn("Message ID {} failed schema validation, messages produced do not align with topic schema: {}", msgId, cause != null ? cause.getMessage() : ex.getMessage());
                             responseListBuilder.addResponse(Response.responseFailure(msgId, cause != null ? cause.getMessage() : ex.getMessage()));
                         } else {
-                            log.atError().setMessage("Error processing message.")
-                                    .addKeyValue("messageId", msgId).setCause(ex).log();
+                            log.error("Error processing message ID {}: {}", msgId, ex.getMessage(), ex);
                             responseListBuilder.addResponse(Response.responseFailure(msgId, ex.getMessage()));
                         }
                         return null;
@@ -116,23 +109,23 @@ public class PulsarSink extends Sinker {
             if (producer != null) {
                 // Push buffered records before closing so shutdown does not drop already accepted messages.
                 producer.flush();
-                log.atInfo().setMessage("Producer flushed.").log();
+                log.info("Producer flushed.");
             }
         } catch (PulsarClientException e) {
-            log.atWarn().setMessage("Error while flushing producer during shutdown.").setCause(e).log();
+            log.warn("Error while flushing producer during shutdown.", e);
         }
 
         try {
             if (producer != null) {
                 producer.close();
-                log.atInfo().setMessage("Producer closed.").log();
+                log.info("Producer closed.");
             }
             if (pulsarClient != null) {
                 pulsarClient.close();
-                log.atInfo().setMessage("PulsarClient closed.").log();
+                log.info("PulsarClient closed.");
             }
         } catch (PulsarClientException e) {
-            log.atError().setMessage("Error while closing PulsarClient or Producer.").setCause(e).log();
+            log.error("Error while closing PulsarClient or Producer.", e);
         }
     }
 }

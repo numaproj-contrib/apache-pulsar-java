@@ -42,8 +42,8 @@ public final class PulsarProducerConfig {
 
         Map<String, Object> producerConfig = pulsarProducerProperties.getProducerConfig();
         if (producerConfig.containsKey(producerNameKey)) {
-            log.atWarn().setMessage("User configured a producerName, but this can cause errors with multiple pods. Overriding.")
-                    .addKeyValue("overriddenProducerName", podName).log();
+            log.warn("User configured a 'producerName' in the config, but this can cause errors if multiple pods spin "
+                    + "up with the same name. Overriding with '{}'", podName);
         }
         producerConfig.put(producerNameKey, podName);
 
@@ -60,7 +60,7 @@ public final class PulsarProducerConfig {
             schema = Schema.AUTO_PRODUCE_BYTES();
         } else {
             schema = Schema.BYTES;
-            log.atInfo().setMessage("Producer using Schema.BYTES; no broker-side schema validation.").log();
+            log.info("Producer using Schema.BYTES: no broker-side schema validation.");
         }
 
         Producer<byte[]> producer = pulsarClient.newProducer(schema)
@@ -68,12 +68,9 @@ public final class PulsarProducerConfig {
                 .create();
 
         SchemaInfo schemaInfo = schema.getSchemaInfo();
-        log.atInfo().setMessage("Producer connected; schema initialized.")
-                .addKeyValue("schemaType", schemaInfo.getType())
-                .addKeyValue("schemaName", schemaInfo.getName())
-                .addKeyValue("schema",
-                        schemaInfo.getSchema() != null ? new String(schemaInfo.getSchema(), StandardCharsets.UTF_8) : "null")
-                .log();
+        log.info("Producer connected; schema initialized: type={}, name={}, schema={}",
+                schemaInfo.getType(), schemaInfo.getName(),
+                schemaInfo.getSchema() != null ? new String(schemaInfo.getSchema(), StandardCharsets.UTF_8) : "null");
 
         return producer;
     }
