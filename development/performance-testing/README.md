@@ -28,8 +28,6 @@ Before the numbered steps, have these in place (names below match **`monovertex_
 - **Pulsar consumer receiver queue:** `500` in your consumer `application.yml`, aligned with batch size (for why, see [Pulsar PR #22619](https://github.com/apache/pulsar/pull/22619)).
 - **Generator load reference:** `rpu: 10000`, `duration: 1s` in `producer_sample.yaml` under `spec.vertices[0].source.generator`.
 - **Subscription initial position:** `Earliest` in your consumer `application.yml`, so the consumer reads from the beginning of the backlog rather than only new messages.
-- **Pre-fill duration:** `500s` — how long the producer runs before the consumer starts, to build up a backlog of at least ~4,000,000 messages.
-- **Measurement duration:** `90s` — how long the consumer metrics are captured after warmup.
 
 ## Files in this folder
 

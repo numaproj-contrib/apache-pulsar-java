@@ -155,8 +155,6 @@ rm -rf development/performance-testing/running-configs/
 | Pulsar receiver queue | 500 | `application.yml` → `pulsar.consumer.consumerConfig.receiverQueueSize` |
 | Subscription initial position | Earliest | `application.yml` → `pulsar.consumer.consumerConfig.subscriptionInitialPosition` |
 | Generator load | rpu: 10000, duration: 1s | producer pipeline `spec.vertices[0].source.generator` |
-| Pre-fill duration | 500s | CI workflow `prefill_duration` input |
-| Measurement duration | 90s | CI workflow `measurement_duration` input |
 
 ## Key files
 
