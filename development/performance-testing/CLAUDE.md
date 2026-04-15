@@ -54,7 +54,7 @@ Update `spec.source.udsource.container.image` in your MonoVertex YAML to match t
   - Producer: `docs/sink/byte-array/manifests/api-key/byte-arr-producer-config.yaml`
   - Producer secret: `docs/sink/byte-array/manifests/api-key/byte-arr-producer-secret.yaml`
 - **Secret**: must contain `PULSAR_AUTH_TOKEN`. One secret can serve both consumer and producer if they share credentials.
-- **MonoVertex manifest**: copy `development/performance-testing/monovertex_sample.yaml`, update image tag, ConfigMap/Secret names, and topic. Do not alter baseline parameters (replicas: 1, readBatchSize: 500, CPU: 100m, memory: 128Mi).
+- **MonoVertex manifest**: copy `development/performance-testing/monovertex_sample.yaml`, update image tag, ConfigMap/Secret names, and topic. Do not alter baseline parameters (replicas: 1, readBatchSize: 500, CPU: 1500m, memory: 640Mi).
 - **Producer manifest**: copy `development/performance-testing/producer_sample.yaml`, update image tag, ConfigMap/Secret names, and topic.
 
 After generating the files, apply only the ConfigMap(s), Secret, and producer pipeline — do **not** apply the consumer MonoVertex yet (that happens in step 5):
@@ -151,9 +151,12 @@ rm -rf development/performance-testing/running-configs/
 |---|---|---|
 | MonoVertex replicas | 1 | `spec.replicas`, `spec.scale` min/max |
 | Read batch size | 500 | `spec.limits.readBatchSize` |
-| Container CPU/memory | 100m / 128Mi | `spec.source.udsource.container.resources.requests` |
+| Container CPU/memory | 1500m / 640Mi | `spec.source.udsource.container.resources` (requests and limits) |
 | Pulsar receiver queue | 500 | `application.yml` → `pulsar.consumer.consumerConfig.receiverQueueSize` |
+| Subscription initial position | Earliest | `application.yml` → `pulsar.consumer.consumerConfig.subscriptionInitialPosition` |
 | Generator load | rpu: 10000, duration: 1s | producer pipeline `spec.vertices[0].source.generator` |
+| Pre-fill duration | 500s | CI workflow `prefill_duration` input |
+| Measurement duration | 90s | CI workflow `measurement_duration` input |
 
 ## Key files
 
