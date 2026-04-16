@@ -14,19 +14,20 @@ Before the numbered steps, have these in place (names below match **`monovertex_
 
 - **Secret** (e.g. `pulsar-secret-cloud`) — Contains the credentials needed to authenticate with Pulsar. If the consumer and producer use the same API key, a single Secret is enough—just reference the same name in both the MonoVertex and producer pipeline manifests. See `docs/get-started` for the secret template.
 
-- **Container image** — Build the **apache-pulsar-java** container image and tag it to match **`spec.source.udsource.container.image`** in your MonoVertex YAML. **Baselines:** keep **`resources.requests`** at **100m / 128Mi** on the MonoVertex unless you intentionally change capacity.
+- **Container image** — Build the **apache-pulsar-java** container image and tag it to match **`spec.source.udsource.container.image`** in your MonoVertex YAML. **Baselines:** keep **`resources`** at **1500m CPU / 640Mi memory** on the MonoVertex unless you intentionally change capacity.
 
 - **Load generator** — A producer pipeline (see **`producer_sample.yaml`**). Since you are comparing consumer images, keep the producer side fixed across runs. **Baselines:** **`rpu: 10000`**, **`duration: 1s`**, and the same message body/payload.
 
-- **Consumer MonoVertex** — Create a spec like **`monovertex_sample.yaml`** and make sure it references the same ConfigMap, Secret, and image tag you created above. **Baselines / match the sample for fair comparison:** **`spec.replicas: 1`**, **`spec.scale` min/max `1`**, **`spec.limits.readBatchSize: 500`**, and **`spec.source.udsource.container.resources.requests`** (`100m` / `128Mi`).
+- **Consumer MonoVertex** — Create a spec like **`monovertex_sample.yaml`** and make sure it references the same ConfigMap, Secret, and image tag you created above. **Baselines / match the sample for fair comparison:** **`spec.replicas: 1`**, **`spec.scale` min/max `1`**, **`spec.limits.readBatchSize: 500`**, and **`spec.source.udsource.container.resources`** (`1500m` CPU / `640Mi` memory).
 
 ## Baseline parameters (keep these the same for fair comparisons)
 
 - **MonoVertex replicas:** `1`. Set in `monovertex_sample.yaml` on `spec.replicas` and on `spec.scale` min/max.
 - **Read batch size:** `500`. Set in `monovertex_sample.yaml` as `spec.limits.readBatchSize`.
-- **Container CPU / memory requests:** `100m` CPU, `128Mi` memory. Set on `spec.source.udsource.container.resources.requests`
+- **Container CPU / memory:** `1500m` CPU, `640Mi` memory (both requests and limits). Set on `spec.source.udsource.container.resources`.
 - **Pulsar consumer receiver queue:** `500` in your consumer `application.yml`, aligned with batch size (for why, see [Pulsar PR #22619](https://github.com/apache/pulsar/pull/22619)).
 - **Generator load reference:** `rpu: 10000`, `duration: 1s` in `producer_sample.yaml` under `spec.vertices[0].source.generator`.
+- **Subscription initial position:** `Earliest` in your consumer `application.yml`, so the consumer reads from the beginning of the backlog rather than only new messages.
 
 ## Files in this folder
 
@@ -40,7 +41,7 @@ Before the numbered steps, have these in place (names below match **`monovertex_
 
 ### 1. Build and load the apache-pulsar-java image
 
-Build the container image and **tag** it so it matches **`spec.source.udsource.container.image`** in your MonoVertex YAML. If you change the tag, update the manifest. **Baseline check:** if you edit `monovertex_sample.yaml`, keep **`spec.source.udsource.container.resources.requests`** at **100m / 128Mi** unless you are deliberately testing different resources.
+Build the container image and **tag** it so it matches **`spec.source.udsource.container.image`** in your MonoVertex YAML. If you change the tag, update the manifest. **Baseline check:** if you edit `monovertex_sample.yaml`, keep **`spec.source.udsource.container.resources`** at **1500m CPU / 640Mi memory** unless you are deliberately testing different resources.
 
 ### 2. Wire Pulsar + Numaflow configs (must match baselines)
 

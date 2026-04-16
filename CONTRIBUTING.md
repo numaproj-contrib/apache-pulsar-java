@@ -6,13 +6,26 @@ This project uses an automated CI/CD pipeline with two GitHub Actions workflows.
 
 ### CI (`ci.yml`)
 
-Runs on every push and pull request to `main`. It builds the project and runs all unit tests:
+Runs on every push and pull request to `main`. The workflow has three jobs:
 
-```bash
-mvn clean install
-```
+| Job | What it does | Runs on |
+|---|---|---|
+| **checkstyle** | `mvn checkstyle:check` — enforces code style rules defined in `checkstyle.xml` | Every push to main and PR |
+| **build** | `mvn clean install` — compiles and runs all unit tests | Every push to main and PR |
+| **coverage** | Runs tests with JaCoCo and posts a coverage report as a PR comment (min 50% overall, 50% for changed files) | PRs only |
 
-All tests must pass before a PR can be merged.
+All jobs must pass before a PR can be merged.
+
+### Benchmark (`benchmark.yml`)
+
+Runs on every push and pull request to `main` (also supports `workflow_dispatch` with configurable measurement and pre-fill durations). The workflow:
+
+1. Builds the application image with Jib
+2. Spins up a **k3d** cluster with Numaflow, JetStream ISB, and a standalone Pulsar instance
+3. Pre-fills a Pulsar topic via a generator-based producer pipeline
+4. Deploys the consumer MonoVertex and captures throughput, latency, and resource metrics
+5. On pushes to `main`: stores results on the `gh-pages` branch for historical tracking
+6. On PRs: posts a sticky comment comparing metrics against the `main` baseline
 
 ### Building a local Docker image
 
