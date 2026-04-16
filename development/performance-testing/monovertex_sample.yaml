@@ -23,6 +23,13 @@ spec:
         image: apache-pulsar-java:after-spring-rm
         args: [ "--config=file:/conf/application.yml" ]
         imagePullPolicy: Never
+        env:
+          # Uncomment to enable debug-level per-message logs
+          # - name: LOGGING_LEVEL_IO_NUMAPROJ_PULSAR
+          #   value: "DEBUG"
+          # Uncomment to switch from JSON to plain-text log output
+          # - name: NUMAFLOW_DEBUG
+          #   value: "true"
         resources:
           requests:
              # using Numaflow controller default cpu and memory values

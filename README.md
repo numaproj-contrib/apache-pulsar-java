@@ -47,3 +47,31 @@ kubectl -n numaflow-system port-forward deployment/numaflow-server 8443:8443
 ```
 
 Then access the Numaflow UI at https://localhost:8443/
+
+## Logging
+
+### Log format
+
+By default, logs are output as **JSON** (for log aggregators like Loki, Datadog, ELK). To switch to **plain text** for local development, set:
+
+```yaml
+env:
+  - name: NUMAFLOW_DEBUG
+    value: "true"
+```
+
+### How do I configure logging level?
+
+Set environment variables in your container spec. Default level is `INFO` if not specified.
+
+```yaml
+env:
+  # Set root level (affects all packages)
+  - name: LOGGING_LEVEL_ROOT
+    value: "WARN"
+  # Set level for io.numaproj.pulsar package
+  - name: LOGGING_LEVEL_IO_NUMAPROJ_PULSAR
+    value: "DEBUG"
+```
+
+Available levels: `TRACE`, `DEBUG`, `INFO` (default), `WARN`, `ERROR`, `OFF`
