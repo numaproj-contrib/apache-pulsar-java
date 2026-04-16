@@ -1,26 +1,23 @@
 <configuration>
 
-    <!-- Production (default): JSON output via logstash-logback-encoder -->
-    <if condition='!isDefined("NUMAFLOW_DEBUG") || !"true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
-        <then>
-            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                    <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampPattern>
-                    <timeZone>UTC</timeZone>
-                </encoder>
-            </appender>
-        </then>
-    </if>
-
-    <!-- Debug mode: plain-text output for human readability -->
     <if condition='isDefined("NUMAFLOW_DEBUG") &amp;&amp; "true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
         <then>
+            <!-- Debug mode: plain-text output for human readability -->
             <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
                 <encoder>
                     <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
                 </encoder>
             </appender>
         </then>
+        <else>
+            <!-- Production (default): JSON output via logstash-logback-encoder -->
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampPattern>
+                    <timeZone>UTC</timeZone>
+                </encoder>
+            </appender>
+        </else>
     </if>
 
     <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
