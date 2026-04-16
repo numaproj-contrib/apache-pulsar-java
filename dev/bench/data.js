@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776271731414,
+  "lastUpdate": 1776358492149,
   "repoUrl": "https://github.com/numaproj-contrib/apache-pulsar-java",
   "entries": {
     "Benchmark": [
@@ -53,6 +53,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "Consumer Memory",
             "value": 361,
+            "unit": "MiB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mayuqing131@gmail.com",
+            "name": "ccm32004",
+            "username": "ccm32004"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d014fddad4624db1f0a986bb0070080dd39fb823",
+          "message": "chore: update docs  (#85)\n\nSigned-off-by: Cece Ma <mayuqing131@gmail.com>",
+          "timestamp": "2026-04-16T12:38:44-04:00",
+          "tree_id": "a8a049f46cdc36610186cb6486fe553f5874e131",
+          "url": "https://github.com/numaproj-contrib/apache-pulsar-java/commit/d014fddad4624db1f0a986bb0070080dd39fb823"
+        },
+        "date": 1776358491666,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Consumer Throughput",
+            "value": 32222.22,
+            "unit": "msgs/sec"
+          },
+          {
+            "name": "Processing Latency (per batch)",
+            "value": 15.53,
+            "unit": "ms"
+          },
+          {
+            "name": "Read Latency (per batch)",
+            "value": 9.44,
+            "unit": "ms"
+          },
+          {
+            "name": "Ack Latency (per batch)",
+            "value": 0.5,
+            "unit": "ms"
+          },
+          {
+            "name": "Consumer CPU",
+            "value": 1362,
+            "unit": "millicores"
+          },
+          {
+            "name": "Consumer Memory",
+            "value": 328,
             "unit": "MiB"
           }
         ]
