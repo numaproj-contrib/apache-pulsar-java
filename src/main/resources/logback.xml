@@ -13,7 +13,7 @@
     </if>
 
     <!-- Debug mode: plain-text output for human readability -->
-    <if condition='isDefined("NUMAFLOW_DEBUG") && "true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
+    <if condition='isDefined("NUMAFLOW_DEBUG") &amp;&amp; "true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
         <then>
             <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
                 <encoder>
