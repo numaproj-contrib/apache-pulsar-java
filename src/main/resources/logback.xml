@@ -1,6 +1,6 @@
 <configuration>
 
-    <if condition='isDefined("NUMAFLOW_DEBUG") &amp;&amp; "true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
+    <if condition='"true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
         <then>
             <!-- Debug mode: plain-text output for human readability -->
             <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">

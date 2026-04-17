@@ -16,6 +16,9 @@
         <lombok.version>1.18.36</lombok.version>
         <pulsar.client.version>4.0.2</pulsar.client.version>
         <jackson.version>2.19.2</jackson.version>
+        <logback.version>1.5.18</logback.version>
+        <logstash.encoder.version>8.0</logstash.encoder.version>
+        <janino.version>3.1.12</janino.version>
     </properties>
 
     <dependencies>
@@ -49,19 +52,19 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.18</version>
+            <version>${logback.version}</version>
         </dependency>
-        <!-- JSON-structured log output (activated via NUMAFLOW_DEBUG env var) -->
+        <!-- JSON-structured log output (default; disabled when NUMAFLOW_DEBUG=true) -->
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <version>8.0</version>
+            <version>${logstash.encoder.version}</version>
         </dependency>
         <!-- Required for conditional logic in logback.xml -->
         <dependency>
             <groupId>org.codehaus.janino</groupId>
             <artifactId>janino</artifactId>
-            <version>3.1.12</version>
+            <version>${janino.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
