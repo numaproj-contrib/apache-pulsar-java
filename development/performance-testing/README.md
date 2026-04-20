@@ -1,5 +1,5 @@
 # Performance testing — reproducible runbook
-//
+
 This runbook is for testing the **apache-pulsar-java** consumer in a **MonoVertex** on a **local Kubernetes** cluster, reading from **StreamNative** (or compatible) Pulsar. For comparable runs, keep **baseline parameters** identical across attempts (see below).
 
 ## What you need to create (cluster + config)
