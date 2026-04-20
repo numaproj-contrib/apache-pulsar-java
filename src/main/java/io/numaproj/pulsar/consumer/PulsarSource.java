@@ -122,11 +122,31 @@ public class PulsarSource extends Sourcer {
         }
     }
 
+    /**
+     * Extracts the partition index from a Pulsar topic name.
+     * Partitioned topics have the format "persistent://tenant/ns/topic-partition-N".
+     * Returns 0 for non-partitioned topics.
+     */
+    private static int extractPartitionIndex(String topicName) {
+        int idx = topicName.lastIndexOf("-partition-");
+        if (idx < 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(topicName.substring(idx + "-partition-".length()));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     /** Builds offset and headers, sends the message to the observer, and records it for ack. */
     private void sendMessage(org.apache.pulsar.client.api.Message<?> pMsg, byte[] payloadBytes, OutputObserver observer) {
         String topicMessageIdKey = pMsg.getTopicName() + pMsg.getMessageId().toString();
         byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
-        Offset offset = new Offset(offsetBytes);
+        // Offset offset = new Offset(offsetBytes);
+        // Extract partition from Pulsar message topic name
+        int partition = extractPartitionIndex(pMsg.getTopicName());
+        Offset offset = new Offset(offsetBytes, partition);
         Map<String, String> headers = buildHeaders(pMsg);
         observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
         messagesToAck.put(topicMessageIdKey, pMsg);
