@@ -252,6 +252,13 @@ public class PulsarSource extends Sourcer {
         }
     }
 
+    /** Returns the effective partition count for a topic (at least 1 for non-partitioned topics). */
+    private int getEffectivePartitionCount(String topicName) throws PulsarAdminException {
+        var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
+        int partitions = (metadata != null) ? metadata.partitions : 0;
+        return Math.max(partitions, 1);
+    }
+
     private long getBacklogForTopic(String topicName, String subscriptionName) throws PulsarAdminException {
         var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
         int partitionCount = (metadata != null) ? metadata.partitions : 0;
@@ -276,26 +283,15 @@ public class PulsarSource extends Sourcer {
         return subscriptionStats != null ? subscriptionStats.getMsgBacklog() : 0;
     }
 
-    /**
-     * Returns partition indices for this source. Numaflow uses this list to decide which partitions
-     * exist for watermark publishing and scaling (same contract as Kafka-style multi-partition sources).
-     * We expose one integer per Pulsar partition across all configured topics as a flat list [0, 1, 2, ...].
-     */
     @Override
-    public List<Integer> getPartitions() {
+    public List<Integer> getActivePartitions() {
         try {
             Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
             List<Integer> partitionIndexes = new ArrayList<>();
-            // Assign one integer per partition across all topics (e.g. topic A has 3 partitions -> 0,1,2; topic B has 2 -> 3,4).
             int globalIndex = 0;
             for (String topicName : topicNames) {
-                var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
-                int numPartitions = (metadata != null) ? metadata.partitions : 0;
-                log.info("Number of partitions reported for topic {}: {}", topicName, numPartitions);
-                if (numPartitions < 1) {
-                    log.warn("Topic '{}' is non-partitioned (partitions={}). It will be treated as a single partition.", topicName, numPartitions);
-                }
-                int effectivePartitions = numPartitions < 1 ? 1 : numPartitions;
+                int effectivePartitions = getEffectivePartitionCount(topicName);
+                log.info("Number of partitions reported for topic {}: {}", topicName, effectivePartitions);
                 for (int i = 0; i < effectivePartitions; i++) {
                     partitionIndexes.add(globalIndex++);
                 }
@@ -303,10 +299,27 @@ public class PulsarSource extends Sourcer {
             if (partitionIndexes.isEmpty()) {
                 partitionIndexes.add(0);
             }
+            log.info("Active partitions: {}", partitionIndexes);
             return partitionIndexes;
         } catch (Exception e) {
             log.error("Error while retrieving partition information. Falling back to default partitions.", e);
             return defaultPartitions();
+        }
+    }
+
+    @Override
+    public Integer getTotalPartitions() {
+        try {
+            Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
+            int total = 0;
+            for (String topicName : topicNames) {
+                total += getEffectivePartitionCount(topicName);
+            }
+            log.info("Total partitions across {} topic(s): {}", topicNames.size(), total);
+            return total;
+        } catch (PulsarAdminException e) {
+            log.error("Error retrieving total partition count", e);
+            return null;
         }
     }
 

@@ -483,11 +483,11 @@ public class PulsarSourceTest {
     }
 
     /**
-     * Tests that the method returns a list of partition indexes from 0 to
+     * Tests that getActivePartitions returns a list of partition indexes from 0 to
      * numPartitions-1 for a partitioned topic.
      */
     @Test
-    public void getPartitionsPartitionedTopic() {
+    public void getActivePartitionsPartitionedTopic() {
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
         Map<String, Object> consumerConfig = new HashMap<>();
         String topicName = "test-topic";
@@ -505,7 +505,7 @@ public class PulsarSourceTest {
             when(mockTopics.getPartitionedTopicMetadata(topicName)).thenReturn(metadata);
 
             PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-            List<Integer> result = source.getPartitions();
+            List<Integer> result = source.getActivePartitions();
 
             assertEquals(3, result.size());
             assertEquals(List.of(0, 1, 2), result);
@@ -513,17 +513,17 @@ public class PulsarSourceTest {
             verify(mockTopics).getPartitionedTopicMetadata(topicName);
 
         } catch (PulsarAdminException e) {
-            fail("Unexpected PulsarAdminException thrown in getPartitionsPartitionedTopic: " + e.getMessage());
+            fail("Unexpected PulsarAdminException thrown in getActivePartitionsPartitionedTopic: " + e.getMessage());
         }
 
     }
 
     /**
-     * Tests that a non-partitioned topic (numPartitions < 1) returns a singleton
-     * list containing 0.
+     * Tests that getActivePartitions for a non-partitioned topic (numPartitions < 1)
+     * returns a singleton list containing 0.
      */
     @Test
-    public void getPartitionsNonPartitionedTopic() {
+    public void getActivePartitionsNonPartitionedTopic() {
         PulsarAdmin pulsarAdmin = mock(PulsarAdmin.class);
         Topics topics = mock(Topics.class);
         when(pulsarAdmin.topics()).thenReturn(topics);
@@ -541,18 +541,18 @@ public class PulsarSourceTest {
         when(pulsarConsumerProperties.getConsumerConfig()).thenReturn(consumerConfig);
 
         PulsarSource localSource = new PulsarSource(mock(PulsarConsumerManager.class), pulsarAdmin, pulsarConsumerProperties);
-        List<Integer> partitions = localSource.getPartitions();
+        List<Integer> partitions = localSource.getActivePartitions();
 
         assertEquals(List.of(0), partitions);
     }
 
     /**
-     * Tests that getPartitions returns a flat list of indices across multiple
+     * Tests that getActivePartitions returns a flat list of indices across multiple
      * topics
      * (e.g. topic-a with 3 partitions -> 0,1,2; topic-b with 2 -> 3,4).
      */
     @Test
-    public void getPartitionsMultipleTopics() throws PulsarAdminException {
+    public void getActivePartitionsMultipleTopics() throws PulsarAdminException {
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
         Map<String, Object> consumerConfig = new HashMap<>();
         Set<String> topicNames = new HashSet<>(Arrays.asList("topic-a", "topic-b"));
@@ -572,7 +572,7 @@ public class PulsarSourceTest {
         when(mockTopics.getPartitionedTopicMetadata("topic-b")).thenReturn(metadataB);
 
         PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-        List<Integer> result = source.getPartitions();
+        List<Integer> result = source.getActivePartitions();
 
         assertEquals(5, result.size());
         assertEquals(List.of(0, 1, 2, 3, 4), result);
@@ -585,7 +585,7 @@ public class PulsarSourceTest {
      * defaultPartitions().
      */
     @Test
-    public void getPartitionsException() {
+    public void getActivePartitionsException() {
         // Arrange
         PulsarConsumerProperties mockProperties = mock(PulsarConsumerProperties.class);
         when(mockProperties.getConsumerConfig()).thenThrow(new RuntimeException("Test exception"));
@@ -597,7 +597,7 @@ public class PulsarSourceTest {
             mockedSourcer.when(Sourcer::defaultPartitions).thenReturn(List.of(42));
 
             PulsarSource source = new PulsarSource(mock(PulsarConsumerManager.class), mockAdmin, mockProperties);
-            List<Integer> result = source.getPartitions();
+            List<Integer> result = source.getActivePartitions();
             assertEquals(List.of(42), result);
             mockedSourcer.verify(Sourcer::defaultPartitions);
         }
