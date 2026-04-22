@@ -24,7 +24,7 @@
         <appender-ref ref="CONSOLE"/>
         <queueSize>1024</queueSize>
         <discardingThreshold>0</discardingThreshold>
-        <neverBlock>false</neverBlock>
+        <neverBlock>true</neverBlock>
     </appender>
 
     <root level="${LOGGING_LEVEL_ROOT:-INFO}">
