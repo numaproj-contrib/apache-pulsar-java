@@ -16,6 +16,9 @@
         <lombok.version>1.18.36</lombok.version>
         <pulsar.client.version>4.0.2</pulsar.client.version>
         <jackson.version>2.19.2</jackson.version>
+        <logback.version>1.5.18</logback.version>
+        <logstash.encoder.version>8.0</logstash.encoder.version>
+        <janino.version>3.1.12</janino.version>
     </properties>
 
     <dependencies>
@@ -45,11 +48,23 @@
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
         </dependency>
-        <!-- SLF4J binding so logs are not NOP (Spring Boot previously provided logback) -->
+        <!-- Logback: SLF4J binding with async appender support and configurable output -->
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.16</version>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
+        <!-- JSON-structured log output (default; disabled when NUMAFLOW_DEBUG=true) -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>${logstash.encoder.version}</version>
+        </dependency>
+        <!-- Required for conditional logic in logback.xml -->
+        <dependency>
+            <groupId>org.codehaus.janino</groupId>
+            <artifactId>janino</artifactId>
+            <version>${janino.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
