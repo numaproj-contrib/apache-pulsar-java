@@ -825,6 +825,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Local Performance Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#baseline-parameters-keep-identical-across-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline parameters (keep identical across runs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster-setup-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cluster setup checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics-stack-with-numaflow-perfman" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics stack with numaflow-perfman
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-a-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running a comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -1165,16 +1215,87 @@
 </table>
 <p>To trigger manually, go to the <a href="https://github.com/numaproj-contrib/apache-pulsar-java/actions/workflows/benchmark.yml">Actions tab</a> and click "Run workflow".</p>
 <h3 id="local-performance-testing">Local Performance Testing<a class="headerlink" href="#local-performance-testing" title="Permanent link">&para;</a></h3>
-<p>For more in-depth testing on your own cluster, see the <a href="https://github.com/numaproj-contrib/apache-pulsar-java/tree/main/development/performance-testing">performance testing runbook</a>.</p>
-<details class="note">
-<summary>What the local runbook covers</summary>
-<ul>
-<li>Baseline parameters for fair comparison (replicas, batch size, CPU/memory, receiver queue)</li>
-<li>Setting up metrics with <a href="https://github.com/numaproj-labs/numaflow-perfman">numaflow-perfman</a> (Prometheus + Grafana)</li>
-<li>Pre-filling topics and deploying the consumer MonoVertex</li>
-<li>Importing the Grafana dashboard for MonoVertex metrics</li>
-</ul>
-</details>
+<p>For more in-depth testing on your own cluster, see the <a href="https://github.com/numaproj-contrib/apache-pulsar-java/tree/main/development/performance-testing">performance testing runbook</a>. The runbook is designed so that two builds of the consumer can be compared apples-to-apples on the same cluster against the same Pulsar backlog.</p>
+<h4 id="baseline-parameters-keep-identical-across-runs">Baseline parameters (keep identical across runs)<a class="headerlink" href="#baseline-parameters-keep-identical-across-runs" title="Permanent link">&para;</a></h4>
+<p>When comparing consumer images, keep every variable fixed except the image tag. The sample manifests (<code>monovertex_sample.yaml</code>, <code>producer_sample.yaml</code>) are pre-configured with these values:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Baseline</th>
+<th>Where to set it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MonoVertex replicas</td>
+<td><code>1</code></td>
+<td><code>spec.replicas</code> and <code>spec.scale.min</code>/<code>spec.scale.max</code> in <code>monovertex_sample.yaml</code></td>
+</tr>
+<tr>
+<td>Read batch size</td>
+<td><code>500</code></td>
+<td><code>spec.limits.readBatchSize</code> in <code>monovertex_sample.yaml</code></td>
+</tr>
+<tr>
+<td>Container resources</td>
+<td><code>1500m</code> CPU / <code>640Mi</code> memory (requests == limits)</td>
+<td><code>spec.source.udsource.container.resources</code></td>
+</tr>
+<tr>
+<td>Pulsar receiver queue size</td>
+<td><code>500</code> (must equal <code>readBatchSize</code>)</td>
+<td><code>pulsar.consumer.consumerConfig.receiverQueueSize</code> in <code>application.yml</code></td>
+</tr>
+<tr>
+<td>Subscription initial position</td>
+<td><code>Earliest</code></td>
+<td><code>pulsar.consumer.consumerConfig.subscriptionInitialPosition</code></td>
+</tr>
+<tr>
+<td>Generator load</td>
+<td><code>rpu: 10000</code>, <code>duration: 1s</code></td>
+<td><code>spec.vertices[0].source.generator</code> in <code>producer_sample.yaml</code></td>
+</tr>
+<tr>
+<td>Pre-fill target</td>
+<td>~1,000,000+ messages in topic before starting consumer</td>
+<td>Run the producer pipeline long enough</td>
+</tr>
+</tbody>
+</table>
+<h4 id="cluster-setup-checklist">Cluster setup checklist<a class="headerlink" href="#cluster-setup-checklist" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Image</strong> — Build <code>apache-pulsar-java</code> and tag it to match <code>spec.source.udsource.container.image</code> in the MonoVertex manifest.</li>
+<li><strong>ConfigMap</strong> (e.g. <code>consumer-config</code>) — provides <code>application.yml</code> mounted at <code>/conf/application.yml</code>. Must include <code>pulsar.client</code>, <code>pulsar.consumer</code>, and <code>pulsar.admin</code> sections.</li>
+<li><strong>Secret</strong> (e.g. <code>pulsar-secret-cloud</code>) — holds Pulsar credentials referenced by <code>envFrom</code> in the MonoVertex.</li>
+<li><strong>Pulsar topic</strong> — same name in the consumer's <code>topicNames</code> and the producer pipeline.</li>
+<li><strong>Producer pipeline</strong> — deploy <code>producer_sample.yaml</code> first and let it run until the topic backlog is ~1M+ messages. This keeps the consumer metrics window stable (ingest is slower than drain, so without pre-filling the topic empties fast).</li>
+<li><strong>Consumer MonoVertex</strong> — deploy <code>monovertex_sample.yaml</code> once the backlog is in place.</li>
+</ol>
+<h4 id="metrics-stack-with-numaflow-perfman">Metrics stack with <a href="https://github.com/numaproj-labs/numaflow-perfman">numaflow-perfman</a><a class="headerlink" href="#metrics-stack-with-numaflow-perfman" title="Permanent link">&para;</a></h4>
+<p>Perfman installs the Prometheus Operator, wires ServiceMonitors for pipeline and ISB metrics, and installs Grafana.</p>
+<ol>
+<li>Clone numaflow-perfman and <code>make build</code> — binary lands at <code>dist/perfman</code>.</li>
+<li>One-time install: <code>./dist/perfman setup -g</code>.</li>
+<li>Port-forward (each blocks, so use separate terminals):</li>
+<li>Prometheus UI: <code>./dist/perfman portforward -p</code> → <code>http://localhost:9090</code></li>
+<li>Grafana: <code>./dist/perfman portforward -g</code> → <code>http://localhost:3000</code> (default <code>admin</code>/<code>admin</code>)</li>
+<li>Import the MonoVertex dashboard from this repo:
+   <div class="highlight"><pre><span></span><code>./dist/perfman<span class="w"> </span>dashboard<span class="w"> </span>--template-path<span class="w"> </span>development/performance-testing/dashboard-monovertex-template.json
+</code></pre></div>
+   The command prints a link to open the dashboard in Grafana once the MonoVertex is running.</li>
+</ol>
+<p>The dashboard surfaces read batch size, end-to-end latency, and forwarder metrics scoped to the MonoVertex.</p>
+<h4 id="running-a-comparison">Running a comparison<a class="headerlink" href="#running-a-comparison" title="Permanent link">&para;</a></h4>
+<p>To benchmark a new consumer image against a baseline:</p>
+<ol>
+<li>Build the new image with a distinct tag (e.g. <code>:experiment-foo</code>).</li>
+<li>Update <code>spec.source.udsource.container.image</code> in the MonoVertex manifest.</li>
+<li><code>kubectl apply -f</code> the MonoVertex. Leave every other baseline parameter untouched.</li>
+<li>Let metrics stabilize in Grafana over the pre-filled backlog, then record the numbers.</li>
+<li>Swap the image tag back to the baseline and repeat for comparison.</li>
+</ol>
 <h3 id="ai-assisted-performance-testing">AI-Assisted Performance Testing<a class="headerlink" href="#ai-assisted-performance-testing" title="Permanent link">&para;</a></h3>
 <p>This repo includes a <a href="https://github.com/numaproj-contrib/apache-pulsar-java/blob/main/development/performance-testing/CLAUDE.md">Claude AI skill</a> that can walk you through the entire local performance testing workflow interactively. It handles image builds, kubectl commands, perfman setup, and topic pre-filling — just provide your Pulsar cluster details and it runs everything for you.</p>
 <p>To use it, open this repo in <a href="https://cursor.com/">Cursor</a> and ask the AI agent something like:</p>

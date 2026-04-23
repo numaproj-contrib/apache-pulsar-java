@@ -620,6 +620,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-the-consumer-reads-and-acks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the consumer reads and acks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -944,6 +955,15 @@
 <h1 id="byte-array-source-consumer">Byte Array Source (Consumer)<a class="headerlink" href="#byte-array-source-consumer" title="Permanent link">&para;</a></h1>
 <p>This guide walks you through consuming raw byte array messages from a Pulsar topic into a Numaflow pipeline.</p>
 <p>The example builds a pipeline that reads from a Pulsar topic and prints received messages using the built-in Numaflow <a href="https://numaflow.numaproj.io/user-guide/sinks/log/">log sink</a>.</p>
+<hr />
+<h2 id="how-the-consumer-reads-and-acks">How the consumer reads and acks<a class="headerlink" href="#how-the-consumer-reads-and-acks" title="Permanent link">&para;</a></h2>
+<p>The consumer follows a <strong>strict read → ack cycle with no read ahead</strong>. Numaflow calls <code>read()</code> and <code>ack()</code> on the source in alternating fashion, and this consumer enforces that pattern tightly:</p>
+<ul>
+<li><strong>No readahead.</strong> <code>read()</code> returns immediately without pulling a new batch from Pulsar if the previous batch has not yet been fully acknowledged. A new batch is only fetched once <code>messagesToAck</code> is empty.</li>
+<li><strong>Strict ack matching.</strong> <code>ack()</code> compares the offsets in the request against the set of pending message IDs from the last read. If they don't match exactly (missing IDs, extra IDs, reordered in a way that changes the set), the ack is <strong>skipped</strong> and logged as an error — no partial acks. Pulsar will eventually redeliver those messages.</li>
+<li><strong>No reack of already-acked messages.</strong> Because <code>messagesToAck</code> is cleared after a successful ack, a repeated ack for the same batch is treated as a mismatch and ignored.</li>
+</ul>
+<p>This design keeps the consumer's state simple: at any moment, either a batch is in flight waiting to be acked, or nothing is pending and the next read can proceed. There is no overlap between batches and no prefetch beyond Pulsar's own <code>receiverQueueSize</code>.</p>
 <hr />
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
