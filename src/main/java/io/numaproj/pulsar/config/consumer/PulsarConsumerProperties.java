@@ -11,16 +11,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Parsed representation of the pulsar.consumer section of application.yml.
+ * Call init() once before use to normalize topicNames and set a default subscriptionName.
+ */
 @Slf4j
 @Getter
 @Setter
 public class PulsarConsumerProperties {
 
+    /** True to run as a Numaflow source (consumer). */
     private boolean enabled = false;
 
-    private Map<String, Object> consumerConfig = new HashMap<>(); // Default to an empty map
+    /** Raw Pulsar consumer configuration keyed by Pulsar consumer config names. */
+    private Map<String, Object> consumerConfig = new HashMap<>();
 
-    /** Defaults to OS env; may be replaced in tests. */
+    /** Resolver for NUMAFLOW_PIPELINE_NAME and NUMAFLOW_VERTEX_NAME environment variables. Defaults to OS env; may be replaced in tests.*/
     private EnvLookup envLookup = EnvLookup.system();
 
     /**
@@ -32,6 +38,12 @@ public class PulsarConsumerProperties {
      */
     private boolean useAutoConsumeSchema = true;
 
+    /**
+     * Normalizes topicNames into a Set<String> and fills in a default subscriptionName
+     * based on the NUMAFLOW_PIPELINE_NAME and NUMAFLOW_VERTEX_NAME environment variables.
+     *
+     * @throws IllegalArgumentException if topicNames is not a String or resolves to zero topics
+     */
     public void init() {
         // Pulsar expects topicNames to be type Set<String>. Config accepts a single string
         // (one topic) or comma-separated topics (e.g. "topic1,topic2,topic3").

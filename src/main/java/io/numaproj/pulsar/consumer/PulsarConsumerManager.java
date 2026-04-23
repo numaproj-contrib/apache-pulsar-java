@@ -13,9 +13,9 @@ import io.numaproj.pulsar.config.consumer.PulsarConsumerProperties;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Creates and maintains Pulsar consumers: one for byte[] (Schema.BYTES) and one for
- * schema-backed messages (Schema.AUTO_CONSUME / GenericRecord). Only the consumer
- * matching the configured schema is created and used; the other remains null.
+ * Lazily creates and caches the Pulsar consumer used by PulsarSource.
+ * Supports two consumer shapes: raw byte[] (Schema.BYTES) or GenericRecord (Schema.AUTO_CONSUME).
+ * Both consumers use Shared subscriptions so multiple pods can consume the same topic concurrently.
  */
 @Slf4j
 public class PulsarConsumerManager {
@@ -23,6 +23,12 @@ public class PulsarConsumerManager {
     private final PulsarConsumerProperties pulsarConsumerProperties;
     private final PulsarClient pulsarClient;
 
+    /**
+     * Creates a new manager. Consumers are created lazily on first use.
+     *
+     * @param pulsarConsumerProperties parsed pulsar.consumer section
+     * @param pulsarClient             the Pulsar client
+     */
     public PulsarConsumerManager(PulsarConsumerProperties pulsarConsumerProperties, PulsarClient pulsarClient) {
         this.pulsarConsumerProperties = pulsarConsumerProperties;
         this.pulsarClient = pulsarClient;
@@ -31,7 +37,14 @@ public class PulsarConsumerManager {
     private Consumer<byte[]> bytesConsumer;
     private Consumer<GenericRecord> genericRecordConsumer;
 
-    /** Returns the byte-array consumer, creating it if necessary. Use when not using AUTO_CONSUME. */
+    /**
+     * Returns the byte-array consumer, creating it on first call.
+     *
+     * @param count         maximum number of messages per batch
+     * @param timeoutMillis maximum time to wait for the batch to fill
+     * @return the byte-array consumer
+     * @throws PulsarClientException if consumer creation fails
+     */
     public Consumer<byte[]> getOrCreateBytesConsumer(long count, long timeoutMillis) throws PulsarClientException {
         if (bytesConsumer != null) {
             return bytesConsumer;
@@ -49,7 +62,15 @@ public class PulsarConsumerManager {
         return bytesConsumer;
     }
 
-    /** Returns the GenericRecord (AUTO_CONSUME) consumer, creating it if necessary. Use when using AUTO_CONSUME. */
+    /**
+     * Returns the AUTO_CONSUME (GenericRecord) consumer, creating it on first call.
+     * Each message is validated against the registered topic schema.
+     *
+     * @param count         maximum number of messages per batch
+     * @param timeoutMillis maximum time to wait for the batch to fill
+     * @return the schema-aware consumer
+     * @throws PulsarClientException if consumer creation fails
+     */
     public Consumer<GenericRecord> getOrCreateGenericRecordConsumer(long count, long timeoutMillis) throws PulsarClientException {
         if (genericRecordConsumer != null) {
             return genericRecordConsumer;
@@ -67,6 +88,10 @@ public class PulsarConsumerManager {
         return genericRecordConsumer;
     }
 
+    /**
+     * Closes any created consumers and the underlying Pulsar client.
+     * Individual close failures are logged rather than thrown.
+     */
     public void cleanup() {
         if (bytesConsumer != null) {
             try {

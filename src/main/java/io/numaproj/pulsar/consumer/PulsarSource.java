@@ -31,6 +31,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Numaflow user-defined source that reads messages from one or more Pulsar topics.
+ * Supports raw byte[] messages (Schema.BYTES) or schema-validated messages (Schema.AUTO_CONSUME),
+ * selected via PulsarConsumerProperties.useAutoConsumeSchema.
+ * Pulsar message metadata is forwarded to Numaflow as x-pulsar-* headers.
+ */
 @Slf4j
 public class PulsarSource extends Sourcer {
 
@@ -45,18 +51,37 @@ public class PulsarSource extends Sourcer {
     private final PulsarConsumerProperties pulsarConsumerProperties;
     private Server server;
 
+    /**
+     * Creates a new source.
+     *
+     * @param pulsarConsumerManager    factory for the byte-array or GenericRecord consumer
+     * @param pulsarAdmin              admin client used to query topic partitions and backlog
+     * @param pulsarConsumerProperties parsed pulsar.consumer section of the config
+     */
     public PulsarSource(PulsarConsumerManager pulsarConsumerManager, PulsarAdmin pulsarAdmin, PulsarConsumerProperties pulsarConsumerProperties) {
         this.pulsarConsumerManager = pulsarConsumerManager;
         this.pulsarAdmin = pulsarAdmin;
         this.pulsarConsumerProperties = pulsarConsumerProperties;
     }
 
+    /**
+     * Starts the Numaflow gRPC server and blocks until it terminates.
+     *
+     * @throws Exception if the gRPC server fails
+     */
     public void startServer() throws Exception {
         server = new Server(this);
         server.start();
         server.awaitTermination();
     }
 
+    /**
+     * Reads a batch of messages from the configured Pulsar topic(s) and forwards them to Numaflow.
+     * Returns early without reading if the previous batch has not yet been acknowledged.
+     *
+     * @param request  the read request (count and timeout)
+     * @param observer output channel that emits messages back to Numaflow
+     */
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
         if (!messagesToAck.isEmpty()) {
@@ -167,6 +192,12 @@ public class PulsarSource extends Sourcer {
         return sb.toString();
     }
 
+    /**
+     * Acknowledges all messages delivered in the previous read call.
+     * The request offsets must match the messages from the previous read; otherwise the ack is skipped.
+     *
+     * @param request the ack request containing the offsets to acknowledge
+     */
     @Override
     public void ack(AckRequest request) {
         // Offsets are topicName + messageId (same as messagesToAck key).
@@ -227,12 +258,22 @@ public class PulsarSource extends Sourcer {
         return headers;
     }
 
+    /**
+     * Not yet implemented.
+     *
+     * @throws UnsupportedOperationException always
+     */
     @Override
     public void nack(NackRequest request) {
         // TODO : implement nack logic
         throw new UnsupportedOperationException("Unimplemented method 'nack'");
     }
 
+    /**
+     * Returns the total subscription backlog across all configured topics.
+     *
+     * @return the total number of un-acknowledged messages, or -1 if the admin call fails
+     */
     @Override
     public long getPending() {
         try {
@@ -277,9 +318,11 @@ public class PulsarSource extends Sourcer {
     }
 
     /**
-     * Returns partition indices for this source. Numaflow uses this list to decide which partitions
-     * exist for watermark publishing and scaling (same contract as Kafka-style multi-partition sources).
-     * We expose one integer per Pulsar partition across all configured topics as a flat list [0, 1, 2, ...].
+     * Returns partition indices across all configured topics as a flat list [0, 1, 2, ...].
+     * Each Pulsar partition contributes one index. Non-partitioned topics count as one partition.
+     * Falls back to defaultPartitions() if partition lookup fails.
+     *
+     * @return the list of partition indices
      */
     @Override
     public List<Integer> getPartitions() {
@@ -310,6 +353,10 @@ public class PulsarSource extends Sourcer {
         }
     }
 
+    /**
+     * Closes the underlying Pulsar consumers, client, and admin.
+     * Errors during shutdown are logged rather than thrown.
+     */
     public void cleanup() {
         try {
             pulsarConsumerManager.cleanup();

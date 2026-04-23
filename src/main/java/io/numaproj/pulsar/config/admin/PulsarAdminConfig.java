@@ -13,6 +13,14 @@ public final class PulsarAdminConfig {
     private PulsarAdminConfig() {
     }
 
+    /**
+     * Builds a PulsarAdmin from the supplied properties.
+     *
+     * @param pulsarAdminProperties parsed pulsar.admin config
+     * @return the admin client
+     * @throws IllegalStateException if the admin config is empty
+     * @throws PulsarClientException if the admin client cannot be built
+     */
     public static PulsarAdmin create(PulsarAdminProperties pulsarAdminProperties) throws PulsarClientException {
         Map<String, Object> config = pulsarAdminProperties.getAdminConfig();
         if (config.isEmpty()) {

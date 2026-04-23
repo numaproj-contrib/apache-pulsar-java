@@ -12,6 +12,13 @@ public final class PulsarClientConfig {
     private PulsarClientConfig() {
     }
 
+    /**
+     * Builds a PulsarClient from the supplied client properties.
+     *
+     * @param pulsarClientProperties parsed pulsar.client config
+     * @return the Pulsar client
+     * @throws PulsarClientException if the client cannot be built
+     */
     public static PulsarClient create(PulsarClientProperties pulsarClientProperties) throws PulsarClientException {
         return PulsarClient.builder()
                 .loadConf(pulsarClientProperties.getClientConfig())
