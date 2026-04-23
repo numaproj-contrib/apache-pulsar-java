@@ -1,0 +1,45 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: raw-consumer-pipeline
+spec:
+  limits:
+    readBatchSize: 1 # Change if you want a different batch size
+  vertices:
+    - name: in
+      scale:
+        min: 1
+      volumes:
+        - name: pulsar-config-volume
+          configMap:
+            name: pulsar-config
+            items:
+              - key: application.yml
+                path: application.yml
+      source:
+        udsource:
+          container:
+            image: apache-pulsar-java:v0.3.0
+            args: ["--config=file:/conf/application.yml"]
+            imagePullPolicy: Never
+            env:
+              # Uncomment to enable debug-level per-message logs
+              # - name: LOGGING_LEVEL_IO_NUMAPROJ_PULSAR
+              #   value: "DEBUG"
+              # Uncomment to switch from JSON to plain-text log output
+              # - name: NUMAFLOW_DEBUG
+              #   value: "true"
+            envFrom:
+              - secretRef:
+                  name: pulsar-consumer-auth-secret # All secret keys injected as env vars
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+    - name: out
+      scale:
+        min: 1
+      sink:
+        log: {}
+  edges:
+    - from: in
+      to: out

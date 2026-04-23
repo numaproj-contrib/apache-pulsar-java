@@ -1,0 +1,42 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: raw-producer-pipeline
+spec:
+  vertices:
+    - name: in
+      source:
+        generator:
+          rpu: 1
+          duration: 10s
+          msgSize: 10
+    - name: out
+      volumes: # Shared between containers that are part of the same pod, useful for sharing configurations
+        - name: pulsar-config-volume
+          configMap:
+            name: byte-arr-producer-config
+            items:
+              - key: application.yml
+                path: application.yml
+      sink:
+        udsink:
+          container:
+            image: apache-pulsar-java:v0.3.0 # TO DO: Replace with quay.io link
+            args: ["--config=file:/conf/application.yml"] # Use external configuration file
+            imagePullPolicy: Never
+            env:
+              # Uncomment to enable debug-level per-message logs
+              # - name: LOGGING_LEVEL_IO_NUMAPROJ_PULSAR
+              #   value: "DEBUG"
+              # Uncomment to switch from JSON to plain-text log output
+              # - name: NUMAFLOW_DEBUG
+              #   value: "true"
+            envFrom:
+              - secretRef:
+                  name: pulsar-producer-auth-secret # All secret keys injected as env vars
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+  edges:
+    - from: in
+      to: out
