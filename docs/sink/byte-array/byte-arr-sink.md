@@ -51,6 +51,9 @@ data:
 !!! info "How `${PULSAR_AUTH_TOKEN}` works"
     `${PULSAR_AUTH_TOKEN}` is **not** resolved by Kubernetes — it's resolved by the application at runtime. The Pipeline spec uses `envFrom` to inject Secret keys as env vars into the container. When the app reads `application.yml`, it substitutes `${PULSAR_AUTH_TOKEN}` with the env value.
 
+!!! note "Why `authParams` and not `authParamMap`?"
+    Pulsar generally supports both `authParams` (single string) and `authParamMap` (key/value map) for auth plugins. For `AuthenticationToken` specifically, only the string form works — the class has no constructor that accepts a `Map`, so `authParamMap` will fail at startup. See the [AuthenticationToken source](https://github.com/apache/pulsar/blob/master/pulsar-client/src/main/java/org/apache/pulsar/client/impl/auth/AuthenticationToken.java).
+
 ### Key fields
 
 The table below highlights the most common fields. For the full list of accepted keys under each section, see the official Pulsar docs:
