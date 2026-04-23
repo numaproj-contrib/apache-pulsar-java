@@ -71,6 +71,14 @@ The table below highlights the most common fields. For the full list of accepted
 !!! tip "Object types in the ConfigMap"
     Pulsar types that are Enums can be passed as strings. Other complex types need YAML List/Map support — check the Pulsar docs if a field isn't behaving as expected.
 
+!!! warning "Keep `receiverQueueSize` equal to `readBatchSize`"
+    The Pulsar consumer maintains a local prefetch buffer (`receiverQueueSize`) separate from Numaflow's `readBatchSize`. When these two values differ, behavior changes across Pulsar client versions due to [apache/pulsar#22619](https://github.com/apache/pulsar/pull/22619):
+
+    - **Pulsar client 3.x** — the smaller `receiverQueueSize` silently overrides a larger `readBatchSize`.
+    - **Pulsar client 4.x+** — the larger `readBatchSize` rewrites `receiverQueueSize` to match.
+
+    To avoid version-dependent surprises, always set `consumer.consumerConfig.receiverQueueSize` equal to the pipeline's `limits.readBatchSize`.
+
 ---
 
 ## 2. Create the Secret
