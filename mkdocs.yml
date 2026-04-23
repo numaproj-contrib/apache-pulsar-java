@@ -1,0 +1,54 @@
+site_name: Apache Pulsar Java - Numaflow User-Defined Source and Sink
+repo_url: https://github.com/numaproj-contrib/apache-pulsar-java
+edit_uri: edit/main/docs/
+strict: true
+theme:
+  name: material
+  font:
+    text: Roboto
+    code: Roboto Mono
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.sections
+    - content.tabs.link
+    - content.code.copy
+extra_css:
+  - stylesheets/extra.css
+markdown_extensions:
+  - codehilite
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+  - attr_list
+nav:
+  - Home: index.md
+  - StreamNative:
+      - Pulsar on StreamNative: get-started/pulsar-on-streamnative.md
+  - Source (Consumer):
+      - Byte Array Source: source/byte-array/byte-arr-source.md
+      - Authentication:
+          - API Key: source/byte-array/manifests/api-key/api-key.md
+  - Sink (Producer):
+      - Byte Array Sink: sink/byte-array/byte-arr-sink.md
+      - Authentication:
+          - API Key: sink/byte-array/manifests/api-key/api-key.md
+  - Configuration:
+      - Logging: configuration/logging.md
+  - Benchmarking: benchmarking.md
+  - Contributing: contributing.md

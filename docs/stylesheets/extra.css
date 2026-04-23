@@ -1,0 +1,15 @@
+.md-grid {
+  max-width: 100%;
+}
+
+.md-content {
+  max-width: none;
+}
+
+.md-sidebar--secondary {
+  width: 15rem;
+}
+
+.md-sidebar--primary {
+  width: 15rem;
+}

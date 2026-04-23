@@ -12,11 +12,41 @@ In this example, we create a pipeline that reads from Apache Pulsar from the spe
 #### Pre-requisite
 
 Have a Pulsar cluster running and if you want a partitioned topic, you must create it before.
-If you don't have a Pulsar cluster running, you can follow the instructions [here](https://github.com/numaproj-contrib/apache-pulsar-java/blob/master/docs/get-started/pulsar-on-streamnative.md) to deploy a Pulsar cluster using StreamNative.
+If you don't have a Pulsar cluster running, you can either run one locally with `docker-compose up` (see the [Home](../../index.md) page) or deploy one on [StreamNative](../../get-started/pulsar-on-streamnative.md).
 
 #### Configure the Pulsar consumer
 
-Use the example [ConfigMap](manifests/byte-arr-consumer-config.yaml) to configure the Pulsar source. Make sure that you have the consumer enabled. 
+Create a ConfigMap with the consumer configuration. Make sure that you have the consumer enabled.
+
+```yaml
+# API Key example
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-config
+data:
+  application.yml: |
+    pulsar:
+      client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
+        clientConfig:
+          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud" # Example HTTPS URL
+          authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
+          authParams: "${PULSAR_AUTH_TOKEN}"
+          # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}"
+      consumer: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
+        enabled: true
+        useAutoConsumeSchema: true
+        consumerConfig:
+          # Single topic (string) or multiple topics (comma-separated string)
+          topicNames: "persistent://public/default/test-topic"
+          # topicNames: "persistent://public/default/topic-a, persistent://public/default/topic-b"
+          subscriptionName: "test-subscription"
+      admin:
+        adminConfig: # Accepts the same key-value pair configurations as pulsar client
+          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud" # Example HTTPS URL
+          authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
+          authParams: "${PULSAR_AUTH_TOKEN}"
+```
 
 In the ConfigMap:
 
@@ -32,8 +62,55 @@ In the ConfigMap:
 
 #### Create the pipeline
 
-Use the example [pipeline](manifests/byte-arr-consumer-pipeline.yaml) to create the pipeline, using the ConfigMap created in
-the previous step. Please make sure that the args list under the consumer vertex matches the file paths in the ConfigMap.
+Create the pipeline using the ConfigMap from the previous step. Make sure that the args list under the consumer vertex matches the file paths in the ConfigMap.
+
+```yaml
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: raw-consumer-pipeline
+spec:
+  limits:
+    readBatchSize: 1 # Change if you want a different batch size
+  vertices:
+    - name: in
+      scale:
+        min: 1
+      volumes:
+        - name: pulsar-config-volume
+          configMap:
+            name: pulsar-config
+            items:
+              - key: application.yml
+                path: application.yml
+      source:
+        udsource:
+          container:
+            image: apache-pulsar-java:v0.3.0
+            args: ["--config=file:/conf/application.yml"]
+            imagePullPolicy: Never
+            env:
+              # Uncomment to enable debug-level per-message logs
+              # - name: LOGGING_LEVEL_IO_NUMAPROJ_PULSAR
+              #   value: "DEBUG"
+              # Uncomment to switch from JSON to plain-text log output
+              # - name: NUMAFLOW_DEBUG
+              #   value: "true"
+            envFrom:
+              - secretRef:
+                  name: pulsar-consumer-auth-secret # All secret keys injected as env vars
+            volumeMounts:
+              - name: pulsar-config-volume
+                mountPath: /conf
+    - name: out
+      scale:
+        min: 1
+      sink:
+        log: {}
+  edges:
+    - from: in
+      to: out
+```
 
 #### Observe the messages
 Wait for the pipeline to be up and running. Produce messages to the specified topic and verify that messages are printed in the log sink.
