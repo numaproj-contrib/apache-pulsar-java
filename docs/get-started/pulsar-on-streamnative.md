@@ -35,7 +35,9 @@ Select your Pulsar instance from the left sidebar, then click the "Overview" tab
 
 ![Select instance overview](img_9.png)
 
-Copy the **HTTP service URL** (highlighted in red below). You'll need this for both the `clientConfig.serviceUrl` and `adminConfig.serviceUrl` in your ConfigMap.
+!!! tip "Copy the HTTP service URL"
+    Copy the **HTTP service URL** (highlighted in red below). You'll need this for both the `clientConfig.serviceUrl` and `adminConfig.serviceUrl` in your ConfigMap.
+
 ![Copy the HTTP service URL in red](img_11.png)
 
 ## 4. Create the ConfigMap

@@ -123,3 +123,31 @@ The site goes live within a minute at:
 
 - Docs: `https://numaproj-contrib.github.io/apache-pulsar-java/docs-site/`
 - API Reference: `https://numaproj-contrib.github.io/apache-pulsar-java/docs-site/apidocs/`
+
+## Commit sign-off (DCO)
+
+Like other Numaproj / CNCF projects, every commit must be **signed off** under the [Developer Certificate of Origin](https://developercertificate.org/). Signing off means adding a trailer line to your commit message like:
+
+```
+Signed-off-by: Jane Doe <jane@example.com>
+```
+
+The name and email must match your `git config user.name` / `user.email`. By adding it you're attesting that you wrote (or have the right to submit) the change under the project's license.
+
+Use `-s` (or the long form `--signoff`) when you commit and git appends the trailer for you:
+
+```bash
+git commit -s -m "feat: add batch message support"
+```
+
+Most contributors set up a short git alias so they never forget:
+
+```bash
+git config --global alias.cs 'commit -s'
+```
+
+Then day-to-day it's just:
+
+```bash
+git cs -m "feat: add batch message support"
+```

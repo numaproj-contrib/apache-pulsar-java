@@ -43,7 +43,7 @@ You need a running Pulsar cluster before deploying the source or sink.
 
     Access Pulsar Manager at [http://localhost:9527](http://localhost:9527) and create an environment with service URL `http://pulsar:8080/`.
 
-    ![Pulsar Manager environment setup](assets/pulsar-manager-env.png)
+    ![Pulsar Manager environment setup](https://github.com/user-attachments/assets/293665d3-4528-4325-bbf7-0cbd7bc04928)
 
 === "StreamNative Cloud"
 
