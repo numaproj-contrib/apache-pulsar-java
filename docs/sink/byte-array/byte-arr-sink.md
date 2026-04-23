@@ -1,27 +1,22 @@
-# Publish messages to a topic
+# Byte Array Sink (Producer)
 
-### Introduction
+This guide walks you through publishing byte array messages to a Pulsar topic from a Numaflow pipeline.
 
-This document demonstrates how to use `apache-pulsar-java` to publish byte array messages to a topic directly
+The example builds a pipeline that reads from the built-in [generator source](https://numaflow.numaproj.io/user-guide/sources/generator/) and writes messages to the target topic `persistent://public/default/test-topic`.
 
+---
 
-### Example
+## Prerequisites
 
-In this example, we create a pipeline that reads from the
-builtin [generator source](https://numaflow.numaproj.io/user-guide/sources/generator/) and writes the messages to a
-target topic `persistent://public/default/test-topic`. 
+- A running Pulsar cluster — run one locally with `docker-compose up` (see the [Home](../../index.md) page) or deploy on [StreamNative](../../get-started/pulsar-on-streamnative.md).
 
-#### Pre-requisite
+---
 
-Have a Pulsar cluster running. 
-If you don't have a Pulsar cluster running, you can either run one locally with `docker-compose up` (see the [Home](../../index.md) page) or deploy one on [StreamNative](../../get-started/pulsar-on-streamnative.md).
+## 1. Create the ConfigMap
 
-#### Configure the Pulsar producer
-
-Create a ConfigMap with the producer configuration:
+The ConfigMap holds `application.yml`, which configures the Pulsar client, producer, and admin.
 
 ```yaml
-# API Key example
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -29,9 +24,9 @@ metadata:
 data:
   application.yml: |
     pulsar:
-      client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
+      client:
         clientConfig:
-          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud" # Example HTTPS URL
+          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud"
           authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
           authParams: "${PULSAR_AUTH_TOKEN}"
           # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}"
@@ -44,26 +39,66 @@ data:
         producerConfig:
           topicName: "persistent://public/default/test-topic"
       admin:
-        adminConfig: # Accepts the same key-value pair configurations as pulsar client
-          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud" # Example HTTPS URL
+        adminConfig:
+          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud"
           authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
           authParams: "${PULSAR_AUTH_TOKEN}"
 ```
 
-In the ConfigMap:
+!!! info "Both `client` and `admin` are required"
+    The application uses the Pulsar **client** to publish messages and the Pulsar **admin** API to validate that the target topic exists before starting. Both sections must be present in the ConfigMap — omitting `admin` will cause the producer to fail on startup.
 
-* `clientConfig` allows you to configure the pulsar client. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client): 
-    * serviceUrl must be specified as it is a required field 
+!!! info "How `${PULSAR_AUTH_TOKEN}` works"
+    `${PULSAR_AUTH_TOKEN}` is **not** resolved by Kubernetes — it's resolved by the application at runtime. The Pipeline spec uses `envFrom` to inject Secret keys as env vars into the container. When the app reads `application.yml`, it substitutes `${PULSAR_AUTH_TOKEN}` with the env value.
 
-* `producerConfig` allows you to set producer configurations for the pulsar client. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer): 
-    * `topicName` is the Pulsar topic name to write data to, and is a required field and therefore must be in the ConfigMap
-    * `producerName` should NOT be specified. If it is specified, the image will overwrite the inputted name
+### Key fields
 
-Deploy the ConfigMap to the Kubernetes cluster.
+The table below highlights the most common fields. For the full list of accepted keys under each section, see the official Pulsar docs:
 
-#### Create the pipeline
+- `clientConfig` → [all client configurations](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client)
+- `producerConfig` → [all producer configurations](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer)
+- `adminConfig` → accepts the same keys as `clientConfig`
 
-Create the pipeline using the ConfigMap from the previous step. Make sure that the args list under the sink vertex matches the file paths in the ConfigMap.
+| Field | Required | Notes |
+|---|---|---|
+| `client.clientConfig.serviceUrl` | yes | The broker URL. |
+| `producer.producerConfig.topicName` | yes | Target topic. **Must already exist** — the producer validates this on startup and fails fast if the topic is missing. |
+| `producer.producerConfig.producerName` | — | Do **not** set — the image overwrites it with the pod name. |
+| `producer.useAutoProduceSchema` | no | When `true`, uses the broker schema to validate payloads. When `false`, uses `Schema.BYTES` (no validation). |
+| `producer.dropInvalidMessages` | no | When `true`, drops messages that fail schema/serialization and keeps publishing. |
+| `admin.adminConfig.serviceUrl` | yes | The admin (web) URL. For **StreamNative Cloud** and most managed clusters, this is the same HTTPS URL as `clientConfig.serviceUrl`. For self-hosted Pulsar, it's typically a separate URL (e.g. `http://broker:8080` vs `pulsar://broker:6650`). |
+
+!!! warning "Create the topic first"
+    Unlike the consumer, the producer will **not** auto-create the target topic. Create it in Pulsar Manager (local) or the StreamNative Cloud console before deploying the pipeline — otherwise the pod will crash on startup.
+
+---
+
+## 2. Create the Secret
+
+Create a Kubernetes Secret with your Pulsar credentials. The ConfigMap references these via `${PULSAR_AUTH_TOKEN}`.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pulsar-producer-auth-secret
+type: Opaque
+stringData:
+  # API Token Authentication (StreamNative Cloud, DataStax Astra, self-hosted with tokens)
+  PULSAR_AUTH_TOKEN: "YOUR-API-KEY-HERE"
+
+  # Example: OAuth2 client secret
+  # PULSAR_OAUTH_CLIENT_SECRET: "your-oauth-client-secret"
+```
+
+!!! note "Local clusters without auth"
+    For local Pulsar clusters without authentication, skip the Secret and remove `authPluginClassName`, `authParams`, and `envFrom` from the ConfigMap and Pipeline.
+
+---
+
+## 3. Create the Pipeline
+
+Update the `image` field to the version you want (from [Quay.io tags](https://quay.io/repository/numaio/numaflow-java/pulsar-java?tab=tags) or a locally built image). Make sure the `args` under the sink vertex match the file path in the ConfigMap.
 
 ```yaml
 apiVersion: numaflow.numaproj.io/v1alpha1
@@ -101,7 +136,7 @@ spec:
               #   value: "true"
             envFrom:
               - secretRef:
-                  name: pulsar-producer-auth-secret # All secret keys injected as env vars
+                  name: pulsar-producer-auth-secret
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf
@@ -110,5 +145,8 @@ spec:
       to: out
 ```
 
-#### Observe the messages
-Wait for the pipeline to be up and running. You can observe the messages in the `test-config-topic` topic. 
+---
+
+## 4. Observe the messages
+
+Wait for the pipeline to be up and running. Messages will be published to the topic configured in `producerConfig.topicName`.

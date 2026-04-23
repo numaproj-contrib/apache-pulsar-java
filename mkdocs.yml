@@ -1,4 +1,4 @@
-site_name: Apache Pulsar Java - Numaflow User-Defined Source and Sink
+site_name: Apache Pulsar Java
 repo_url: https://github.com/numaproj-contrib/apache-pulsar-java
 edit_uri: edit/main/docs/
 strict: true
@@ -22,6 +22,8 @@ theme:
     - navigation.tabs.sticky
     - navigation.top
     - navigation.sections
+    - navigation.footer
+    - toc.integrate
     - content.tabs.link
     - content.code.copy
 extra_css:
@@ -40,15 +42,10 @@ nav:
   - Home: index.md
   - StreamNative:
       - Pulsar on StreamNative: get-started/pulsar-on-streamnative.md
-  - Source (Consumer):
-      - Byte Array Source: source/byte-array/byte-arr-source.md
-      - Authentication:
-          - API Key: source/byte-array/manifests/api-key/api-key.md
-  - Sink (Producer):
-      - Byte Array Sink: sink/byte-array/byte-arr-sink.md
-      - Authentication:
-          - API Key: sink/byte-array/manifests/api-key/api-key.md
-  - Configuration:
+  - Source (Consumer): source/byte-array/byte-arr-source.md
+  - Sink (Producer): sink/byte-array/byte-arr-sink.md
+  - Logging:
       - Logging: configuration/logging.md
-  - Benchmarking: benchmarking.md
+  - Testing: testing.md
+  - "Performance Charts ⧉": https://numaproj-contrib.github.io/apache-pulsar-java/dev/bench/
   - Contributing: contributing.md

@@ -1,25 +1,23 @@
-# Consume messages from a topic
+# Byte Array Source (Consumer)
 
-### Introduction
+This guide walks you through consuming raw byte array messages from a Pulsar topic into a Numaflow pipeline.
 
-This document demonstrates how to use `apache-pulsar-java` to consume raw byte array messages from a topic.
+The example builds a pipeline that reads from a Pulsar topic and prints received messages using the built-in Numaflow [log sink](https://numaflow.numaproj.io/user-guide/sinks/log/).
 
+---
 
-### Example
+## Prerequisites
 
-In this example, we create a pipeline that reads from Apache Pulsar from the specified topic in the config map, and uses the built-in Numaflow [log sink](https://numaflow.numaproj.io/user-guide/sinks/log/) to print all received messages.
+- A running Pulsar cluster — run one locally with `docker-compose up` (see the [Home](../../index.md) page) or deploy on [StreamNative](../../get-started/pulsar-on-streamnative.md).
+- If you want a partitioned topic, create it before deploying the pipeline.
 
-#### Pre-requisite
+---
 
-Have a Pulsar cluster running and if you want a partitioned topic, you must create it before.
-If you don't have a Pulsar cluster running, you can either run one locally with `docker-compose up` (see the [Home](../../index.md) page) or deploy one on [StreamNative](../../get-started/pulsar-on-streamnative.md).
+## 1. Create the ConfigMap
 
-#### Configure the Pulsar consumer
-
-Create a ConfigMap with the consumer configuration. Make sure that you have the consumer enabled.
+The ConfigMap holds `application.yml`, which configures the Pulsar client, consumer, and admin.
 
 ```yaml
-# API Key example
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,13 +25,13 @@ metadata:
 data:
   application.yml: |
     pulsar:
-      client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client
+      client:
         clientConfig:
-          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud" # Example HTTPS URL
+          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud"
           authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
           authParams: "${PULSAR_AUTH_TOKEN}"
           # Example: OAuth2 - authParams: "${PULSAR_OAUTH_CLIENT_SECRET}"
-      consumer: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer
+      consumer:
         enabled: true
         useAutoConsumeSchema: true
         consumerConfig:
@@ -42,27 +40,65 @@ data:
           # topicNames: "persistent://public/default/topic-a, persistent://public/default/topic-b"
           subscriptionName: "test-subscription"
       admin:
-        adminConfig: # Accepts the same key-value pair configurations as pulsar client
-          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud" # Example HTTPS URL
+        adminConfig:
+          serviceUrl: "https://pc-xxxxx.streamnative.aws.snio.cloud"
           authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken
           authParams: "${PULSAR_AUTH_TOKEN}"
 ```
 
-In the ConfigMap:
+!!! info "Both `client` and `admin` are required"
+    The application uses the Pulsar **client** to consume messages and the Pulsar **admin** API to inspect topics (partition counts, subscription backlog). Both sections must be present in the ConfigMap — omitting `admin` will cause the consumer to fail on startup.
 
-* `clientConfig` allows you to configure the pulsar client. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client):
-    * serviceUrl must be specified as it is a required field. This is the brokerServiceUrl.
+!!! info "How `${PULSAR_AUTH_TOKEN}` works"
+    `${PULSAR_AUTH_TOKEN}` is **not** resolved by Kubernetes — it's resolved by the application at runtime. The Pipeline spec uses `envFrom` to inject Secret keys as env vars into the container. When the app reads `application.yml`, it substitutes `${PULSAR_AUTH_TOKEN}` with the env value.
 
-* `consumerConfig` allows you to set consumer configurations for the pulsar client. Below are some common configurations to consider specifying. See all available configurations [here](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer):
-    * `topicNames` is the Pulsar topic name to write data to, and is a required field. It must be in the ConfigMap. Currently, we only support 1 topic therefore only one **string** value is accepted even though the Pulsar docs indicate that topicNames is of type Set. 
-    * If a `subscriptionName` is not specified, the image will give it a default value of `{PipelineName}-{VertexName}-sub`
-    * `subscriptionInitialPosition` is the initial position of the subscription. It can be `Earliest` or `Latest`. If it is not specified, Pulsar defaults to Latest meaning that the subscription will start consuming messages from the latest available message in the topic. So if messages were produced to a topic before the subscription, they will not be consumered. If you want to start consuming messages from the earliest available message, you can specify `Earliest`.
-* `adminConfig` must be specified in order for the consumer to work. The serviceUrl is a required field but note that this is **different** from the serviceUrl file in the clientConfig. This is the webServiceUrl.
-* NOTE: To verify if the configMap supports the object Type, look through Pulsar docs to see if that object is an Enum. If it is an Enum, you can provide the value as a String in the config map. Otherwise, check if .yaml files support that type (ex. yaml files support List and Maps). 
+### Key fields
 
-#### Create the pipeline
+The table below highlights the most common fields. For the full list of accepted keys under each section, see the official Pulsar docs:
 
-Create the pipeline using the ConfigMap from the previous step. Make sure that the args list under the consumer vertex matches the file paths in the ConfigMap.
+- `clientConfig` → [all client configurations](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client)
+- `consumerConfig` → [all consumer configurations](https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-consumer)
+- `adminConfig` → accepts the same keys as `clientConfig`
+
+| Field | Required | Notes |
+|---|---|---|
+| `client.clientConfig.serviceUrl` | yes | The broker URL. |
+| `consumer.consumerConfig.topicNames` | yes | Single topic as a string, or multiple topics as a **comma-separated string** (e.g. `"persistent://public/default/topic-a, persistent://public/default/topic-b"`). |
+| `consumer.consumerConfig.subscriptionName` | no | Defaults to `{PipelineName}-{VertexName}-sub`. |
+| `consumer.consumerConfig.subscriptionInitialPosition` | no | `Earliest` or `Latest`. Defaults to `Latest` — use `Earliest` to replay messages produced before the subscription existed. |
+| `admin.adminConfig.serviceUrl` | yes | The admin (web) URL. For **StreamNative Cloud** and most managed clusters, this is the same HTTPS URL as `clientConfig.serviceUrl`. For self-hosted Pulsar, it's typically a separate URL (e.g. `http://broker:8080` vs `pulsar://broker:6650`). |
+
+!!! tip "Object types in the ConfigMap"
+    Pulsar types that are Enums can be passed as strings. Other complex types need YAML List/Map support — check the Pulsar docs if a field isn't behaving as expected.
+
+---
+
+## 2. Create the Secret
+
+Create a Kubernetes Secret with your Pulsar credentials. The ConfigMap references these via `${PULSAR_AUTH_TOKEN}`.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pulsar-consumer-auth-secret
+type: Opaque
+stringData:
+  # API Token Authentication (StreamNative Cloud, DataStax Astra, self-hosted with tokens)
+  PULSAR_AUTH_TOKEN: "YOUR-API-KEY-HERE"
+
+  # Example: OAuth2 client secret
+  # PULSAR_OAUTH_CLIENT_SECRET: "your-oauth-client-secret"
+```
+
+!!! note "Local clusters without auth"
+    For local Pulsar clusters without authentication, skip the Secret and remove `authPluginClassName`, `authParams`, and `envFrom` from the ConfigMap and Pipeline.
+
+---
+
+## 3. Create the Pipeline
+
+Update the `image` field to the version you want (from [Quay.io tags](https://quay.io/repository/numaio/numaflow-java/pulsar-java?tab=tags) or a locally built image). Make sure the `args` under the consumer vertex match the file path in the ConfigMap.
 
 ```yaml
 apiVersion: numaflow.numaproj.io/v1alpha1
@@ -71,7 +107,7 @@ metadata:
   name: raw-consumer-pipeline
 spec:
   limits:
-    readBatchSize: 1 # Change if you want a different batch size
+    readBatchSize: 1
   vertices:
     - name: in
       scale:
@@ -98,7 +134,7 @@ spec:
               #   value: "true"
             envFrom:
               - secretRef:
-                  name: pulsar-consumer-auth-secret # All secret keys injected as env vars
+                  name: pulsar-consumer-auth-secret
             volumeMounts:
               - name: pulsar-config-volume
                 mountPath: /conf
@@ -112,5 +148,8 @@ spec:
       to: out
 ```
 
-#### Observe the messages
-Wait for the pipeline to be up and running. Produce messages to the specified topic and verify that messages are printed in the log sink.
+---
+
+## 4. Observe the messages
+
+Wait for the pipeline to be up and running, then produce messages to the topic. You should see them printed in the log sink.
