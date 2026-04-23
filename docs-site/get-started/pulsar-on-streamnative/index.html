@@ -1003,8 +1003,11 @@ left side of the page:</p>
 <h2 id="3-get-the-service-url">3. Get the Service URL<a class="headerlink" href="#3-get-the-service-url" title="Permanent link">&para;</a></h2>
 <p>Select your Pulsar instance from the left sidebar, then click the "Overview" tab.</p>
 <p><img alt="Select instance overview" src="../img_9.png" /></p>
-<p>Copy the <strong>HTTP service URL</strong> (highlighted in red below). You'll need this for both the <code>clientConfig.serviceUrl</code> and <code>adminConfig.serviceUrl</code> in your ConfigMap.
-<img alt="Copy the HTTP service URL in red" src="../img_11.png" /></p>
+<div class="admonition tip">
+<p class="admonition-title">Copy the HTTP service URL</p>
+<p>Copy the <strong>HTTP service URL</strong> (highlighted in red below). You'll need this for both the <code>clientConfig.serviceUrl</code> and <code>adminConfig.serviceUrl</code> in your ConfigMap.</p>
+</div>
+<p><img alt="Copy the HTTP service URL in red" src="../img_11.png" /></p>
 <h2 id="4-create-the-configmap">4. Create the ConfigMap<a class="headerlink" href="#4-create-the-configmap" title="Permanent link">&para;</a></h2>
 <p>Update the <code>serviceUrl</code> and <code>topicName</code> fields with values from steps 2 and 3. The topic name format is <code>persistent://tenant/namespace/topic</code>. See the <a href="../../sink/byte-array/byte-arr-sink/">Sink (Producer)</a> or <a href="../../source/byte-array/byte-arr-source/">Source (Consumer)</a> guides for the full ConfigMap spec.</p>
 <div class="highlight"><pre><span></span><code>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>&lt;path-to-config-map.yaml&gt;

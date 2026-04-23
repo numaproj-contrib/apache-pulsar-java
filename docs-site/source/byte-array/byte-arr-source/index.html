@@ -1008,6 +1008,10 @@
 <p class="admonition-title">How <code>${PULSAR_AUTH_TOKEN}</code> works</p>
 <p><code>${PULSAR_AUTH_TOKEN}</code> is <strong>not</strong> resolved by Kubernetes — it's resolved by the application at runtime. The Pipeline spec uses <code>envFrom</code> to inject Secret keys as env vars into the container. When the app reads <code>application.yml</code>, it substitutes <code>${PULSAR_AUTH_TOKEN}</code> with the env value.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Why <code>authParams</code> and not <code>authParamMap</code>?</p>
+<p>Pulsar generally supports both <code>authParams</code> (single string) and <code>authParamMap</code> (key/value map) for auth plugins. For <code>AuthenticationToken</code> specifically, only the string form works — the class has no constructor that accepts a <code>Map</code>, so <code>authParamMap</code> will fail at startup. See the <a href="https://github.com/apache/pulsar/blob/master/pulsar-client/src/main/java/org/apache/pulsar/client/impl/auth/AuthenticationToken.java">AuthenticationToken source</a>.</p>
+</div>
 <h3 id="key-fields">Key fields<a class="headerlink" href="#key-fields" title="Permanent link">&para;</a></h3>
 <p>The table below highlights the most common fields. For the full list of accepted keys under each section, see the official Pulsar docs:</p>
 <ul>

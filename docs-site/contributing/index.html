@@ -975,6 +975,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#commit-sign-off-dco" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit sign-off (DCO)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1171,6 +1182,20 @@
 <li>Docs: <code>https://numaproj-contrib.github.io/apache-pulsar-java/docs-site/</code></li>
 <li>API Reference: <code>https://numaproj-contrib.github.io/apache-pulsar-java/docs-site/apidocs/</code></li>
 </ul>
+<h2 id="commit-sign-off-dco">Commit sign-off (DCO)<a class="headerlink" href="#commit-sign-off-dco" title="Permanent link">&para;</a></h2>
+<p>Like other Numaproj / CNCF projects, every commit must be <strong>signed off</strong> under the <a href="https://developercertificate.org/">Developer Certificate of Origin</a>. Signing off means adding a trailer line to your commit message like:</p>
+<div class="highlight"><pre><span></span><code>Signed-off-by: Jane Doe &lt;jane@example.com&gt;
+</code></pre></div>
+<p>The name and email must match your <code>git config user.name</code> / <code>user.email</code>. By adding it you're attesting that you wrote (or have the right to submit) the change under the project's license.</p>
+<p>Use <code>-s</code> (or the long form <code>--signoff</code>) when you commit and git appends the trailer for you:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: add batch message support&quot;</span>
+</code></pre></div>
+<p>Most contributors set up a short git alias so they never forget:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>alias.cs<span class="w"> </span><span class="s1">&#39;commit -s&#39;</span>
+</code></pre></div>
+<p>Then day-to-day it's just:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>cs<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: add batch message support&quot;</span>
+</code></pre></div>
 
 
 
