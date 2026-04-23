@@ -28,6 +28,8 @@ theme:
     - content.code.copy
 extra_css:
   - stylesheets/extra.css
+exclude_docs: |
+  apidocs/**/*.md
 markdown_extensions:
   - codehilite
   - admonition
@@ -49,3 +51,4 @@ nav:
   - Testing: testing.md
   - "Performance Charts ⧉": https://numaproj-contrib.github.io/apache-pulsar-java/dev/bench/
   - Contributing: contributing.md
+  - API Reference: apidocs/index.html

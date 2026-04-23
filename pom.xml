@@ -180,6 +180,24 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.11.2</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <doclint>none</doclint>
+                    <failOnError>false</failOnError>
+                    <failOnWarnings>false</failOnWarnings>
+                    <quiet>true</quiet>
+                    <show>public</show>
+                    <windowtitle>Apache Pulsar Java API</windowtitle>
+                    <doctitle>Apache Pulsar Java ${project.version} API</doctitle>
+                    <header>Apache Pulsar Java ${project.version}</header>
+                    <bottom>Copyright © Numaproj contributors. Licensed under Apache License 2.0.</bottom>
+                    <outputDirectory>${project.basedir}/docs</outputDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
                 <version>3.5.1</version>
