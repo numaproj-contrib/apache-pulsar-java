@@ -5,6 +5,17 @@ This guide walks you through consuming raw byte array messages from a Pulsar top
 The example builds a pipeline that reads from a Pulsar topic and prints received messages using the built-in Numaflow [log sink](https://numaflow.numaproj.io/user-guide/sinks/log/).
 
 ---
+## How the consumer reads and acks
+
+The consumer follows a **strict read → ack cycle with no read ahead**. Numaflow calls `read()` and `ack()` on the source in alternating fashion, and this consumer enforces that pattern tightly:
+
+- **No readahead.** `read()` returns immediately without pulling a new batch from Pulsar if the previous batch has not yet been fully acknowledged. A new batch is only fetched once `messagesToAck` is empty.
+- **Strict ack matching.** `ack()` compares the offsets in the request against the set of pending message IDs from the last read. If they don't match exactly (missing IDs, extra IDs, reordered in a way that changes the set), the ack is **skipped** and logged as an error — no partial acks. Pulsar will eventually redeliver those messages.
+- **No reack of already-acked messages.** Because `messagesToAck` is cleared after a successful ack, a repeated ack for the same batch is treated as a mismatch and ignored.
+
+This design keeps the consumer's state simple: at any moment, either a batch is in flight waiting to be acked, or nothing is pending and the next read can proceed. There is no overlap between batches and no prefetch beyond Pulsar's own `receiverQueueSize`.
+
+---
 
 ## Prerequisites
 

@@ -52,13 +52,57 @@ To trigger manually, go to the [Actions tab](https://github.com/numaproj-contrib
 
 ### Local Performance Testing
 
-For more in-depth testing on your own cluster, see the [performance testing runbook](https://github.com/numaproj-contrib/apache-pulsar-java/tree/main/development/performance-testing).
+For more in-depth testing on your own cluster, see the [performance testing runbook](https://github.com/numaproj-contrib/apache-pulsar-java/tree/main/development/performance-testing). The runbook is designed so that two builds of the consumer can be compared apples-to-apples on the same cluster against the same Pulsar backlog.
 
-??? note "What the local runbook covers"
-    - Baseline parameters for fair comparison (replicas, batch size, CPU/memory, receiver queue)
-    - Setting up metrics with [numaflow-perfman](https://github.com/numaproj-labs/numaflow-perfman) (Prometheus + Grafana)
-    - Pre-filling topics and deploying the consumer MonoVertex
-    - Importing the Grafana dashboard for MonoVertex metrics
+#### Baseline parameters (keep identical across runs)
+
+When comparing consumer images, keep every variable fixed except the image tag. The sample manifests (`monovertex_sample.yaml`, `producer_sample.yaml`) are pre-configured with these values:
+
+| Setting | Baseline | Where to set it |
+|---|---|---|
+| MonoVertex replicas | `1` | `spec.replicas` and `spec.scale.min`/`spec.scale.max` in `monovertex_sample.yaml` |
+| Read batch size | `500` | `spec.limits.readBatchSize` in `monovertex_sample.yaml` |
+| Container resources | `1500m` CPU / `640Mi` memory (requests == limits) | `spec.source.udsource.container.resources` |
+| Pulsar receiver queue size | `500` (must equal `readBatchSize`) | `pulsar.consumer.consumerConfig.receiverQueueSize` in `application.yml` |
+| Subscription initial position | `Earliest` | `pulsar.consumer.consumerConfig.subscriptionInitialPosition` |
+| Generator load | `rpu: 10000`, `duration: 1s` | `spec.vertices[0].source.generator` in `producer_sample.yaml` |
+| Pre-fill target | ~1,000,000+ messages in topic before starting consumer | Run the producer pipeline long enough |
+
+#### Cluster setup checklist
+
+1. **Image** — Build `apache-pulsar-java` and tag it to match `spec.source.udsource.container.image` in the MonoVertex manifest.
+2. **ConfigMap** (e.g. `consumer-config`) — provides `application.yml` mounted at `/conf/application.yml`. Must include `pulsar.client`, `pulsar.consumer`, and `pulsar.admin` sections.
+3. **Secret** (e.g. `pulsar-secret-cloud`) — holds Pulsar credentials referenced by `envFrom` in the MonoVertex.
+4. **Pulsar topic** — same name in the consumer's `topicNames` and the producer pipeline.
+5. **Producer pipeline** — deploy `producer_sample.yaml` first and let it run until the topic backlog is ~1M+ messages. This keeps the consumer metrics window stable (ingest is slower than drain, so without pre-filling the topic empties fast).
+6. **Consumer MonoVertex** — deploy `monovertex_sample.yaml` once the backlog is in place.
+
+#### Metrics stack with [numaflow-perfman](https://github.com/numaproj-labs/numaflow-perfman)
+
+Perfman installs the Prometheus Operator, wires ServiceMonitors for pipeline and ISB metrics, and installs Grafana.
+
+1. Clone numaflow-perfman and `make build` — binary lands at `dist/perfman`.
+2. One-time install: `./dist/perfman setup -g`.
+3. Port-forward (each blocks, so use separate terminals):
+   - Prometheus UI: `./dist/perfman portforward -p` → `http://localhost:9090`
+   - Grafana: `./dist/perfman portforward -g` → `http://localhost:3000` (default `admin`/`admin`)
+4. Import the MonoVertex dashboard from this repo:
+   ```bash
+   ./dist/perfman dashboard --template-path development/performance-testing/dashboard-monovertex-template.json
+   ```
+   The command prints a link to open the dashboard in Grafana once the MonoVertex is running.
+
+The dashboard surfaces read batch size, end-to-end latency, and forwarder metrics scoped to the MonoVertex.
+
+#### Running a comparison
+
+To benchmark a new consumer image against a baseline:
+
+1. Build the new image with a distinct tag (e.g. `:experiment-foo`).
+2. Update `spec.source.udsource.container.image` in the MonoVertex manifest.
+3. `kubectl apply -f` the MonoVertex. Leave every other baseline parameter untouched.
+4. Let metrics stabilize in Grafana over the pre-filled backlog, then record the numbers.
+5. Swap the image tag back to the baseline and repeat for comparison.
 
 ### AI-Assisted Performance Testing
 

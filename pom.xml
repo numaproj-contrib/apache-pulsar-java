@@ -195,6 +195,9 @@
                     <header>Apache Pulsar Java ${project.version}</header>
                     <bottom>Copyright © Numaproj contributors. Licensed under Apache License 2.0.</bottom>
                     <outputDirectory>${project.basedir}/docs</outputDirectory>
+                    <addStylesheets>
+                        <addStylesheet>apidocs-overrides.css</addStylesheet>
+                    </addStylesheets>
                 </configuration>
             </plugin>
             <plugin>

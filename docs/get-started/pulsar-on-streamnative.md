@@ -31,9 +31,11 @@ Click "New Topic" and add a name and desired number of partitions. Remember your
 
 ## 3. Get the Service URL
 
-Select your Pulsar instance from the left sidebar, then click the "Overview" tab. Copy the **HTTP service URL** (highlighted in red below). You'll need this for both the `clientConfig.serviceUrl` and `adminConfig.serviceUrl` in your ConfigMap.
+Select your Pulsar instance from the left sidebar, then click the "Overview" tab.
 
 ![Select instance overview](img_9.png)
+
+Copy the **HTTP service URL** (highlighted in red below). You'll need this for both the `clientConfig.serviceUrl` and `adminConfig.serviceUrl` in your ConfigMap.
 ![Copy the HTTP service URL in red](img_11.png)
 
 ## 4. Create the ConfigMap
