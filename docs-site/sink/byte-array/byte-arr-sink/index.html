@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../../../source/byte-array/manifests/api-key/api-key/">
+        <link rel="prev" href="../../../source/byte-array/byte-arr-source/">
       
       
-        <link rel="next" href="../manifests/api-key/api-key/">
+        <link rel="next" href="../../../configuration/logging/">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>Byte Array Sink - Apache Pulsar Java - Numaflow User-Defined Source and Sink</title>
+        <title>Sink (Producer) - Apache Pulsar Java</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#publish-messages-to-a-topic" class="md-skip">
+        <a href="#byte-array-sink-producer" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +92,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Apache Pulsar Java - Numaflow User-Defined Source and Sink" class="md-header__button md-logo" aria-label="Apache Pulsar Java - Numaflow User-Defined Source and Sink" data-md-component="logo">
+    <a href="../../.." title="Apache Pulsar Java" class="md-header__button md-logo" aria-label="Apache Pulsar Java" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,13 +106,13 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            Apache Pulsar Java - Numaflow User-Defined Source and Sink
+            Apache Pulsar Java
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Byte Array Sink
+              Sink (Producer)
             
           </span>
         </div>
@@ -255,18 +255,17 @@
   
   
   
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../../source/byte-array/byte-arr-source/" class="md-tabs__link">
-          
+    <li class="md-tabs__item">
+      <a href="../../../source/byte-array/byte-arr-source/" class="md-tabs__link">
+        
   
+  
+    
   
   Source (Consumer)
 
-        </a>
-      </li>
-    
+      </a>
+    </li>
   
 
       
@@ -277,18 +276,17 @@
     
   
   
-    
-    
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
-          
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
   
+  
+    
   
   Sink (Producer)
 
-        </a>
-      </li>
-    
+      </a>
+    </li>
   
 
       
@@ -304,7 +302,7 @@
           
   
   
-  Configuration
+  Logging
 
         </a>
       </li>
@@ -318,13 +316,32 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../benchmarking/" class="md-tabs__link">
+      <a href="../../../testing/" class="md-tabs__link">
         
   
   
     
   
-  Benchmarking
+  Testing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://numaproj-contrib.github.io/apache-pulsar-java/dev/bench/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Performance Charts ⧉
 
       </a>
     </li>
@@ -344,6 +361,25 @@
     
   
   Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../apidocs/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
 
       </a>
     </li>
@@ -376,15 +412,17 @@
   
 
 
-<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Apache Pulsar Java - Numaflow User-Defined Source and Sink" class="md-nav__button md-logo" aria-label="Apache Pulsar Java - Numaflow User-Defined Source and Sink" data-md-component="logo">
+    <a href="../../.." title="Apache Pulsar Java" class="md-nav__button md-logo" aria-label="Apache Pulsar Java" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    Apache Pulsar Java - Numaflow User-Defined Source and Sink
+    Apache Pulsar Java
   </label>
   
     <div class="md-nav__source">
@@ -521,58 +559,6 @@
   
   
   
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Source (Consumer)
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Source (Consumer)
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
     <li class="md-nav__item">
       <a href="../../../source/byte-array/byte-arr-source/" class="md-nav__link">
         
@@ -581,7 +567,7 @@
   <span class="md-ellipsis">
     
   
-    Byte Array Source
+    Source (Consumer)
   
 
     
@@ -593,162 +579,9 @@
     </li>
   
 
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Authentication
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Authentication
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../source/byte-array/manifests/api-key/api-key/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Key
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sink (Producer)
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Sink (Producer)
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
   
   
     
@@ -770,7 +603,7 @@
   <span class="md-ellipsis">
     
   
-    Byte Array Sink
+    Sink (Producer)
   
 
     
@@ -788,7 +621,7 @@
   <span class="md-ellipsis">
     
   
-    Byte Array Sink
+    Sink (Producer)
   
 
     
@@ -814,10 +647,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Introduction
+        Prerequisites
       
     </span>
   </a>
@@ -825,55 +658,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#1-create-the-configmap" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example
+        1. Create the ConfigMap
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Example">
+    <nav class="md-nav" aria-label="1. Create the ConfigMap">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pre-requisite" class="md-nav__link">
+  <a href="#key-fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pre-requisite
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configure-the-pulsar-producer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configure the Pulsar producer
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create-the-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create the pipeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#observe-the-messages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observe the messages
+        Key fields
       
     </span>
   </a>
@@ -885,108 +685,42 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#2-create-the-secret" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Create the Secret
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-create-the-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Create the Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-observe-the-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Observe the messages
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Authentication
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Authentication
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../manifests/api-key/api-key/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Key
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
       
     </li>
   
@@ -1022,7 +756,7 @@
   <span class="md-ellipsis">
     
   
-    Configuration
+    Logging
   
 
     
@@ -1038,7 +772,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Configuration
+    Logging
   
 
           </label>
@@ -1086,14 +820,41 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../benchmarking/" class="md-nav__link">
+      <a href="../../../testing/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Benchmarking
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://numaproj-contrib.github.io/apache-pulsar-java/dev/bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Charts ⧉
   
 
     
@@ -1133,110 +894,39 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../apidocs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
                 </div>
               </div>
             
-            
-              
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
-                <div class="md-sidebar__scrollwrap">
-                  <div class="md-sidebar__inner">
-                    
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#introduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Introduction
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pre-requisite" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pre-requisite
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configure-the-pulsar-producer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configure the Pulsar producer
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create-the-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create the pipeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#observe-the-messages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observe the messages
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-                  </div>
-                </div>
-              </div>
             
           
           
@@ -1251,29 +941,27 @@
   
 
 
-<h1 id="publish-messages-to-a-topic">Publish messages to a topic<a class="headerlink" href="#publish-messages-to-a-topic" title="Permanent link">&para;</a></h1>
-<h3 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h3>
-<p>This document demonstrates how to use <code>apache-pulsar-java</code> to publish byte array messages to a topic directly</p>
-<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
-<p>In this example, we create a pipeline that reads from the
-builtin <a href="https://numaflow.numaproj.io/user-guide/sources/generator/">generator source</a> and writes the messages to a
-target topic <code>persistent://public/default/test-topic</code>. </p>
-<h4 id="pre-requisite">Pre-requisite<a class="headerlink" href="#pre-requisite" title="Permanent link">&para;</a></h4>
-<p>Have a Pulsar cluster running. 
-If you don't have a Pulsar cluster running, you can either run one locally with <code>docker-compose up</code> (see the <a href="../../../">Home</a> page) or deploy one on <a href="../../../get-started/pulsar-on-streamnative/">StreamNative</a>.</p>
-<h4 id="configure-the-pulsar-producer">Configure the Pulsar producer<a class="headerlink" href="#configure-the-pulsar-producer" title="Permanent link">&para;</a></h4>
-<p>Create a ConfigMap with the producer configuration:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># API Key example</span>
-<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<h1 id="byte-array-sink-producer">Byte Array Sink (Producer)<a class="headerlink" href="#byte-array-sink-producer" title="Permanent link">&para;</a></h1>
+<p>This guide walks you through publishing byte array messages to a Pulsar topic from a Numaflow pipeline.</p>
+<p>The example builds a pipeline that reads from the built-in <a href="https://numaflow.numaproj.io/user-guide/sources/generator/">generator source</a> and writes messages to the target topic <code>persistent://public/default/test-topic</code>.</p>
+<hr />
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A running Pulsar cluster — run one locally with <code>docker-compose up</code> (see the <a href="../../../">Home</a> page) or deploy on <a href="../../../get-started/pulsar-on-streamnative/">StreamNative</a>.</li>
+</ul>
+<hr />
+<h2 id="1-create-the-configmap">1. Create the ConfigMap<a class="headerlink" href="#1-create-the-configmap" title="Permanent link">&para;</a></h2>
+<p>The ConfigMap holds <code>application.yml</code>, which configures the Pulsar client, producer, and admin.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
 <span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
 <span class="nt">metadata</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">byte-arr-producer-config</span>
 <span class="nt">data</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">application.yml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <span class="w">    </span><span class="no">pulsar:</span>
-<span class="w">      </span><span class="no">client: # see here for all configurations: https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client</span>
+<span class="w">      </span><span class="no">client:</span>
 <span class="w">        </span><span class="no">clientConfig:</span>
-<span class="w">          </span><span class="no">serviceUrl: &quot;https://pc-xxxxx.streamnative.aws.snio.cloud&quot; # Example HTTPS URL</span>
+<span class="w">          </span><span class="no">serviceUrl: &quot;https://pc-xxxxx.streamnative.aws.snio.cloud&quot;</span>
 <span class="w">          </span><span class="no">authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken</span>
 <span class="w">          </span><span class="no">authParams: &quot;${PULSAR_AUTH_TOKEN}&quot;</span>
 <span class="w">          </span><span class="no"># Example: OAuth2 - authParams: &quot;${PULSAR_OAUTH_CLIENT_SECRET}&quot;</span>
@@ -1286,30 +974,93 @@ If you don't have a Pulsar cluster running, you can either run one locally with 
 <span class="w">        </span><span class="no">producerConfig:</span>
 <span class="w">          </span><span class="no">topicName: &quot;persistent://public/default/test-topic&quot;</span>
 <span class="w">      </span><span class="no">admin:</span>
-<span class="w">        </span><span class="no">adminConfig: # Accepts the same key-value pair configurations as pulsar client</span>
-<span class="w">          </span><span class="no">serviceUrl: &quot;https://pc-xxxxx.streamnative.aws.snio.cloud&quot; # Example HTTPS URL</span>
+<span class="w">        </span><span class="no">adminConfig:</span>
+<span class="w">          </span><span class="no">serviceUrl: &quot;https://pc-xxxxx.streamnative.aws.snio.cloud&quot;</span>
 <span class="w">          </span><span class="no">authPluginClassName: org.apache.pulsar.client.impl.auth.AuthenticationToken</span>
 <span class="w">          </span><span class="no">authParams: &quot;${PULSAR_AUTH_TOKEN}&quot;</span>
 </code></pre></div>
-<p>In the ConfigMap:</p>
+<div class="admonition info">
+<p class="admonition-title">Both <code>client</code> and <code>admin</code> are required</p>
+<p>The application uses the Pulsar <strong>client</strong> to publish messages and the Pulsar <strong>admin</strong> API to validate that the target topic exists before starting. Both sections must be present in the ConfigMap — omitting <code>admin</code> will cause the producer to fail on startup.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">How <code>${PULSAR_AUTH_TOKEN}</code> works</p>
+<p><code>${PULSAR_AUTH_TOKEN}</code> is <strong>not</strong> resolved by Kubernetes — it's resolved by the application at runtime. The Pipeline spec uses <code>envFrom</code> to inject Secret keys as env vars into the container. When the app reads <code>application.yml</code>, it substitutes <code>${PULSAR_AUTH_TOKEN}</code> with the env value.</p>
+</div>
+<h3 id="key-fields">Key fields<a class="headerlink" href="#key-fields" title="Permanent link">&para;</a></h3>
+<p>The table below highlights the most common fields. For the full list of accepted keys under each section, see the official Pulsar docs:</p>
 <ul>
-<li>
-<p><code>clientConfig</code> allows you to configure the pulsar client. See all available configurations <a href="https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client">here</a>: </p>
-<ul>
-<li>serviceUrl must be specified as it is a required field </li>
+<li><code>clientConfig</code> → <a href="https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-client">all client configurations</a></li>
+<li><code>producerConfig</code> → <a href="https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer">all producer configurations</a></li>
+<li><code>adminConfig</code> → accepts the same keys as <code>clientConfig</code></li>
 </ul>
-</li>
-<li>
-<p><code>producerConfig</code> allows you to set producer configurations for the pulsar client. See all available configurations <a href="https://pulsar.apache.org/reference/#/4.0.x/client/client-configuration-producer">here</a>: </p>
-<ul>
-<li><code>topicName</code> is the Pulsar topic name to write data to, and is a required field and therefore must be in the ConfigMap</li>
-<li><code>producerName</code> should NOT be specified. If it is specified, the image will overwrite the inputted name</li>
-</ul>
-</li>
-</ul>
-<p>Deploy the ConfigMap to the Kubernetes cluster.</p>
-<h4 id="create-the-pipeline">Create the pipeline<a class="headerlink" href="#create-the-pipeline" title="Permanent link">&para;</a></h4>
-<p>Create the pipeline using the ConfigMap from the previous step. Make sure that the args list under the sink vertex matches the file paths in the ConfigMap.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>client.clientConfig.serviceUrl</code></td>
+<td>yes</td>
+<td>The broker URL.</td>
+</tr>
+<tr>
+<td><code>producer.producerConfig.topicName</code></td>
+<td>yes</td>
+<td>Target topic. <strong>Must already exist</strong> — the producer validates this on startup and fails fast if the topic is missing.</td>
+</tr>
+<tr>
+<td><code>producer.producerConfig.producerName</code></td>
+<td>—</td>
+<td>Do <strong>not</strong> set — the image overwrites it with the pod name.</td>
+</tr>
+<tr>
+<td><code>producer.useAutoProduceSchema</code></td>
+<td>no</td>
+<td>When <code>true</code>, uses the broker schema to validate payloads. When <code>false</code>, uses <code>Schema.BYTES</code> (no validation).</td>
+</tr>
+<tr>
+<td><code>producer.dropInvalidMessages</code></td>
+<td>no</td>
+<td>When <code>true</code>, drops messages that fail schema/serialization and keeps publishing.</td>
+</tr>
+<tr>
+<td><code>admin.adminConfig.serviceUrl</code></td>
+<td>yes</td>
+<td>The admin (web) URL. For <strong>StreamNative Cloud</strong> and most managed clusters, this is the same HTTPS URL as <code>clientConfig.serviceUrl</code>. For self-hosted Pulsar, it's typically a separate URL (e.g. <code>http://broker:8080</code> vs <code>pulsar://broker:6650</code>).</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Create the topic first</p>
+<p>Unlike the consumer, the producer will <strong>not</strong> auto-create the target topic. Create it in Pulsar Manager (local) or the StreamNative Cloud console before deploying the pipeline — otherwise the pod will crash on startup.</p>
+</div>
+<hr />
+<h2 id="2-create-the-secret">2. Create the Secret<a class="headerlink" href="#2-create-the-secret" title="Permanent link">&para;</a></h2>
+<p>Create a Kubernetes Secret with your Pulsar credentials. The ConfigMap references these via <code>${PULSAR_AUTH_TOKEN}</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pulsar-producer-auth-secret</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Opaque</span>
+<span class="nt">stringData</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># API Token Authentication (StreamNative Cloud, DataStax Astra, self-hosted with tokens)</span>
+<span class="w">  </span><span class="nt">PULSAR_AUTH_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;YOUR-API-KEY-HERE&quot;</span>
+
+<span class="w">  </span><span class="c1"># Example: OAuth2 client secret</span>
+<span class="w">  </span><span class="c1"># PULSAR_OAUTH_CLIENT_SECRET: &quot;your-oauth-client-secret&quot;</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Local clusters without auth</p>
+<p>For local Pulsar clusters without authentication, skip the Secret and remove <code>authPluginClassName</code>, <code>authParams</code>, and <code>envFrom</code> from the ConfigMap and Pipeline.</p>
+</div>
+<hr />
+<h2 id="3-create-the-pipeline">3. Create the Pipeline<a class="headerlink" href="#3-create-the-pipeline" title="Permanent link">&para;</a></h2>
+<p>Update the <code>image</code> field to the version you want (from <a href="https://quay.io/repository/numaio/numaflow-java/pulsar-java?tab=tags">Quay.io tags</a> or a locally built image). Make sure the <code>args</code> under the sink vertex match the file path in the ConfigMap.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numaflow.numaproj.io/v1alpha1</span>
 <span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pipeline</span>
 <span class="nt">metadata</span><span class="p">:</span>
@@ -1345,7 +1096,7 @@ If you don't have a Pulsar cluster running, you can either run one locally with 
 <span class="w">              </span><span class="c1">#   value: &quot;true&quot;</span>
 <span class="w">            </span><span class="nt">envFrom</span><span class="p">:</span>
 <span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">secretRef</span><span class="p">:</span>
-<span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pulsar-producer-auth-secret</span><span class="w"> </span><span class="c1"># All secret keys injected as env vars</span>
+<span class="w">                  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pulsar-producer-auth-secret</span>
 <span class="w">            </span><span class="nt">volumeMounts</span><span class="p">:</span>
 <span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pulsar-config-volume</span>
 <span class="w">                </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/conf</span>
@@ -1353,8 +1104,9 @@ If you don't have a Pulsar cluster running, you can either run one locally with 
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">in</span>
 <span class="w">      </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">out</span>
 </code></pre></div>
-<h4 id="observe-the-messages">Observe the messages<a class="headerlink" href="#observe-the-messages" title="Permanent link">&para;</a></h4>
-<p>Wait for the pipeline to be up and running. You can observe the messages in the <code>test-config-topic</code> topic. </p>
+<hr />
+<h2 id="4-observe-the-messages">4. Observe the messages<a class="headerlink" href="#4-observe-the-messages" title="Permanent link">&para;</a></h2>
+<p>Wait for the pipeline to be up and running. Messages will be published to the topic configured in <code>producerConfig.topicName</code>.</p>
 
 
 
@@ -1387,6 +1139,46 @@ If you don't have a Pulsar cluster running, you can either run one locally with 
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../../source/byte-array/byte-arr-source/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Source (Consumer)">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Source (Consumer)
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../../configuration/logging/" class="md-footer__link md-footer__link--next" aria-label="Next: Logging">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Logging
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
       <div class="md-copyright">
@@ -1412,7 +1204,7 @@ If you don't have a Pulsar cluster running, you can either run one locally with 
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.sections", "content.tabs.link", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.sections", "navigation.footer", "toc.integrate", "content.tabs.link", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>

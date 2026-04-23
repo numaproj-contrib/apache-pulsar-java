@@ -4,6 +4,8 @@
 
 .md-content {
   max-width: none;
+  padding-bottom: 6rem;
+  padding-right: 4rem;
 }
 
 .md-sidebar--secondary {
@@ -12,4 +14,27 @@
 
 .md-sidebar--primary {
   width: 15rem;
+}
+
+.md-typeset h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+}
+
+.md-typeset h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-top: 2.5rem;
+}
+
+.md-typeset h3 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+.md-typeset h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
 }
