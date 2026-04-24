@@ -25,7 +25,6 @@ import org.apache.pulsar.common.policies.data.SubscriptionStats;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -194,7 +193,7 @@ public class PulsarSource extends Sourcer {
 
     /**
      * Acknowledges all messages delivered in the previous read call.
-     * The request offsets must match the messages from the previous read; otherwise the ack is skipped.
+     * The ack request offsets must match the messages from the previous read; otherwise the ack is skipped.
      *
      * @param request the ack request containing the offsets to acknowledge
      */
@@ -318,39 +317,21 @@ public class PulsarSource extends Sourcer {
     }
 
     /**
-     * Returns partition indices across all configured topics as a flat list [0, 1, 2, ...].
-     * Each Pulsar partition contributes one index. Non-partitioned topics count as one partition.
-     * Falls back to defaultPartitions() if partition lookup fails.
+     * Returns the partition(s) this source replica is responsible for, which Numaflow uses to route watermarks.
+     * <p>
+     * Pulsar's subscription model dispatches messages across consumers dynamically; with a Shared
+     * subscription any consumer can receive from any topic partition, so there is no stable binding
+     * between a consumer and a specific set of Pulsar partitions to report here. Instead, each
+     * replica of this source reports itself as a single logical partition, mirroring what
+     * Numaflow's upstream Rust Pulsar source does (see {@code numaflow/rust/extns/numaflow-pulsar}).
      *
-     * @return the list of partition indices
+     * @return a singleton list containing this replica's index, i.e. the value of the
+     *         {@code NUMAFLOW_REPLICA} environment variable that Numaflow injects into
+     *         each source pod
      */
     @Override
-    public List<Integer> getPartitions() {
-        try {
-            Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            List<Integer> partitionIndexes = new ArrayList<>();
-            // Assign one integer per partition across all topics (e.g. topic A has 3 partitions -> 0,1,2; topic B has 2 -> 3,4).
-            int globalIndex = 0;
-            for (String topicName : topicNames) {
-                var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
-                int numPartitions = (metadata != null) ? metadata.partitions : 0;
-                log.info("Number of partitions reported for topic {}: {}", topicName, numPartitions);
-                if (numPartitions < 1) {
-                    log.warn("Topic '{}' is non-partitioned (partitions={}). It will be treated as a single partition.", topicName, numPartitions);
-                }
-                int effectivePartitions = numPartitions < 1 ? 1 : numPartitions;
-                for (int i = 0; i < effectivePartitions; i++) {
-                    partitionIndexes.add(globalIndex++);
-                }
-            }
-            if (partitionIndexes.isEmpty()) {
-                partitionIndexes.add(0);
-            }
-            return partitionIndexes;
-        } catch (Exception e) {
-            log.error("Error while retrieving partition information. Falling back to default partitions.", e);
-            return defaultPartitions();
-        }
+    public List<Integer> getActivePartitions() {
+        return defaultPartitions();
     }
 
     /**
