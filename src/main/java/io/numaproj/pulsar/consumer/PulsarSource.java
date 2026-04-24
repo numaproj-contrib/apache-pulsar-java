@@ -325,7 +325,9 @@ public class PulsarSource extends Sourcer {
      * replica of this source reports itself as a single logical partition, mirroring what
      * Numaflow's upstream Rust Pulsar source does (see {@code numaflow/rust/extns/numaflow-pulsar}).
      *
-     * @return a singleton list containing this replica's index (from {@code NUMAFLOW_REPLICA})
+     * @return a singleton list containing this replica's index, i.e. the value of the
+     *         {@code NUMAFLOW_REPLICA} environment variable that Numaflow injects into
+     *         each source pod
      */
     @Override
     public List<Integer> getActivePartitions() {
