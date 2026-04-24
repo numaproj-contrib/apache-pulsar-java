@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Builds a Pulsar Producer from configuration. 
+ * Builds a Pulsar Producer from configuration.
  */
 @Slf4j
 public final class PulsarProducerConfig {
@@ -23,12 +23,31 @@ public final class PulsarProducerConfig {
     private PulsarProducerConfig() {
     }
 
+    /**
+     * Creates a new producer using the system environment for pod-name lookup.
+     *
+     * @param pulsarClient             the Pulsar client
+     * @param pulsarProducerProperties parsed pulsar.producer config
+     * @param pulsarAdmin              admin client used to verify topic existence
+     * @return the configured producer
+     * @throws Exception if validation fails or the producer cannot be built
+     */
     public static Producer<byte[]> create(PulsarClient pulsarClient,
             PulsarProducerProperties pulsarProducerProperties,
             PulsarAdmin pulsarAdmin) throws Exception {
         return create(pulsarClient, pulsarProducerProperties, pulsarAdmin, EnvLookup.system());
     }
 
+    /**
+     * Creates a new producer using the given environment lookup.
+     *
+     * @param pulsarClient             the Pulsar client
+     * @param pulsarProducerProperties parsed pulsar.producer config
+     * @param pulsarAdmin              admin client used to verify topic existence
+     * @param envLookup                resolver for the NUMAFLOW_POD environment variable
+     * @return the configured producer
+     * @throws Exception if validation fails or the producer cannot be built
+     */
     public static Producer<byte[]> create(PulsarClient pulsarClient,
             PulsarProducerProperties pulsarProducerProperties,
             PulsarAdmin pulsarAdmin,

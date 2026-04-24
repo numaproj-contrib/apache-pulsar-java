@@ -74,3 +74,80 @@ Other prefixes (`chore:`, `docs:`, `refactor:`, `test:`) won't trigger a version
 |---|---|
 | `release-please-config.json` | Release Please settings (release type, snapshot config, title pattern) |
 | `.release-please-manifest.json` | Tracks the current released version |
+
+## Documentation
+
+The documentation site (the one you're reading) is built with [MkDocs](https://www.mkdocs.org/) using the [Material](https://squidfunk.github.io/mkdocs-material/) theme. All content lives under `docs/`, and the site structure is configured in `mkdocs.yml`.
+
+### Updating prose content
+
+- Edit the relevant Markdown file in `docs/` (e.g. `docs/source/byte-array/byte-arr-source.md`).
+- To add a new page, create the `.md` file under `docs/` and register it in the `nav` section of `mkdocs.yml`.
+
+### Updating the API Reference
+
+The **API Reference** tab is Javadoc generated from the Java source. To update it:
+
+1. Edit the Javadoc comments on the relevant classes/methods in `src/main/java/...`.
+2. Regenerate the HTML:
+
+   ```bash
+   mvn javadoc:javadoc
+   ```
+
+   This writes to `docs/apidocs/` (gitignored — the HTML is regenerated on every build, so it is never committed).
+
+### Previewing locally
+
+```bash
+python3 -m mkdocs serve    # live-reload server at http://localhost:8000
+```
+
+### Deploying to GitHub Pages
+
+The site is hosted on the `gh-pages` branch under the `docs-site/` folder. It lives alongside the benchmark data (`dev/bench/`) — deployment only touches `docs-site/`.
+
+Run the deploy script from the repo root:
+
+```bash
+./development/scripts/deploy-docs/deploy-docs.sh
+```
+
+It regenerates the Javadoc, builds the MkDocs site, checks out `gh-pages` in a temporary git worktree, replaces the `docs-site/` folder, commits, and pushes. Optionally pass a custom commit message:
+
+```bash
+./development/scripts/deploy-docs/deploy-docs.sh "docs: add StreamNative auth example"
+```
+
+The site goes live within a minute at:
+
+- Docs: `https://numaproj-contrib.github.io/apache-pulsar-java/docs-site/`
+- API Reference: `https://numaproj-contrib.github.io/apache-pulsar-java/docs-site/apidocs/`
+
+## Commit sign-off (DCO)
+
+Like other Numaproj / CNCF projects, every commit must be **signed off** under the [Developer Certificate of Origin](https://developercertificate.org/). Signing off means adding a trailer line to your commit message like:
+
+```
+Signed-off-by: Jane Doe <jane@example.com>
+```
+
+The name and email must match your `git config user.name` / `user.email`. By adding it you're attesting that you wrote (or have the right to submit) the change under the project's license.
+
+Use `-s` (or the long form `--signoff`) when you commit and git appends the trailer for you:
+
+```bash
+git commit -s -m "feat: add batch message support"
+```
+
+Most contributors set up a short git alias so they never forget:
+
+```bash
+git config --global alias.cs 'commit -s'
+```
+
+Then day-to-day it's just:
+
+```bash
+git cs -m "feat: add batch message support"
+```

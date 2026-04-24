@@ -1,0 +1,54 @@
+site_name: Apache Pulsar Java
+repo_url: https://github.com/numaproj-contrib/apache-pulsar-java
+edit_uri: edit/main/docs/
+strict: true
+theme:
+  name: material
+  font:
+    text: Roboto
+    code: Roboto Mono
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.sections
+    - navigation.footer
+    - toc.integrate
+    - content.tabs.link
+    - content.code.copy
+extra_css:
+  - stylesheets/extra.css
+exclude_docs: |
+  apidocs/**/*.md
+markdown_extensions:
+  - codehilite
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+  - attr_list
+nav:
+  - Home: index.md
+  - StreamNative:
+      - Pulsar on StreamNative: get-started/pulsar-on-streamnative.md
+  - Source (Consumer): source/byte-array/byte-arr-source.md
+  - Sink (Producer): sink/byte-array/byte-arr-sink.md
+  - Logging:
+      - Logging: configuration/logging.md
+  - Testing: testing.md
+  - "Performance Charts ⧉": https://numaproj-contrib.github.io/apache-pulsar-java/dev/bench/
+  - Contributing: contributing.md
+  - API Reference: apidocs/index.html

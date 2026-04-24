@@ -17,8 +17,19 @@ import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Main entry point for the apache-pulsar-java container image.
+ * Runs as a Numaflow source (consumer) or sink (producer) based on which is enabled
+ * in the configuration file passed via --config=file:/path/to/application.yml.
+ */
 @Slf4j
 public class PulsarApplication {
+    /**
+     * Loads the configuration and starts either the consumer or the producer.
+     *
+     * @param args command-line arguments, must include --config=file:/path/to/application.yml
+     * @throws Exception if startup or the gRPC server fails
+     */
     public static void main(String[] args) throws Exception {
         Path configPath = getConfigPath(args);
         PulsarConfigLoader.LoadedPulsarConfig config = PulsarConfigLoader.loadConfig(configPath);

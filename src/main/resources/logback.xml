@@ -1,0 +1,37 @@
+<configuration>
+
+    <if condition='"true".equalsIgnoreCase(property("NUMAFLOW_DEBUG"))'>
+        <then>
+            <!-- Debug mode: plain-text output for human readability -->
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <encoder>
+                    <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                </encoder>
+            </appender>
+        </then>
+        <else>
+            <!-- Production (default): JSON output via logstash-logback-encoder -->
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampPattern>
+                    <timeZone>UTC</timeZone>
+                </encoder>
+            </appender>
+        </else>
+    </if>
+
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CONSOLE"/>
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <root level="${LOGGING_LEVEL_ROOT:-INFO}">
+        <appender-ref ref="ASYNC"/>
+    </root>
+
+    <!-- Package-level overrides via env vars -->
+    <logger name="io.numaproj.pulsar" level="${LOGGING_LEVEL_IO_NUMAPROJ_PULSAR:-${LOGGING_LEVEL_ROOT:-INFO}}"/>
+
+</configuration>

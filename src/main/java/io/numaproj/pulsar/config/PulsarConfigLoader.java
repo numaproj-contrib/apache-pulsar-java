@@ -19,20 +19,35 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Loads and parses the application.yml configuration into typed property objects.
+ * Resolves ${VAR} and ${VAR:default} placeholders against the process environment.
+ */
 public final class PulsarConfigLoader {
 
     // Pattern defines a regex used to find placeholders like ${VAR} or ${VAR:default} in config strings so they can be replaced
     // (e.g. authParams: "${PULSAR_AUTH_TOKEN}").
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}:]+)(?::([^}]*))?}");
 
-    // Loads Pulsar config from the given path.
+    /**
+     * Loads Pulsar config from a YAML file.
+     *
+     * @param configPath the path to the YAML config file
+     * @return the parsed config object
+     * @throws IOException if the file cannot be read
+     */
     public static LoadedPulsarConfig loadConfig(Path configPath) throws IOException {
         try (InputStream in = Files.newInputStream(configPath)) {
             return loadConfig(in);
         }
     }
 
-    // Loads Pulsar config from the given YAML input stream.
+    /**
+     * Loads Pulsar config from a YAML input stream.
+     *
+     * @param yamlInputStream the source of YAML content
+     * @return the parsed config object
+     */
     public static LoadedPulsarConfig loadConfig(InputStream yamlInputStream) {
         Yaml yaml = new Yaml();
 
@@ -202,6 +217,9 @@ public final class PulsarConfigLoader {
         return sb.toString();
     }
 
+    /**
+     * Bundle of all four config sections parsed from application.yml.
+     */
     @Getter
     @RequiredArgsConstructor
     public static final class LoadedPulsarConfig {

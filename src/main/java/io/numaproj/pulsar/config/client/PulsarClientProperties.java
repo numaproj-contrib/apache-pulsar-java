@@ -6,6 +6,10 @@ import lombok.Setter;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Holds the pulsar.client configuration parsed from application.yml.
+ * Default to an empty map.
+ */
 @Getter
 @Setter
 public class PulsarClientProperties {

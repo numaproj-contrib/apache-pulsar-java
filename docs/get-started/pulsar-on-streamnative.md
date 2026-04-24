@@ -1,82 +1,116 @@
+# Pulsar on StreamNative
 
-# Deploying a Pulsar Cluster with StreamNative and Using Numaflow to Produce and Consume Messages
+[StreamNative Cloud](https://docs.streamnative.io/docs/cloud-overview) is a fully managed Pulsar service available on AWS, GCP, and Azure. This guide walks through connecting a StreamNative cluster to Numaflow.
 
-## Introduction
+## Prerequisites
 
-This document demonstrates how to:  
-1. Deploy a Pulsar cluster using StreamNative  
-2. Connect the remote Pulsar cluster to a local Numaflow pipeline, and produce and consume messages  
+- [Numaflow installed](https://numaflow.numaproj.io/quick-start/) on your Kubernetes cluster
 
-### StreamNative
+## 1. Create a StreamNative Cluster
 
-StreamNative Cloud is a data streaming service, delivered as a fully managed Pulsar and Kafka service. It removes the complexity of managing Pulsar and Kafka. StreamNative provides two options—StreamNative Hosted or BYOC Cloud—to run Pulsar or Kafka in the cloud in a simple, fast, reliable, and cost-effective way.
+1. Go to [streamnative.io](https://streamnative.io/) and create an account at the [StreamNative Console](http://console.streamnative.cloud/)
+2. Follow the guided prompts to create an organization
 
-• Fully Hosted: StreamNative clusters hosted on StreamNative's public cloud account, available on AWS, GCP, and Azure. You can choose between Serverless and Dedicated clusters.  
-• Bring Your Own Cloud (BYOC): Host on your own public cloud account (AWS, GCP, or Azure), managed by StreamNative.
+    ![Create organization](img.png)
 
-[More info here](https://docs.streamnative.io/docs/cloud-overview)
+3. Follow steps 2–4 in the [StreamNative Quickstart Console](https://docs.streamnative.io/docs/quickstart-console)
 
-### Prerequisite
+    !!! warning
+        **Save your API key in step 3.** You'll need it for the Kubernetes Secret later.
 
-Ensure you have Numaflow installed. If not, see the Quick Start guide at https://numaflow.numaproj.io/quick-start/.
+## 2. Create a Topic
 
-### Getting Started with StreamNative
+Select an instance, tenant, and namespace in the top-left bar. This will allow you to select "Topics" from the 
+left side of the page:
 
-This guide focuses on using the StreamNative Cloud Console for management and interactions.
+![Select topics](img_7.png)
 
-1. Go to https://streamnative.io/  
-2. Create an account at the StreamNative Console: http://console.streamnative.cloud/  
-3. Follow the guided prompts to create an organization  
-   ![img.png](img.png)  
-4. Follow steps 2–4 in this document: https://docs.streamnative.io/docs/quickstart-console  
+Click "New Topic" and add a name and desired number of partitions. Remember your topic name — you'll need it for the ConfigMap later.
 
-   **In step 3, SAVE THE API KEY.**  
-5. Select an instance, tenant, and namespace in the top-left bar. This will allow you to select "Topics" from the left side of the page:  
-   ![img_7.png](img_7.png)  
-6. To test producing messages, we will test the UDSink. Go to [docs/sink/byte-array/manifests/api-key](https://github.com/numaproj-contrib/apache-pulsar-java/blob/master/docs/sink/byte-array/manifests/api-key), copy these template yaml files, we will be providing the corresponding service URL and topic name.  
-7. Click "New Topic" and add a name and desired number of partitions. Remember your topic name - you'll need it for the producer ConfigMap's `topicName` field. The format should be `persistent://tenant/namespace/topic`.  
-   ![img_8.png](img_8.png)  
-8. To get the service URL, select an instance, then click on the "Overview" tab. Copy the HTTP service URL (in red).  
-   ![img_9.png](img_9.png)  
-   ![img_11.png](img_11.png)
+![Create topic](img_8.png)
 
-9. **Update the ConfigMap** with your service URL (from step 8) and topic name (from step 7):
-    
-    Edit `docs/sink/byte-array/manifests/api-key/byte-arr-producer-config.yaml` and update the `serviceUrl` and `topicName` fields, then apply:
-    ```bash
-    kubectl apply -f docs/sink/byte-array/manifests/api-key/byte-arr-producer-config.yaml
-    ```
+## 3. Get the Service URL
 
-10. **Create the Kubernetes Secret with your API key:**
-    
-    Edit `docs/sink/byte-array/manifests/api-key/byte-arr-producer-secret.yaml` and replace `YOUR-API-KEY-HERE` with your actual API key from step 3, then apply:
-    ```bash
-    kubectl apply -f docs/sink/byte-array/manifests/api-key/byte-arr-producer-secret.yaml
-    ```
-    
-    **Using different authentication configurations:** This implementation supports various authentication methods (API tokens, OAuth2, Basic Auth, etc.) via the Secret/ConfigMap pattern. Simply add your sensitive credentials to the Secret as environment variables, reference them in the ConfigMap using `${ENV_VAR_NAME}` syntax, and apply both files. No Java code changes required!
-    
-    **Note:** For production environments, consider using cloud-native secret managers like AWS Secrets Manager, Google Secret Manager, Azure Key Vault, or HashiCorp Vault with the [External Secrets Operator](https://external-secrets.io/).
+Select your Pulsar instance from the left sidebar, then click the "Overview" tab.
 
-11. **Deploy the producer pipeline** (this generates one message every 10 seconds):
-    ```bash
-    kubectl apply -f docs/sink/byte-array/manifests/api-key/byte-arr-producer-pipeline.yaml
-    ```
-    
-    You should see changes to throughput and storage size in the StreamNative cluster dashboard.
+![Select instance overview](img_9.png)
 
-12. To see the messages produced, you can use the CLI or apply another pipeline for testing. Provide values for the required fields in the UDSource ConfigMap, which can be found at [docs/source/byte-array/manifests/api-key](https://github.com/numaproj-contrib/apache-pulsar-java/tree/master/docs/source/byte-array/manifests/api-key).  
-    
-    Refer to step 8 to get the URL for the admin, the topic name, and the API key. Use the same topic name and API key. Apply the pipeline to **consume** messages from the specified topic and log them. On checking the pod logs, you should see the same messages generated by the first pipeline.
+!!! tip "Copy the HTTP service URL"
+    Copy the **HTTP service URL** (highlighted in red below). You'll need this for both the `clientConfig.serviceUrl` and `adminConfig.serviceUrl` in your ConfigMap.
 
-13. **Avro schema validation (optional)**  
-    If you have an AVRO schema associated with your topic and want to enable schema validation, you can configure the pipeline ConfigMaps as follows:
+![Copy the HTTP service URL in red](img_11.png)
 
-    - **Producer:** In the **producer ConfigMap** (e.g. `byte-arr-producer-config.yaml`), set:
-      - `use-auto-produce-schema: true`
-      - `drop-invalid-messages: false`
-      The producer will validate messages against the topic's registered schema. **What “drop” means:** When `drop-invalid-messages` is **true**, messages that fail schema or serialization validation are **dropped**—the sink still returns success for those messages, they are not sent to Pulsar, and the pipeline **continues** without failing or retrying. When **false**, invalid messages are reported as failures and may be retried, so bad data does not silently disappear.
+## 4. Create the ConfigMap
 
-    - **Consumer:** In the **consumer/source ConfigMap**, set:
-      - `use-auto-consume-schema: true`
-      The consumer deserializes messages using the topic’s registered Avro schema. **When a message is invalid** (schema mismatch or corrupt payload), the consumer then throws a `RuntimeException` and **processing fails** for that read. The invalid message is not sent downstream and is not acknowledged, so it may be redelivered. 
+Update the `serviceUrl` and `topicName` fields with values from steps 2 and 3. The topic name format is `persistent://tenant/namespace/topic`. See the [Sink (Producer)](../sink/byte-array/byte-arr-sink.md) or [Source (Consumer)](../source/byte-array/byte-arr-source.md) guides for the full ConfigMap spec.
+
+```bash
+kubectl apply -f <path-to-config-map.yaml>
+```
+
+## 5. Create the Secret
+
+Create a Kubernetes Secret with the API key you saved in step 1:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pulsar-producer-auth-secret
+type: Opaque
+stringData:
+  PULSAR_AUTH_TOKEN: "YOUR-API-KEY-HERE"
+```
+
+```bash
+kubectl apply -f <path-to-secret.yaml>
+```
+
+!!! note "Other authentication methods"
+    This implementation supports API tokens, OAuth2, Basic Auth, and more via the Secret/ConfigMap pattern. Add your credentials to the Secret as environment variables, reference them in the ConfigMap using `${ENV_VAR_NAME}` syntax, and apply both. No code changes required.
+
+    For production, consider [External Secrets Operator](https://external-secrets.io/) with AWS Secrets Manager, Google Secret Manager, Azure Key Vault, or HashiCorp Vault.
+
+## 6. Deploy the Producer Pipeline
+
+This deploys a pipeline that generates one message every 10 seconds and publishes to your topic:
+
+```bash
+kubectl apply -f <path-to-producer-pipeline.yaml>
+```
+
+You should see throughput and storage changes in the StreamNative dashboard.
+
+## 7. Deploy the Consumer Pipeline
+
+To consume those messages, deploy a consumer pipeline using the [Source (Consumer)](../source/byte-array/byte-arr-source.md) guide. Use the same topic name and API key. Check the pod logs to see the messages produced by the first pipeline.
+
+## Schema Validation (Optional)
+
+If you have an Avro schema registered on your topic, you can enable schema validation. See the [Pulsar schema docs](https://pulsar.apache.org/docs/4.0.x/schema-overview/) for background.
+
+**Producer ConfigMap:**
+
+```yaml
+producer:
+  enabled: true
+  useAutoProduceSchema: true    # validate payloads against the topic's schema
+  dropInvalidMessages: false     # true = silently drop invalid messages; false = fail and retry
+  producerConfig:
+    topicName: "persistent://public/default/test-topic"
+```
+
+- `dropInvalidMessages: true` — invalid messages are dropped, pipeline continues
+- `dropInvalidMessages: false` — invalid messages are reported as failures and may be retried
+
+**Consumer ConfigMap:**
+
+```yaml
+consumer:
+  enabled: true
+  useAutoConsumeSchema: true     # deserialize using the topic's registered Avro schema
+  consumerConfig:
+    topicNames: "persistent://public/default/test-topic"
+```
+
+If a message is invalid (schema mismatch or corrupt payload), the consumer throws a `RuntimeException` and the message is not acknowledged, so it may be redelivered.

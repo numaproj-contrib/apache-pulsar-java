@@ -18,6 +18,11 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+/**
+ * Numaflow user-defined sink that publishes messages to a Pulsar topic.
+ * Supports Schema.BYTES (raw bytes) or Schema.AUTO_PRODUCE_BYTES (broker-validated payloads).
+ * The target topic must already exist; existence is checked on startup by PulsarProducerConfig.
+ */
 @Slf4j
 public class PulsarSink extends Sinker {
 
@@ -28,18 +33,38 @@ public class PulsarSink extends Sinker {
 
     private Server server;
 
+    /**
+     * Creates a new sink.
+     *
+     * @param producer           the Pulsar producer bound to the target topic
+     * @param pulsarClient       the Pulsar client, closed during cleanup
+     * @param producerProperties parsed pulsar.producer config
+     */
     public PulsarSink(Producer<byte[]> producer, PulsarClient pulsarClient, PulsarProducerProperties producerProperties) {
         this.producer = producer;
         this.pulsarClient = pulsarClient;
         this.producerProperties = producerProperties;
     }
 
+    /**
+     * Starts the Numaflow gRPC server and blocks until it terminates.
+     *
+     * @throws Exception if the gRPC server fails
+     */
     public void startServer() throws Exception {
         server = new Server(this);
         server.start();
         server.awaitTermination();
     }
 
+    /**
+     * Publishes every datum in the batch to Pulsar and waits for all acks before returning.
+     * Schema validation failures are either dropped or surfaced as per-message failures
+     * depending on producerProperties.dropInvalidMessages.
+     *
+     * @param datumIterator the datum iterator
+     * @return per-message responses to report back to Numaflow
+     */
     @Override
     public ResponseList processMessages(DatumIterator datumIterator) {
         ResponseList.ResponseListBuilder responseListBuilder = ResponseList.newBuilder();
@@ -104,6 +129,10 @@ public class PulsarSink extends Sinker {
         return false;
     }
 
+    /**
+     * Flushes buffered records and closes the producer and client.
+     * Errors are logged rather than thrown.
+     */
     public void cleanup() {
         try {
             if (producer != null) {

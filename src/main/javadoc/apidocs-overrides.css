@@ -1,0 +1,75 @@
+/*
+ * Custom Javadoc theme for apache-pulsar-java.
+ *
+ * Works by overriding the CSS custom properties that Javadoc's default
+ * stylesheet exposes in :root. This is the approach documented in
+ * Oracle's "Programmer's Guide to JavaDoc CSS Themes":
+ *   https://docs.oracle.com/en/java/javase/22/javadoc/programmers-guide-javadoc-css-themes.html
+ *
+ * Keep this file to variable overrides only. If you find yourself
+ * writing rule-by-rule overrides, stop and ask whether the outcome
+ * can be achieved by tweaking a variable instead — Javadoc guarantees
+ * these variables, but not its HTML structure, so variable-only
+ * theming survives Javadoc upgrades.
+ */
+
+:root {
+  /* Typography. The mono stack leads with the well-hinted "nice" fonts
+     (SF Mono on macOS, JetBrains/Fira Code if a dev has them installed)
+     so we never fall back to Courier New on Chrome. */
+  --body-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --block-font-family: var(--body-font-family);
+  --code-font-family: "SF Mono", "SFMono-Regular", "JetBrains Mono",
+    "Fira Code", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  --body-font-size: 15.5px;
+  --code-font-size: 14px;
+
+  /* Text colors */
+  --body-text-color: #212121;
+  --block-text-color: #212121;
+  --title-color: #212121;
+  --navbar-text-color: #212121;
+
+  /* Backgrounds */
+  --body-background-color: #ffffff;
+  --section-background-color: #ffffff;
+  --detail-background-color: #ffffff;
+  --navbar-background-color: #eef0f6;   /* top nav — tinted so it separates from page body */
+  --subnav-background-color: #e6e9f2;   /* sub nav + table headers — slightly deeper */
+
+  /* Selected tab ("Packages", active nav item) — was bright orange */
+  --selected-background-color: #3f51b5; /* indigo */
+  --selected-text-color: #ffffff;
+  --selected-link-color: #ffffff;
+
+  /* Summary table zebra striping (more visible than the default near-whites) */
+  --even-row-color: #ffffff;
+  --odd-row-color: #f0f2f7;
+
+  /* Links */
+  --link-color: #3f51b5;
+  --link-color-active: #1a237e;
+
+  /* Borders */
+  --border-color: #cfd4de;
+  --table-border-color: #cfd4de;
+
+  /* Code snippets */
+  --snippet-background-color: #f2f4f9;
+  --snippet-text-color: var(--block-text-color);
+  --snippet-highlight-color: #fff3bf;
+
+  /* Search input */
+  --search-input-background-color: #ffffff;
+  --search-input-text-color: #212121;
+  --search-input-placeholder-color: #9e9e9e;
+  --search-tag-highlight-color: #fff3bf;
+
+  /* Misc */
+  --copy-icon-brightness: 60%;
+  --copy-button-background-color-active: rgba(63, 81, 181, 0.15);
+  --invalid-tag-background-color: #ffe6e6;
+  --invalid-tag-text-color: #212121;
+}
