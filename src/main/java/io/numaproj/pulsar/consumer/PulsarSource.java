@@ -25,12 +25,17 @@ import org.apache.pulsar.common.policies.data.SubscriptionStats;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Numaflow user-defined source that reads messages from one or more Pulsar topics.
+ * Supports raw byte[] messages (Schema.BYTES) or schema-validated messages (Schema.AUTO_CONSUME),
+ * selected via PulsarConsumerProperties.useAutoConsumeSchema.
+ * Pulsar message metadata is forwarded to Numaflow as x-pulsar-* headers.
+ */
 @Slf4j
 public class PulsarSource extends Sourcer {
 
@@ -45,18 +50,37 @@ public class PulsarSource extends Sourcer {
     private final PulsarConsumerProperties pulsarConsumerProperties;
     private Server server;
 
+    /**
+     * Creates a new source.
+     *
+     * @param pulsarConsumerManager    factory for the byte-array or GenericRecord consumer
+     * @param pulsarAdmin              admin client used to query topic partitions and backlog
+     * @param pulsarConsumerProperties parsed pulsar.consumer section of the config
+     */
     public PulsarSource(PulsarConsumerManager pulsarConsumerManager, PulsarAdmin pulsarAdmin, PulsarConsumerProperties pulsarConsumerProperties) {
         this.pulsarConsumerManager = pulsarConsumerManager;
         this.pulsarAdmin = pulsarAdmin;
         this.pulsarConsumerProperties = pulsarConsumerProperties;
     }
 
+    /**
+     * Starts the Numaflow gRPC server and blocks until it terminates.
+     *
+     * @throws Exception if the gRPC server fails
+     */
     public void startServer() throws Exception {
         server = new Server(this);
         server.start();
         server.awaitTermination();
     }
 
+    /**
+     * Reads a batch of messages from the configured Pulsar topic(s) and forwards them to Numaflow.
+     * Returns early without reading if the previous batch has not yet been acknowledged.
+     *
+     * @param request  the read request (count and timeout)
+     * @param observer output channel that emits messages back to Numaflow
+     */
     @Override
     public void read(ReadRequest request, OutputObserver observer) {
         if (!messagesToAck.isEmpty()) {
@@ -122,31 +146,11 @@ public class PulsarSource extends Sourcer {
         }
     }
 
-    /**
-     * Extracts the partition index from a Pulsar topic name.
-     * Partitioned topics have the format "persistent://tenant/ns/topic-partition-N".
-     * Returns 0 for non-partitioned topics.
-     */
-    private static int extractPartitionIndex(String topicName) {
-        int idx = topicName.lastIndexOf("-partition-");
-        if (idx < 0) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(topicName.substring(idx + "-partition-".length()));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
     /** Builds offset and headers, sends the message to the observer, and records it for ack. */
     private void sendMessage(org.apache.pulsar.client.api.Message<?> pMsg, byte[] payloadBytes, OutputObserver observer) {
         String topicMessageIdKey = pMsg.getTopicName() + pMsg.getMessageId().toString();
         byte[] offsetBytes = topicMessageIdKey.getBytes(StandardCharsets.UTF_8);
-        // Offset offset = new Offset(offsetBytes);
-        // Extract partition from Pulsar message topic name
-        int partition = extractPartitionIndex(pMsg.getTopicName());
-        Offset offset = new Offset(offsetBytes, partition);
+        Offset offset = new Offset(offsetBytes);
         Map<String, String> headers = buildHeaders(pMsg);
         observer.send(new Message(payloadBytes, offset, Instant.now(), headers));
         messagesToAck.put(topicMessageIdKey, pMsg);
@@ -187,6 +191,12 @@ public class PulsarSource extends Sourcer {
         return sb.toString();
     }
 
+    /**
+     * Acknowledges all messages delivered in the previous read call.
+     * The ack request offsets must match the messages from the previous read; otherwise the ack is skipped.
+     *
+     * @param request the ack request containing the offsets to acknowledge
+     */
     @Override
     public void ack(AckRequest request) {
         // Offsets are topicName + messageId (same as messagesToAck key).
@@ -247,12 +257,22 @@ public class PulsarSource extends Sourcer {
         return headers;
     }
 
+    /**
+     * Not yet implemented.
+     *
+     * @throws UnsupportedOperationException always
+     */
     @Override
     public void nack(NackRequest request) {
         // TODO : implement nack logic
         throw new UnsupportedOperationException("Unimplemented method 'nack'");
     }
 
+    /**
+     * Returns the total subscription backlog across all configured topics.
+     *
+     * @return the total number of un-acknowledged messages, or -1 if the admin call fails
+     */
     @Override
     public long getPending() {
         try {
@@ -270,13 +290,6 @@ public class PulsarSource extends Sourcer {
             log.error("Error while fetching admin stats for pending messages", e);
             return -1;
         }
-    }
-
-    /** Returns the effective partition count for a topic (at least 1 for non-partitioned topics). */
-    private int getEffectivePartitionCount(String topicName) throws PulsarAdminException {
-        var metadata = pulsarAdmin.topics().getPartitionedTopicMetadata(topicName);
-        int partitions = (metadata != null) ? metadata.partitions : 0;
-        return Math.max(partitions, 1);
     }
 
     private long getBacklogForTopic(String topicName, String subscriptionName) throws PulsarAdminException {
@@ -303,46 +316,26 @@ public class PulsarSource extends Sourcer {
         return subscriptionStats != null ? subscriptionStats.getMsgBacklog() : 0;
     }
 
+    /**
+     * Returns the partition(s) this source replica is responsible for, which Numaflow uses to route watermarks.
+     * <p>
+     * Pulsar's subscription model dispatches messages across consumers dynamically; with a Shared
+     * subscription any consumer can receive from any topic partition, so there is no stable binding
+     * between a consumer and a specific set of Pulsar partitions to report here. Instead, each
+     * replica of this source reports itself as a single logical partition, mirroring what
+     * Numaflow's upstream Rust Pulsar source does (see {@code numaflow/rust/extns/numaflow-pulsar}).
+     *
+     * @return a singleton list containing this replica's index (from {@code NUMAFLOW_REPLICA})
+     */
     @Override
     public List<Integer> getActivePartitions() {
-        try {
-            Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            List<Integer> partitionIndexes = new ArrayList<>();
-            int globalIndex = 0;
-            for (String topicName : topicNames) {
-                int effectivePartitions = getEffectivePartitionCount(topicName);
-                log.info("Number of partitions reported for topic {}: {}", topicName, effectivePartitions);
-                for (int i = 0; i < effectivePartitions; i++) {
-                    partitionIndexes.add(globalIndex++);
-                }
-            }
-            if (partitionIndexes.isEmpty()) {
-                partitionIndexes.add(0);
-            }
-            log.info("Active partitions: {}", partitionIndexes);
-            return partitionIndexes;
-        } catch (Exception e) {
-            log.error("Error while retrieving partition information. Falling back to default partitions.", e);
-            return defaultPartitions();
-        }
+        return defaultPartitions();
     }
 
-    @Override
-    public Integer getTotalPartitions() {
-        try {
-            Set<String> topicNames = (Set<String>) pulsarConsumerProperties.getConsumerConfig().get("topicNames");
-            int total = 0;
-            for (String topicName : topicNames) {
-                total += getEffectivePartitionCount(topicName);
-            }
-            log.info("Total partitions across {} topic(s): {}", topicNames.size(), total);
-            return total;
-        } catch (PulsarAdminException e) {
-            log.error("Error retrieving total partition count", e);
-            return null;
-        }
-    }
-
+    /**
+     * Closes the underlying Pulsar consumers, client, and admin.
+     * Errors during shutdown are logged rather than thrown.
+     */
     public void cleanup() {
         try {
             pulsarConsumerManager.cleanup();

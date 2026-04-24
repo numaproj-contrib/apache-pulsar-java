@@ -42,3 +42,9 @@ development/scripts/register-schema/
 
 ### Performance testing generated configs ###
 development/performance-testing/running-configs/
+
+### MkDocs build output ###
+site/
+
+### Generated Javadoc bundled into MkDocs site ###
+docs/apidocs/
